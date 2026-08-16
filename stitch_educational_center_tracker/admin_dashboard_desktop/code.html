@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Center Tracker - Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#1b4332",
+                        "on-surface-variant": "#414844",
+                        "outline-variant": "#c1c8c2",
+                        "primary": "#012d1d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#274e3d",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary": "#0e6c4a",
+                        "secondary-fixed-dim": "#85d7ad",
+                        "inverse-on-surface": "#ecf2f0",
+                        "inverse-primary": "#a5d0b9",
+                        "tertiary": "#242623",
+                        "secondary-container": "#a0f4c8",
+                        "on-tertiary-fixed-variant": "#454744",
+                        "surface-container-low": "#eff5f3",
+                        "outline": "#717973",
+                        "surface-variant": "#dee4e2",
+                        "surface-bright": "#f5fbf9",
+                        "secondary-fixed": "#a0f4c8",
+                        "surface": "#f5fbf9",
+                        "on-surface": "#171d1c",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-background": "#171d1c",
+                        "surface-container": "#e9efed",
+                        "surface-tint": "#3f6653",
+                        "tertiary-container": "#3a3c39",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c7c2",
+                        "surface-dim": "#d5dbd9",
+                        "background": "#f5fbf9",
+                        "on-secondary-fixed": "#002113",
+                        "tertiary-fixed": "#e2e3de",
+                        "on-tertiary-container": "#a5a6a2",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#dee4e2",
+                        "on-primary-container": "#86af99",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2c3231",
+                        "on-secondary-fixed-variant": "#005236",
+                        "primary-fixed-dim": "#a5d0b9",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#c1ecd4",
+                        "on-secondary-container": "#19724f",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#002114",
+                        "on-tertiary-fixed": "#1a1c19"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "1.25rem",
+                        "stack-md": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "1.5rem",
+                        "gutter-mobile": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "30px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #F7F7F2; /* Overriding slightly for the soft off-white feel described in instructions if needed, but sticking to config colors primarily */
+            /* Using config background class instead to adhere strictly */
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-lg">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-outline flex justify-between items-center px-margin-mobile h-12 w-full docked full-width top-0 z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" data-icon="account_balance">account_balance</span>
+<span class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim">Center Tracker</span>
+</div>
+<!-- Desktop Nav items injected from BottomNavBar logic for desktop context -->
+<nav class="hidden md:flex gap-4">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200 rounded-full" href="#">
+<span class="material-symbols-outlined text-sm mb-1" data-icon="add_box">add_box</span>
+<span class="font-label-md text-label-md">New Entry</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-secondary text-on-primary-container dark:text-on-secondary rounded-full px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-sm mb-1" data-icon="list_alt">list_alt</span>
+<span class="font-label-md text-label-md">Records</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200 rounded-full" href="#">
+<span class="material-symbols-outlined text-sm mb-1" data-icon="group">group</span>
+<span class="font-label-md text-label-md">Manage</span>
+</a>
+</nav>
+</header>
+<div class="flex flex-1 overflow-hidden relative">
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-stack-lg">
+<div class="flex justify-between items-end mb-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Overview</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Today's snapshot and recent activity.</p>
+</div>
+<button class="md:hidden flex items-center justify-center bg-[#1B4332] text-white px-4 py-2 rounded-lg font-label-md text-label-md gap-2 h-12 shadow-sm">
+<span class="material-symbols-outlined text-sm">add</span> New
+                </button>
+</div>
+<!-- Stats Row -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Stat Card 1 -->
+<div class="bg-surface-container-lowest border border-[#E5E5E0] rounded-xl p-6 flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Attendance Today</span>
+<div class="p-2 bg-secondary-container rounded-full text-on-secondary-container">
+<span class="material-symbols-outlined text-sm">how_to_reg</span>
+</div>
+</div>
+<div>
+<span class="font-headline-lg text-headline-lg text-on-surface">142</span>
+<span class="font-body-md text-body-md text-on-surface-variant ml-2">/ 150</span>
+</div>
+</div>
+<!-- Stat Card 2 -->
+<div class="bg-surface-container-lowest border border-[#E5E5E0] rounded-xl p-6 flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Pending Collections</span>
+<div class="p-2 bg-surface-container-high rounded-full text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">pending_actions</span>
+</div>
+</div>
+<div>
+<span class="font-headline-lg text-headline-lg text-on-surface">12</span>
+<span class="font-body-md text-body-md text-on-surface-variant ml-2 text-error">Requires action</span>
+</div>
+</div>
+<!-- Stat Card 3 -->
+<div class="bg-surface-container-lowest border border-[#E5E5E0] rounded-xl p-6 flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Revenue This Week</span>
+<div class="p-2 bg-secondary-container rounded-full text-on-secondary-container">
+<span class="material-symbols-outlined text-sm">payments</span>
+</div>
+</div>
+<div>
+<span class="font-headline-lg text-headline-lg text-on-surface">$4,250</span>
+<span class="font-body-md text-body-md text-on-surface-variant ml-2">+5% from last week</span>
+</div>
+</div>
+</div>
+<!-- Main Records Layout (Bento-ish) -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 mt-4">
+<!-- Records List -->
+<div class="lg:col-span-2 bg-surface-container-lowest border border-[#E5E5E0] rounded-xl flex flex-col overflow-hidden">
+<div class="p-4 border-b border-[#E5E5E0] flex justify-between items-center bg-surface-bright">
+<h2 class="font-headline-md text-headline-md text-on-surface">Recent Records</h2>
+<div class="flex gap-2">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="pl-9 pr-4 py-2 border-b border-outline-variant bg-surface focus:border-primary focus:ring-0 font-body-md text-body-md w-48 text-on-surface placeholder-on-surface-variant h-10 transition-colors" placeholder="Search..." type="text"/>
+</div>
+<button class="p-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-0">
+<!-- List Item 1 -->
+<div class="flex items-center justify-between p-4 border-b border-[#E5E5E0] hover:bg-surface-bright transition-colors">
+<div class="flex items-center gap-4">
+<img class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A small, professional avatar portrait of a person in a corporate setting. The lighting is soft and neutral, enhancing a clean, modern aesthetic with a warm white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5fTlcs3Gk26L4ZRTqd75tSTYtE_2Oylspg1Ruky5X9Bt7loIy7S55k2f8zmAoox8f-SvbOAsSQ7-TwxQIHmIWrjr0_UONWIiHETJLNR-kt6cOdY_h0aUKFrvVjau9lfPwdWBPhi51amMqytdOh12vNa5wSP0aaEmeYlGQqG4MTfsa3ocBsdN93h58ZEz3NJ5imvvzY_dYucfOZpu6PkBUfHjD7X6v2CKnd0OWfmf5UVvUToFH-kVoog"/>
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-semibold">Sarah Jenkins</p>
+<p class="font-body-md text-body-md text-on-surface-variant">Class A - Attendance</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="px-3 py-1 rounded-full bg-secondary-fixed-dim bg-opacity-20 text-[#0e6c4a] font-label-md text-label-md">Present</span>
+<span class="font-body-md text-body-md text-on-surface-variant text-right w-16">09:00 AM</span>
+</div>
+</div>
+<!-- List Item 2 -->
+<div class="flex items-center justify-between p-4 border-b border-[#E5E5E0] hover:bg-surface-bright transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-headline-md text-headline-md">
+                                    MJ
+                                </div>
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-semibold">Marcus Johnson</p>
+<p class="font-body-md text-body-md text-on-surface-variant">Collection - Monthly Fee</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="px-3 py-1 rounded-full bg-surface-variant text-on-surface-variant font-label-md text-label-md">Pending</span>
+<span class="font-body-md text-body-md text-on-surface-variant text-right w-16">Oct 12</span>
+</div>
+</div>
+<!-- List Item 3 -->
+<div class="flex items-center justify-between p-4 border-b border-[#E5E5E0] hover:bg-surface-bright transition-colors">
+<div class="flex items-center gap-4">
+<img class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A small, professional avatar portrait of a person in a corporate setting. The lighting is soft and neutral, enhancing a clean, modern aesthetic with a warm white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKFTh3QEz5vdxZ3_dvNfbgHhFZKyQ7Wuuo8BwjhaAviSQyWVIEAxPGkgFM7yxR2kByqe0KaB0EoTZ8dlRIqRJTwRuEOAtz5pYtzBc-4-6w-C_SsC-e8OQbTN6FL-KtfeMbWidyD_gPOx0xRSNOr49nH3M0kfFAYhVvuawsoq0OJBTaOlhXsibRuQo20WfHnI_KZNeRTm9mh1KJKHcD34BhUBxw0AtWN4-H1Dw7ENgAUQGv0_3XvG01tA"/>
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-semibold">Emily Chen</p>
+<p class="font-body-md text-body-md text-on-surface-variant">Class B - Attendance</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="px-3 py-1 rounded-full bg-secondary-fixed-dim bg-opacity-20 text-[#0e6c4a] font-label-md text-label-md">Present</span>
+<span class="font-body-md text-body-md text-on-surface-variant text-right w-16">09:15 AM</span>
+</div>
+</div>
+<!-- List Item 4 -->
+<div class="flex items-center justify-between p-4 hover:bg-surface-bright transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-headline-md text-headline-md">
+                                    DT
+                                </div>
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-semibold">David Thompson</p>
+<p class="font-body-md text-body-md text-on-surface-variant">Collection - Registration</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="px-3 py-1 rounded-full bg-secondary-fixed-dim bg-opacity-20 text-[#0e6c4a] font-label-md text-label-md">Paid</span>
+<span class="font-body-md text-body-md text-on-surface-variant text-right w-16">Oct 11</span>
+</div>
+</div>
+</div>
+</div>
+<!-- New Entry Quick Form (Sidebar overlay style on large screens) -->
+<div class="lg:col-span-1 bg-surface-container-lowest border border-[#E5E5E0] rounded-xl flex flex-col p-6 shadow-[0px_4px_12px_rgba(27,67,50,0.05)] h-fit sticky top-6 hidden md:flex">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-6 border-b border-outline-variant pb-4">Quick Entry</h2>
+<form class="flex flex-col gap-4">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface-variant">Record Type</label>
+<select class="h-12 border-b border-outline-variant bg-surface-bright focus:border-primary focus:ring-0 font-body-md text-body-md text-on-surface transition-colors px-2">
+<option>Attendance</option>
+<option>Collection</option>
+<option>Note</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface-variant">Student / Entity</label>
+<input class="h-12 border-b border-outline-variant bg-surface-bright focus:border-primary focus:ring-0 font-body-md text-body-md text-on-surface placeholder-on-surface-variant transition-colors px-2" placeholder="Start typing name..." type="text"/>
+</div>
+<div class="flex flex-col gap-1 mt-2">
+<label class="font-label-md text-label-md text-on-surface-variant">Details</label>
+<textarea class="border-b border-outline-variant bg-surface-bright focus:border-primary focus:ring-0 font-body-md text-body-md text-on-surface placeholder-on-surface-variant transition-colors p-2 resize-none" placeholder="Add any relevant notes..." rows="3"></textarea>
+</div>
+<button class="mt-4 bg-[#1B4332] text-white font-label-md text-label-md h-12 rounded-lg hover:bg-primary transition-colors flex justify-center items-center gap-2 w-full" type="button">
+<span class="material-symbols-outlined text-sm">save</span>
+                            Save Entry
+                        </button>
+</form>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface dark:bg-surface-dim px-gutter-mobile border-t border-outline-variant dark:border-outline shadow-sm dark:shadow-none z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 scale-95 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-xl mb-1" data-icon="add_box">add_box</span>
+<span class="font-label-md text-label-md">New Entry</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-secondary text-on-primary-container dark:text-on-secondary rounded-full px-4 py-1 scale-95 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-xl mb-1" data-icon="list_alt">list_alt</span>
+<span class="font-label-md text-label-md">Records</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 scale-95 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-xl mb-1" data-icon="group">group</span>
+<span class="font-label-md text-label-md">Manage</span>
+</a>
+</nav>
+</body></html>

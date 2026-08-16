@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Assistant Schedule</title>
+    <!-- Material Symbols Outlined -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#1b4332",
+                        "on-surface-variant": "#414844",
+                        "outline-variant": "#c1c8c2",
+                        "primary": "#012d1d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#274e3d",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary": "#0e6c4a",
+                        "secondary-fixed-dim": "#85d7ad",
+                        "inverse-on-surface": "#ecf2f0",
+                        "inverse-primary": "#a5d0b9",
+                        "tertiary": "#242623",
+                        "secondary-container": "#a0f4c8",
+                        "on-tertiary-fixed-variant": "#454744",
+                        "surface-container-low": "#eff5f3",
+                        "outline": "#717973",
+                        "surface-variant": "#dee4e2",
+                        "surface-bright": "#f5fbf9",
+                        "secondary-fixed": "#a0f4c8",
+                        "surface": "#f5fbf9",
+                        "on-surface": "#171d1c",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-background": "#171d1c",
+                        "surface-container": "#e9efed",
+                        "surface-tint": "#3f6653",
+                        "tertiary-container": "#3a3c39",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c7c2",
+                        "surface-dim": "#d5dbd9",
+                        "background": "#f5fbf9",
+                        "on-secondary-fixed": "#002113",
+                        "tertiary-fixed": "#e2e3de",
+                        "on-tertiary-container": "#a5a6a2",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#dee4e2",
+                        "on-primary-container": "#86af99",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2c3231",
+                        "on-secondary-fixed-variant": "#005236",
+                        "primary-fixed-dim": "#a5d0b9",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#c1ecd4",
+                        "on-secondary-container": "#19724f",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#002114",
+                        "on-tertiary-fixed": "#1a1c19"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "1.25rem",
+                        "stack-md": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "1.5rem",
+                        "gutter-mobile": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "30px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Inter', sans-serif;
+            background-color: #f5fbf9; /* surface */
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .loading-spinner {
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border-left-color: var(--tw-colors-primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="text-on-background min-h-screen flex flex-col antialiased">
+
+    <!-- Top Header -->
+    <header class="w-full bg-surface-container-lowest border-b border-outline-variant py-4 px-margin-mobile flex flex-col gap-4 sticky top-0 z-10 shadow-sm">
+        <div class="flex items-center gap-2 justify-center">
+            <span class="material-symbols-outlined text-primary text-[28px]">event_available</span>
+            <h1 class="font-headline-md text-primary">Assistant Schedule</h1>
+        </div>
+        
+        <!-- Filter/Search -->
+        <div class="relative max-w-md mx-auto w-full">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span class="material-symbols-outlined text-on-surface-variant text-[20px]">search</span>
+            </div>
+            <input type="text" id="assistant_search" placeholder="Type your name to filter..." class="block w-full bg-surface-container-low border border-outline-variant rounded-full py-2 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors">
+        </div>
+    </header>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-grow px-margin-mobile pt-stack-md pb-stack-lg max-w-2xl mx-auto w-full">
+        
+        <!-- Status Indicator -->
+        <div id="connection_status" class="flex items-center justify-center gap-2 mb-4 text-xs font-label-md text-on-surface-variant">
+            <div class="w-2 h-2 rounded-full bg-outline-variant" id="status_dot"></div>
+            <span id="status_text">Connecting to schedule...</span>
+        </div>
+
+        <div id="schedule_loading" class="flex justify-center py-12">
+            <div class="loading-spinner"></div>
+        </div>
+
+        <!-- Schedule List -->
+        <div id="schedule_list" class="flex flex-col gap-stack-md">
+            <!-- Populated from Supabase -->
+        </div>
+
+    </main>
+
+    <!-- Application Script -->
+    <script>
+        // --- Supabase Initialization ---
+        const SUPABASE_URL = 'https://guscxutiucotybrzrlgr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1c2N4dXRpdWNvdHlicnpybGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyNTc1NjUsImV4cCI6MjA4NDgzMzU2NX0.6NeQYrtjOy-V2TfLjJJPfH0HE0BuHS7gejBkq1Mlllo';
+        
+        let supabaseClient;
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch(e) {
+            console.error("Failed to initialize Supabase client:", e);
+        }
+
+        let allSchedules = [];
+
+        async function fetchSchedule() {
+            try {
+                updateStatus('fetching');
+                const { data, error } = await supabaseClient
+                    .from('schedule')
+                    .select('*')
+                    .gte('date', new Date().toISOString().split('T')[0]) // Optional: only show today and future
+                    .order('date', { ascending: true })
+                    .order('time', { ascending: true });
+
+                if (error) throw error;
+                
+                allSchedules = data || [];
+                document.getElementById('schedule_loading').classList.add('hidden');
+                renderScheduleList();
+                updateStatus('connected');
+            } catch (err) {
+                console.error("Error fetching schedule:", err);
+                updateStatus('error');
+            }
+        }
+
+        function updateStatus(state) {
+            const dot = document.getElementById('status_dot');
+            const text = document.getElementById('status_text');
+            
+            if(state === 'fetching') {
+                dot.className = "w-2 h-2 rounded-full bg-secondary-fixed-dim animate-pulse";
+                text.textContent = "Syncing schedule...";
+            } else if(state === 'connected') {
+                dot.className = "w-2 h-2 rounded-full bg-secondary";
+                text.textContent = "Live Updates Active";
+            } else if (state === 'error') {
+                dot.className = "w-2 h-2 rounded-full bg-error";
+                text.textContent = "Connection Error. Retrying...";
+            }
+        }
+
+        function updateCountdowns() {
+            const now = new Date();
+            document.querySelectorAll('.countdown-timer').forEach(el => {
+                const dateStr = el.getAttribute('data-date');
+                const timeStr = el.getAttribute('data-time');
+                if (!dateStr || !timeStr) {
+                    el.innerHTML = '';
+                    return;
+                }
+                
+                // Parse date and time
+                const [y, m, d] = dateStr.split('-');
+                const [h, min, s] = timeStr.split(':');
+                const target = new Date(y, m - 1, d, h || 0, min || 0, s || 0);
+                
+                const diffMs = target - now;
+                
+                if (diffMs < 0) {
+                    const diffMins = Math.floor(Math.abs(diffMs) / 60000);
+                    let startedText = "Started";
+                    if (diffMins > 0) {
+                        const hStr = Math.floor(diffMins / 60);
+                        const mStr = diffMins % 60;
+                        if (hStr > 0) {
+                            startedText += ` ${hStr}h ${mStr}m ago`;
+                        } else {
+                            startedText += ` ${mStr}m ago`;
+                        }
+                    } else {
+                        startedText += ` just now`;
+                    }
+                    el.innerHTML = `<span class="text-error font-medium">${startedText}</span>`;
+                } else {
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const hStr = Math.floor(diffSec / 3600);
+                    const mStr = Math.floor((diffSec % 3600) / 60);
+                    const sStr = diffSec % 60;
+                    let text = "Starts in: ";
+                    if (hStr > 0) text += `${hStr}h `;
+                    if (mStr > 0 || hStr > 0) text += `${mStr}m `;
+                    text += `${sStr}s`;
+                    el.innerHTML = `<span class="text-secondary font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>${text}</span>`;
+                }
+            });
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            const [h, m] = timeStr.split(':');
+            let hour = parseInt(h, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12;
+            return `${hour}:${m} ${ampm}`;
+        }
+
+        function renderScheduleList() {
+            const listContainer = document.getElementById('schedule_list');
+            const searchVal = document.getElementById('assistant_search').value.toLowerCase().trim();
+            
+            // Filter
+            let filtered = allSchedules;
+            if (searchVal) {
+                filtered = allSchedules.filter(s => {
+                    return (s.assistants || []).some(a => a.toLowerCase().includes(searchVal));
+                });
+            }
+
+            // Before grouping, sort by date and time (fallback in case supabase sorting isn't perfect for realtime inserts)
+            filtered.sort((a, b) => {
+                const dateA = a.date || '';
+                const dateB = b.date || '';
+                if (dateA !== dateB) return dateA.localeCompare(dateB);
+                const timeA = a.time || '';
+                const timeB = b.time || '';
+                return timeA.localeCompare(timeB);
+            });
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `
+                <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4">
+                    <span class="material-symbols-outlined text-[48px] text-outline-variant mb-2">event_busy</span>
+                    <p class="text-on-surface font-body-lg">No assignments found.</p>
+                    ${searchVal ? `<p class="text-on-surface-variant font-body-md mt-1">Try a different name.</p>` : ''}
+                </div>`;
+                return;
+            }
+
+            // Group by date
+            const grouped = {};
+            filtered.forEach(s => {
+                if(!grouped[s.date]) grouped[s.date] = [];
+                grouped[s.date].push(s);
+            });
+
+            const html = [];
+            Object.keys(grouped).sort().forEach(date => {
+                // Determine if date is today
+                const isToday = (date === new Date().toISOString().split('T')[0]);
+                const dateObj = new Date(date);
+                // Adjust for local time mapping if needed, but assuming yyyy-mm-dd matches local
+                const dateFormatted = dateObj.toLocaleDateString(undefined, {weekday: 'long', month:'long', day:'numeric'});
+                
+                const dateLabelClass = isToday 
+                    ? "font-label-md text-primary bg-primary-fixed px-3 py-1 rounded-full inline-block uppercase tracking-wider shadow-sm"
+                    : "font-label-md text-on-surface-variant px-1 inline-block uppercase tracking-wider";
+
+                const datePrefix = isToday ? "Today: " : "";
+
+                html.push(`<div class="mt-6 mb-3 sticky top-[104px] z-0"><h2 class="${dateLabelClass}">${datePrefix}${dateFormatted}</h2></div>`);
+                
+                grouped[date].forEach(item => {
+                    const assistantsTags = (item.assistants || []).map(a => {
+                        const isMatch = searchVal && a.toLowerCase().includes(searchVal);
+                        const tagClass = isMatch 
+                            ? "inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-3 py-1.5 rounded-lg text-sm font-semibold border border-secondary"
+                            : "inline-flex items-center gap-1 bg-surface-variant text-on-surface px-3 py-1.5 rounded-lg text-sm border border-outline-variant/50";
+                        return `<span class="${tagClass}">${a}</span>`;
+                    }).join('');
+
+                    let centerDisplay = `<h3 class="font-headline-md text-on-surface">${item.center}</h3>`;
+                    if (item.address) {
+                        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`;
+                        centerDisplay = `<a href="${mapsUrl}" target="_blank" class="font-headline-md text-primary hover:underline hover:text-primary-fixed transition-colors">${item.center}</a>`;
+                    }
+
+                    const timeDisplay = item.time 
+                        ? `<div class="font-label-md text-on-surface-variant flex items-center gap-1 mt-1"><span class="material-symbols-outlined text-[16px]">schedule</span> ${formatTime(item.time)}</div><div class="countdown-timer font-label-sm mt-1" data-date="${date}" data-time="${item.time}"></div>` 
+                        : '';
+
+                    html.push(`
+                    <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm relative transition-all duration-300">
+                        <div class="flex items-start gap-3 mb-3">
+                            <span class="material-symbols-outlined text-secondary-fixed-dim bg-secondary/10 p-2 rounded-lg mt-1">storefront</span>
+                            <div>
+                                ${centerDisplay}
+                                ${timeDisplay}
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <p class="font-label-md text-outline mb-2">ASSIGNED ASSISTANTS</p>
+                            <div class="flex flex-wrap gap-2">${assistantsTags}</div>
+                        </div>
+                    </article>
+                    `);
+                });
+            });
+
+            listContainer.innerHTML = html.join('');
+            updateCountdowns();
+        }
+
+        // Search Input Listener
+        document.getElementById('assistant_search').addEventListener('input', renderScheduleList);
+
+        // Realtime Subscription
+        if (supabaseClient) {
+            supabaseClient
+                .channel('public:schedule')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule' }, payload => {
+                    console.log("Realtime update received:", payload);
+                    if (payload.eventType === 'INSERT') {
+                        allSchedules.push(payload.new);
+                    } else if (payload.eventType === 'DELETE') {
+                        allSchedules = allSchedules.filter(s => s.id !== payload.old.id);
+                    } else if (payload.eventType === 'UPDATE') {
+                        const index = allSchedules.findIndex(s => s.id === payload.new.id);
+                        if (index !== -1) allSchedules[index] = payload.new;
+                    }
+                    renderScheduleList();
+                })
+                .subscribe((status) => {
+                    if(status === 'SUBSCRIBED') {
+                        updateStatus('connected');
+                    }
+                });
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSchedule();
+            setInterval(updateCountdowns, 1000);
+        });
+
+    </script>
+</body>
+</html>

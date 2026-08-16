@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Center Tracker - Admin</title>
+    <!-- Material Symbols Outlined -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#1b4332",
+                        "on-surface-variant": "#414844",
+                        "outline-variant": "#c1c8c2",
+                        "primary": "#012d1d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#274e3d",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary": "#0e6c4a",
+                        "secondary-fixed-dim": "#85d7ad",
+                        "inverse-on-surface": "#ecf2f0",
+                        "inverse-primary": "#a5d0b9",
+                        "tertiary": "#242623",
+                        "secondary-container": "#a0f4c8",
+                        "on-tertiary-fixed-variant": "#454744",
+                        "surface-container-low": "#eff5f3",
+                        "outline": "#717973",
+                        "surface-variant": "#dee4e2",
+                        "surface-bright": "#f5fbf9",
+                        "secondary-fixed": "#a0f4c8",
+                        "surface": "#f5fbf9",
+                        "on-surface": "#171d1c",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-background": "#171d1c",
+                        "surface-container": "#e9efed",
+                        "surface-tint": "#3f6653",
+                        "tertiary-container": "#3a3c39",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c7c2",
+                        "surface-dim": "#d5dbd9",
+                        "background": "#f5fbf9",
+                        "on-secondary-fixed": "#002113",
+                        "tertiary-fixed": "#e2e3de",
+                        "on-tertiary-container": "#a5a6a2",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#dee4e2",
+                        "on-primary-container": "#86af99",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2c3231",
+                        "on-secondary-fixed-variant": "#005236",
+                        "primary-fixed-dim": "#a5d0b9",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#c1ecd4",
+                        "on-secondary-container": "#19724f",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#002114",
+                        "on-tertiary-fixed": "#1a1c19"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "1.25rem",
+                        "stack-md": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "1.5rem",
+                        "gutter-mobile": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "30px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Inter', sans-serif;
+            background-color: #f5fbf9; /* surface */
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom Input Styles */
+        input[type="number"], 
+        input[type="text"], 
+        input[type="date"], 
+        select, 
+        textarea {
+            background-color: var(--tw-colors-surface-container-low);
+            border: 1px solid var(--tw-colors-surface-variant);
+            transition: all 0.2s ease-in-out;
+        }
+        
+        input:focus, 
+        select:focus, 
+        textarea:focus {
+            border-color: var(--tw-colors-primary-fixed-dim);
+            background-color: var(--tw-colors-surface-container-lowest);
+            box-shadow: 0 4px 12px rgba(1, 45, 29, 0.05); 
+            outline: none;
+        }
+
+        .ambient-shadow {
+            box-shadow: 0 4px 12px rgba(27, 67, 50, 0.1);
+        }
+        
+        /* Avatar colors for manage tab */
+        .avatar-color-0 { background-color: #a5d0b9; color: #1b4332; } 
+        .avatar-color-1 { background-color: #a0f4c8; color: #19724f; } 
+        .avatar-color-2 { background-color: #3a3c39; color: #ffffff; } 
+
+        .loading-spinner {
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-left-color: var(--tw-colors-primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="text-on-background min-h-screen flex flex-col pt-12 md:pt-16 pb-20 md:pb-0 antialiased">
+
+    <!-- TopAppBar -->
+    <header class="fixed top-0 left-0 w-full z-50 bg-surface dark:bg-surface-dim flex justify-between items-center px-margin-mobile h-12 md:h-16 border-b border-outline-variant dark:border-outline">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim icon-fill">account_balance</span>
+            <h1 id="header-title" class="font-headline-md text-headline-md-mobile md:text-headline-md text-primary dark:text-primary-fixed-dim">Center Tracker</h1>
+        </div>
+        
+        <!-- Desktop Nav -->
+        <nav class="hidden md:flex gap-2">
+            <button onclick="switchTab('new-entry')" id="nav-desktop-new-entry" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
+                <span class="material-symbols-outlined text-[20px]">add_box</span> New Entry
+            </button>
+            <button onclick="switchTab('records')" id="nav-desktop-records" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
+                <span class="material-symbols-outlined text-[20px]">list_alt</span> Records
+            </button>
+            <button onclick="switchTab('manage')" id="nav-desktop-manage" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
+                <span class="material-symbols-outlined text-[20px]">group</span> Manage
+            </button>
+            <button onclick="switchTab('schedule')" id="nav-desktop-schedule" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
+                <span class="material-symbols-outlined text-[20px]">calendar_today</span> Schedule
+            </button>
+        </nav>
+    </header>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-grow px-margin-mobile pt-stack-lg pb-stack-lg max-w-5xl mx-auto w-full">
+        
+        <!-- ================= VIEW: NEW ENTRY ================= -->
+        <div id="view-new-entry" class="view-section max-w-2xl mx-auto">
+            <div class="mb-stack-lg">
+                <h2 class="font-headline-lg-mobile md:text-headline-lg text-on-surface">New Entry</h2>
+                <p class="font-body-md text-on-surface-variant mt-stack-sm">Record attendance and collections for today's session.</p>
+            </div>
+            <form id="new-entry-form" class="space-y-stack-md">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+                    <!-- Center Selection -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
+                        <label class="block font-label-md text-on-surface mb-2" for="entry_center">Center Location</label>
+                        <div class="relative">
+                            <select id="entry_center" class="block w-full rounded-lg font-body-lg py-3 pl-4 pr-10 appearance-none text-on-surface focus:ring-0">
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+                                <span class="material-symbols-outlined">expand_more</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Date Picker -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                        <label class="block font-label-md text-on-surface mb-2" for="entry_date">Session Date</label>
+                        <input id="entry_date" type="date" class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0"/>
+                    </div>
+                    <!-- Students Attended -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                        <label class="block font-label-md text-on-surface mb-2" for="entry_students">Students Attended</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="material-symbols-outlined text-outline">groups</span>
+                            </div>
+                            <input id="entry_students" type="number" min="0" placeholder="0" class="block w-full rounded-lg font-body-lg py-3 pl-10 pr-4 text-right text-on-surface focus:ring-0"/>
+                        </div>
+                    </div>
+                    <!-- Amount Collected -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
+                        <label class="block font-label-md text-on-surface mb-2" for="entry_amount">Amount Collected (EGP)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="font-label-md text-outline">EGP</span>
+                            </div>
+                            <input id="entry_amount" type="number" min="0" step="0.01" placeholder="0.00" class="block w-full rounded-lg font-headline-md py-4 pl-12 pr-4 text-right bg-surface-bright text-on-surface focus:ring-0"/>
+                        </div>
+                    </div>
+                    <!-- Assistants Present -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
+                        <label class="block font-label-md text-on-surface mb-3">Assistants Present</label>
+                        <div id="entry_assistants_list" class="space-y-3">
+                        </div>
+                    </div>
+                    <!-- Notes -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
+                        <label class="block font-label-md text-on-surface mb-2" for="entry_notes">Notes</label>
+                        <textarea id="entry_notes" rows="3" placeholder="Add any special observations..." class="block w-full rounded-lg font-body-md py-3 px-4 resize-none text-on-surface focus:ring-0"></textarea>
+                    </div>
+                </div>
+                <!-- Submit Button -->
+                <div class="pt-stack-md pb-stack-lg">
+                    <button type="submit" class="w-full bg-primary-container text-on-primary h-14 rounded-full font-label-md ambient-shadow flex justify-center items-center gap-2 hover:bg-secondary transition-colors duration-200">
+                        <span class="material-symbols-outlined icon-fill">save</span>
+                        Save entry
+                    </button>
+                    <p id="entry_error" class="text-error text-center mt-2 font-label-md hidden"></p>
+                </div>
+            </form>
+        </div>
+
+        <!-- ================= VIEW: RECORDS ================= -->
+        <div id="view-records" class="view-section hidden">
+            <!-- Summary Stats -->
+            <section class="grid grid-cols-2 md:grid-cols-3 gap-stack-md mb-stack-lg">
+                <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-primary-container/10 rounded-full blur-xl group-hover:bg-primary-container/20 transition-colors"></div>
+                    <div class="flex items-center gap-2 text-on-surface-variant mb-2 z-10">
+                        <span class="material-symbols-outlined text-sm">menu_book</span>
+                        <span class="font-label-md">Lectures</span>
+                    </div>
+                    <div id="stat_lectures" class="font-headline-lg-mobile md:text-headline-lg text-primary z-10">0</div>
+                </div>
+                <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-secondary-container/10 rounded-full blur-xl group-hover:bg-secondary-container/20 transition-colors"></div>
+                    <div class="flex items-center gap-2 text-on-surface-variant mb-2 z-10">
+                        <span class="material-symbols-outlined text-sm">group</span>
+                        <span class="font-label-md">Students</span>
+                    </div>
+                    <div id="stat_students" class="font-headline-lg-mobile md:text-headline-lg text-primary z-10">0</div>
+                </div>
+                <div class="bg-primary-container rounded-xl border border-outline-variant p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow col-span-2 md:col-span-1">
+                    <div class="absolute -right-8 -top-8 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors"></div>
+                    <div class="flex items-center gap-2 text-on-primary-container mb-2 z-10">
+                        <span class="material-symbols-outlined text-sm">payments</span>
+                        <span class="font-label-md">EGP collected</span>
+                    </div>
+                    <div id="stat_revenue" class="font-headline-lg-mobile md:text-headline-lg text-on-primary z-10">0</div>
+                </div>
+            </section>
+            
+            <!-- Filter Area -->
+            <section class="mb-stack-md flex justify-between items-center">
+                <h2 class="font-headline-md text-on-surface hidden md:block">Recent Entries</h2>
+                <div class="relative w-full md:w-auto">
+                    <select id="records_filter" class="appearance-none w-full md:w-48 bg-surface-container-lowest border border-outline-variant text-on-surface font-body-md rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary shadow-sm cursor-pointer">
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+                        <span class="material-symbols-outlined">expand_more</span>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Entry Cards List -->
+            <section id="records_list" class="flex flex-col gap-stack-md">
+            </section>
+        </div>
+
+        <!-- ================= VIEW: MANAGE ================= -->
+        <div id="view-manage" class="view-section max-w-3xl mx-auto hidden space-y-stack-lg">
+            <div class="flex items-center justify-between mb-stack-md">
+                <h1 class="font-headline-lg-mobile text-on-surface">Manage</h1>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-lg">
+                <!-- Centers Section -->
+                <section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-stack-md shadow-sm flex flex-col h-full">
+                    <div class="flex items-center gap-2 mb-stack-md">
+                        <div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+                            <span class="material-symbols-outlined text-sm">storefront</span>
+                        </div>
+                        <h2 class="font-headline-md text-headline-md-mobile text-on-surface">Centers</h2>
+                    </div>
+                    
+                    <div id="manage_centers_list" class="flex-grow flex flex-col gap-2 mb-stack-md">
+                    </div>
+                    
+                    <div class="mt-auto pt-stack-sm">
+                        <form id="add-center-form" class="flex flex-col gap-2">
+                            <input id="new-center-input" type="text" placeholder="New center name..." required class="w-full h-12 bg-surface-container-lowest border-b border-outline-variant focus:border-primary focus:ring-0 px-3 font-body-md text-on-surface placeholder-on-surface-variant"/>
+                            <input id="new-center-address" type="text" placeholder="Center Address (Optional)..." class="w-full h-12 bg-surface-container-lowest border-b border-outline-variant focus:border-primary focus:ring-0 px-3 font-body-md text-on-surface placeholder-on-surface-variant"/>
+                            <button type="submit" class="h-12 px-4 bg-primary text-on-primary rounded-lg font-label-md flex items-center justify-center gap-2 hover:bg-on-primary-fixed-variant transition-colors shadow-sm w-full">
+                                <span class="material-symbols-outlined text-[18px]">add</span> Add Center
+                            </button>
+                        </form>
+                    </div>
+                </section>
+                
+                <!-- Assistants Section -->
+                <section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-stack-md shadow-sm flex flex-col h-full">
+                    <div class="flex items-center gap-2 mb-stack-md">
+                        <div class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center text-on-tertiary">
+                            <span class="material-symbols-outlined text-sm">support_agent</span>
+                        </div>
+                        <h2 class="font-headline-md text-headline-md-mobile text-on-surface">Assistants</h2>
+                    </div>
+                    
+                    <div id="manage_assistants_list" class="flex-grow flex flex-col gap-2 mb-stack-md">
+                    </div>
+                    
+                    <div class="mt-auto pt-stack-sm">
+                        <form id="add-assistant-form" class="flex gap-2">
+                            <div class="relative flex-grow">
+                                <input id="new-assistant-input" type="text" placeholder="New assistant name..." required class="w-full h-12 bg-surface-container-lowest border-b border-outline-variant focus:border-primary focus:ring-0 px-3 font-body-md text-on-surface placeholder-on-surface-variant"/>
+                            </div>
+                            <button type="submit" class="h-12 px-4 border-2 border-outline text-on-surface rounded-lg font-label-md flex items-center gap-2 hover:bg-surface-container-high hover:border-primary transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">person_add</span> Add Assistant
+                            </button>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- ================= VIEW: SCHEDULE ================= -->
+        <div id="view-schedule" class="view-section max-w-2xl mx-auto hidden">
+            <div class="mb-stack-lg">
+                <h2 class="font-headline-lg-mobile md:text-headline-lg text-on-surface">Schedule</h2>
+                <p class="font-body-md text-on-surface-variant mt-stack-sm">Assign assistants to upcoming sessions.</p>
+            </div>
+            
+            <form id="new-schedule-form" class="space-y-stack-md mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-stack-md">
+                    <!-- Date Picker -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                        <label class="block font-label-md text-on-surface mb-2" for="schedule_date">Date</label>
+                        <input id="schedule_date" type="date" required class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0"/>
+                    </div>
+                    <!-- Time Picker -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                        <label class="block font-label-md text-on-surface mb-2" for="schedule_time">Time</label>
+                        <input id="schedule_time" type="time" required class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0"/>
+                    </div>
+                    <!-- Center Selection -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                        <label class="block font-label-md text-on-surface mb-2" for="schedule_center">Center</label>
+                        <div class="relative">
+                            <select id="schedule_center" required class="block w-full rounded-lg font-body-lg py-3 pl-4 pr-10 appearance-none text-on-surface focus:ring-0">
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+                                <span class="material-symbols-outlined">expand_more</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Assistants to Schedule -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
+                        <label class="block font-label-md text-on-surface mb-3">Assign Assistants</label>
+                        <div id="schedule_assistants_list" class="space-y-3">
+                        </div>
+                    </div>
+                </div>
+                <!-- Submit Button -->
+                <div class="pt-stack-md pb-stack-lg">
+                    <button type="submit" id="btn_save_schedule" class="w-full bg-primary-container text-on-primary h-14 rounded-full font-label-md ambient-shadow flex justify-center items-center gap-2 hover:bg-secondary transition-colors duration-200">
+                        <span class="material-symbols-outlined icon-fill">calendar_add_on</span>
+                        Schedule Assignment
+                    </button>
+                    <p id="schedule_error" class="text-error text-center mt-2 font-label-md hidden"></p>
+                </div>
+            </form>
+
+            <div>
+                <h3 class="font-headline-md text-on-surface mb-4">Upcoming Schedule</h3>
+                <div id="schedule_list_loading" class="flex justify-center py-4 hidden">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div id="schedule_list" class="flex flex-col gap-stack-md">
+                    <!-- Populated from Supabase -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- BottomNavBar (Mobile) -->
+    <nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface dark:bg-surface-dim px-gutter-mobile border-t border-outline-variant dark:border-outline shadow-sm z-50">
+        <button onclick="switchTab('new-entry')" id="nav-mobile-new-entry" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
+            <span class="material-symbols-outlined nav-icon text-sm">add_box</span>
+            <span class="font-label-md text-[10px] mt-1 leading-none text-center">New</span>
+        </button>
+        <button onclick="switchTab('records')" id="nav-mobile-records" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
+            <span class="material-symbols-outlined nav-icon text-sm">list_alt</span>
+            <span class="font-label-md text-[10px] mt-1 leading-none text-center">Records</span>
+        </button>
+        <button onclick="switchTab('schedule')" id="nav-mobile-schedule" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
+            <span class="material-symbols-outlined nav-icon text-sm">calendar_today</span>
+            <span class="font-label-md text-[10px] mt-1 leading-none text-center">Schedule</span>
+        </button>
+        <button onclick="switchTab('manage')" id="nav-mobile-manage" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
+            <span class="material-symbols-outlined nav-icon text-sm">group</span>
+            <span class="font-label-md text-[10px] mt-1 leading-none text-center">Manage</span>
+        </button>
+    </nav>
+
+    <!-- Application Script -->
+    <script>
+        // --- Supabase Initialization ---
+        const SUPABASE_URL = 'https://guscxutiucotybrzrlgr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1c2N4dXRpdWNvdHlicnpybGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyNTc1NjUsImV4cCI6MjA4NDgzMzU2NX0.6NeQYrtjOy-V2TfLjJJPfH0HE0BuHS7gejBkq1Mlllo';
+        
+        let supabaseClient;
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch(e) {
+            console.error("Failed to initialize Supabase client:", e);
+        }
+
+        // --- Local State Management ---
+        const State = {
+            centers: (JSON.parse(localStorage.getItem('ct_centers')) || ['Downtown Center', 'North Side', 'West End']).map(c => typeof c === 'string' ? { name: c, address: '' } : c),
+            assistants: JSON.parse(localStorage.getItem('ct_assistants')) || ['Sarah J.', 'Mike T.', 'Lina K.'],
+            entries: JSON.parse(localStorage.getItem('ct_entries')) || [],
+            schedules: [] // populated from supabase
+        };
+
+        function saveState() {
+            localStorage.setItem('ct_centers', JSON.stringify(State.centers));
+            localStorage.setItem('ct_assistants', JSON.stringify(State.assistants));
+            localStorage.setItem('ct_entries', JSON.stringify(State.entries));
+        }
+
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // --- Navigation ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+            const titleEl = document.getElementById('header-title');
+            if (tabId === 'new-entry') titleEl.textContent = 'New Entry';
+            if (tabId === 'records') titleEl.textContent = 'Records';
+            if (tabId === 'manage') titleEl.textContent = 'Manage';
+            if (tabId === 'schedule') titleEl.textContent = 'Schedule';
+
+            // Desktop Nav
+            const desktopClassesActive = ['bg-primary-container', 'text-on-primary-container'];
+            const desktopClassesInactive = ['text-on-surface-variant', 'hover:bg-surface-container-high'];
+            
+            document.querySelectorAll('.nav-desktop-item').forEach(el => {
+                el.classList.remove(...desktopClassesActive);
+                el.classList.add(...desktopClassesInactive);
+                const icon = el.querySelector('.material-symbols-outlined');
+                icon.classList.remove('icon-fill');
+            });
+
+            const activeDesktop = document.getElementById(`nav-desktop-${tabId}`);
+            if(activeDesktop) {
+                activeDesktop.classList.remove(...desktopClassesInactive);
+                activeDesktop.classList.add(...desktopClassesActive);
+                activeDesktop.querySelector('.material-symbols-outlined').classList.add('icon-fill');
+            }
+
+            // Mobile Nav
+            const mobileClassesActive = ['bg-primary-container', 'text-on-primary-container'];
+            const mobileClassesInactive = ['text-on-surface-variant', 'hover:bg-surface-container-low'];
+            
+            document.querySelectorAll('.nav-mobile-item').forEach(el => {
+                el.classList.remove(...mobileClassesActive);
+                el.classList.add(...mobileClassesInactive);
+                const icon = el.querySelector('.nav-icon');
+                icon.classList.remove('icon-fill');
+                icon.classList.remove('text-[20px]'); // optional bump size
+            });
+
+            const activeMobile = document.getElementById(`nav-mobile-${tabId}`);
+            if(activeMobile) {
+                activeMobile.classList.remove(...mobileClassesInactive);
+                activeMobile.classList.add(...mobileClassesActive);
+                const icon = activeMobile.querySelector('.nav-icon');
+                icon.classList.add('icon-fill');
+                icon.classList.add('text-[20px]');
+            }
+
+            // View init
+            if (tabId === 'new-entry') initNewEntryView();
+            if (tabId === 'records') initRecordsView();
+            if (tabId === 'manage') initManageView();
+            if (tabId === 'schedule') initScheduleView();
+        }
+
+        // --- Manage View ---
+        function initManageView() {
+            renderManageCenters();
+            renderManageAssistants();
+        }
+
+        function renderManageCenters() {
+            const container = document.getElementById('manage_centers_list');
+            container.innerHTML = '';
+            State.centers.forEach(center => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group";
+                div.innerHTML = `
+                    <span class="font-body-lg text-on-surface">${center.name}</span>
+                    <button onclick="deleteCenter('${center.name}')" class="text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container/20">
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderManageAssistants() {
+            const container = document.getElementById('manage_assistants_list');
+            container.innerHTML = '';
+            State.assistants.forEach((assistant, index) => {
+                const colorClass = `avatar-color-${index % 3}`;
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group";
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full ${colorClass} flex items-center justify-center font-label-md">
+                            ${getInitials(assistant)}
+                        </div>
+                        <span class="font-body-lg text-on-surface">${assistant}</span>
+                    </div>
+                    <button onclick="deleteAssistant('${assistant}')" class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+                        <span class="material-symbols-outlined text-[20px]">delete</span>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        document.getElementById('add-center-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('new-center-input');
+            const addressInput = document.getElementById('new-center-address');
+            const val = input.value.trim();
+            const addressVal = addressInput.value.trim();
+            if (val && !State.centers.find(c => c.name === val)) {
+                State.centers.push({ name: val, address: addressVal });
+                saveState();
+                input.value = '';
+                addressInput.value = '';
+                renderManageCenters();
+                initNewEntryView(); 
+                initRecordsView();
+            }
+        });
+
+        document.getElementById('add-assistant-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('new-assistant-input');
+            const val = input.value.trim();
+            if (val && !State.assistants.includes(val)) {
+                State.assistants.push(val);
+                saveState();
+                input.value = '';
+                renderManageAssistants();
+                initNewEntryView();
+            }
+        });
+
+        window.deleteCenter = function(centerName) {
+            State.centers = State.centers.filter(c => c.name !== centerName);
+            saveState();
+            renderManageCenters();
+        };
+
+        window.deleteAssistant = function(assistant) {
+            State.assistants = State.assistants.filter(a => a !== assistant);
+            saveState();
+            renderManageAssistants();
+        };
+
+        // --- New Entry View ---
+        function initNewEntryView() {
+            const dateInput = document.getElementById('entry_date');
+            if (!dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+
+            const centerSelect = document.getElementById('entry_center');
+            const currentCenter = centerSelect.value;
+            centerSelect.innerHTML = State.centers.length 
+                ? State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
+                : `<option value="">No centers available</option>`;
+            
+            if (currentCenter && State.centers.find(c => c.name === currentCenter)) {
+                centerSelect.value = currentCenter;
+            }
+
+            const assistantsList = document.getElementById('entry_assistants_list');
+            if (State.assistants.length === 0) {
+                assistantsList.innerHTML = `<p class="text-sm text-on-surface-variant italic">No assistants added yet.</p>`;
+            } else {
+                assistantsList.innerHTML = State.assistants.map((assistant) => `
+                    <label class="flex items-center p-3 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low cursor-pointer transition-colors">
+                        <input type="checkbox" name="assistants" value="${assistant}" checked 
+                            class="assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
+                        <span class="ml-3 font-body-lg text-on-surface flex-grow">${assistant}</span>
+                        <span class="material-symbols-outlined text-secondary-fixed-dim text-sm icon-fill">check_circle</span>
+                    </label>
+                `).join('');
+            }
+        }
+
+        document.getElementById('new-entry-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById('entry_error');
+            errorEl.classList.add('hidden');
+
+            const center = document.getElementById('entry_center').value;
+            const date = document.getElementById('entry_date').value;
+            const studentsStr = document.getElementById('entry_students').value;
+            const amountStr = document.getElementById('entry_amount').value;
+            const note = document.getElementById('entry_notes').value;
+
+            if (!center || !date || studentsStr === "") {
+                errorEl.textContent = "Please fill all required fields.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const present = [];
+            const absent = [];
+            document.querySelectorAll('.assistant-cb').forEach(cb => {
+                if (cb.checked) present.push(cb.value);
+                else absent.push(cb.value);
+            });
+
+            State.entries.unshift({
+                id: generateId(),
+                center,
+                date,
+                students: parseInt(studentsStr, 10),
+                amount: parseFloat(amountStr) || 0,
+                present,
+                absent,
+                note,
+                createdAt: new Date().toISOString()
+            });
+            saveState();
+
+            document.getElementById('new-entry-form').reset();
+            document.getElementById('entry_date').value = new Date().toISOString().split('T')[0];
+            initNewEntryView();
+            switchTab('records');
+        });
+
+        // --- Records View ---
+        function initRecordsView() {
+            const filter = document.getElementById('records_filter');
+            const currentFilter = filter.value;
+            filter.innerHTML = `<option value="all">All centers</option>` + 
+                State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+            
+            if (currentFilter === 'all' || State.centers.find(c => c.name === currentFilter)) {
+                filter.value = currentFilter;
+            } else {
+                filter.value = 'all';
+            }
+            renderRecords();
+        }
+
+        document.getElementById('records_filter').addEventListener('change', renderRecords);
+
+        function renderRecords() {
+            const filterVal = document.getElementById('records_filter').value;
+            const filteredEntries = filterVal === 'all' ? State.entries : State.entries.filter(e => e.center === filterVal);
+
+            document.getElementById('stat_lectures').textContent = filteredEntries.length;
+            document.getElementById('stat_students').textContent = filteredEntries.reduce((sum, e) => sum + e.students, 0);
+            
+            // Calculate total and round to prevent floating point imprecision issues (like 69999.97 instead of 70000)
+            const totalRevenue = filteredEntries.reduce((sum, e) => sum + e.amount, 0);
+            const roundedRevenue = Math.round(totalRevenue * 100) / 100;
+            document.getElementById('stat_revenue').textContent = roundedRevenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+
+            const listContainer = document.getElementById('records_list');
+            if (filteredEntries.length === 0) {
+                listContainer.innerHTML = `<p class="text-on-surface-variant text-center py-8">No records found.</p>`;
+                return;
+            }
+
+            listContainer.innerHTML = filteredEntries.map(entry => {
+                const dateFormatted = new Date(entry.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+                
+                const assistantsHtml = [
+                    ...entry.present.map(a => `
+                        <span class="inline-flex items-center gap-1 bg-secondary-container/30 text-on-secondary-container px-2 py-1 rounded text-xs border border-secondary-container/50">
+                            <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> ${a} (P)
+                        </span>
+                    `),
+                    ...entry.absent.map(a => `
+                        <span class="inline-flex items-center gap-1 bg-error-container/30 text-on-error-container px-2 py-1 rounded text-xs border border-error-container/50">
+                            <span class="w-1.5 h-1.5 rounded-full bg-error"></span> ${a} (A)
+                        </span>
+                    `)
+                ].join('');
+
+                const noteHtml = entry.note ? `
+                    <div class="mt-3 flex items-start gap-2 text-on-surface-variant font-body-md text-sm">
+                        <span class="material-symbols-outlined text-[16px] mt-0.5 text-outline">sticky_note_2</span>
+                        <p><span class="font-semibold">Note:</span> ${entry.note}</p>
+                    </div>
+                ` : '';
+
+                return `
+                <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm hover:shadow-md transition-shadow relative group">
+                    <button onclick="deleteEntry('${entry.id}')" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                        <span class="material-symbols-outlined text-[20px]">delete</span>
+                    </button>
+                    <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4 pr-8 md:pr-0">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-1">
+                                <h3 class="font-body-lg font-bold text-on-surface">${entry.center}</h3>
+                                <span class="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded text-xs font-medium">${dateFormatted}</span>
+                            </div>
+                            <p class="font-body-md text-on-surface-variant mb-3 flex items-center gap-4">
+                                <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">person</span> ${entry.students} students</span>
+                                <span class="flex items-center gap-1 font-semibold text-primary"><span class="material-symbols-outlined text-[16px]">payments</span> ${entry.amount.toLocaleString()} EGP</span>
+                            </p>
+                            ${(entry.present.length > 0 || entry.absent.length > 0) ? `
+                                <div class="bg-surface-container-low rounded-lg p-3 border border-outline-variant/50">
+                                    <div class="flex flex-wrap gap-2">${assistantsHtml}</div>
+                                </div>
+                            ` : ''}
+                            ${noteHtml}
+                        </div>
+                    </div>
+                </article>
+                `;
+            }).join('');
+        }
+
+        window.deleteEntry = function(id) {
+            if(confirm("Are you sure you want to delete this record?")) {
+                State.entries = State.entries.filter(e => e.id !== id);
+                saveState();
+                renderRecords();
+            }
+        };
+
+        // --- Schedule View (Supabase) ---
+        let fetchingSchedule = false;
+
+        async function initScheduleView() {
+            // Set date to today if empty
+            const dateInput = document.getElementById('schedule_date');
+            if (!dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+
+            // Populate Center Dropdown
+            const centerSelect = document.getElementById('schedule_center');
+            centerSelect.innerHTML = State.centers.length 
+                ? State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
+                : `<option value="">No centers available</option>`;
+            
+            // Populate Assistants checklist
+            const assistantsList = document.getElementById('schedule_assistants_list');
+            if (State.assistants.length === 0) {
+                assistantsList.innerHTML = `<p class="text-sm text-on-surface-variant italic">No assistants added yet.</p>`;
+            } else {
+                assistantsList.innerHTML = State.assistants.map((assistant) => `
+                    <label class="flex items-center p-3 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low cursor-pointer transition-colors">
+                        <input type="checkbox" name="sched_assistants" value="${assistant}" 
+                            class="sched-assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
+                        <span class="ml-3 font-body-lg text-on-surface flex-grow">${assistant}</span>
+                    </label>
+                `).join('');
+            }
+
+            await fetchSchedule();
+        }
+
+        async function fetchSchedule() {
+            if (fetchingSchedule) return;
+            fetchingSchedule = true;
+            document.getElementById('schedule_list_loading').classList.remove('hidden');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('schedule')
+                    .select('*')
+                    .order('date', { ascending: true });
+
+                if (error) throw error;
+                State.schedules = data || [];
+                renderScheduleList();
+            } catch (err) {
+                console.error("Error fetching schedule:", err);
+                // Optionally show error to user
+            } finally {
+                document.getElementById('schedule_list_loading').classList.add('hidden');
+                fetchingSchedule = false;
+            }
+        }
+
+        function renderScheduleList() {
+            const listContainer = document.getElementById('schedule_list');
+            
+            if (State.schedules.length === 0) {
+                listContainer.innerHTML = `<p class="text-on-surface-variant text-center py-8">No upcoming assignments.</p>`;
+                return;
+            }
+
+            // Group by date
+            const grouped = {};
+            State.schedules.forEach(s => {
+                if(!grouped[s.date]) grouped[s.date] = [];
+                grouped[s.date].push(s);
+            });
+
+            const html = [];
+            Object.keys(grouped).sort().forEach(date => {
+                const dateFormatted = new Date(date).toLocaleDateString(undefined, {weekday: 'short', month:'short', day:'numeric', year:'numeric'});
+                
+                html.push(`<div class="mt-4 mb-2"><h4 class="font-label-md text-on-surface-variant uppercase tracking-wider">${dateFormatted}</h4></div>`);
+                
+                grouped[date].forEach(item => {
+                    const assistantsTags = (item.assistants || []).map(a => `
+                        <span class="inline-flex items-center gap-1 bg-surface-variant text-on-surface px-2 py-1 rounded text-xs border border-outline-variant">
+                            ${a}
+                        </span>
+                    `).join('');
+
+                    html.push(`
+                    <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 shadow-sm relative group flex justify-between items-center mb-2">
+                        <div>
+                            <h3 class="font-body-lg font-bold text-on-surface">${item.center}</h3>
+                            <div class="flex flex-wrap gap-2 mt-2">${assistantsTags}</div>
+                        </div>
+                        <button onclick="deleteSchedule('${item.id}')" class="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                        </button>
+                    </article>
+                    `);
+                });
+            });
+
+            listContainer.innerHTML = html.join('');
+        }
+
+        document.getElementById('new-schedule-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn_save_schedule');
+            const errorEl = document.getElementById('schedule_error');
+            errorEl.classList.add('hidden');
+            
+            const date = document.getElementById('schedule_date').value;
+            const time = document.getElementById('schedule_time').value;
+            const center = document.getElementById('schedule_center').value;
+            
+            const selectedAssistants = [];
+            document.querySelectorAll('.sched-assistant-cb').forEach(cb => {
+                if(cb.checked) selectedAssistants.push(cb.value);
+            });
+
+            if (!date || !time || !center) {
+                errorEl.textContent = "Please select date, time and center.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            if (selectedAssistants.length === 0) {
+                errorEl.textContent = "Please select at least one assistant.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-spinner"></div> Saving...`;
+
+            const centerObj = State.centers.find(c => c.name === center);
+            const address = centerObj ? centerObj.address : '';
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('schedule')
+                    .insert([
+                        { date: date, time: time, center: center, address: address, assistants: selectedAssistants }
+                    ])
+                    .select();
+
+                if (error) throw error;
+                
+                // Add to local state and re-render instantly instead of waiting for fetch
+                if(data && data.length > 0) {
+                    State.schedules.push(data[0]);
+                    State.schedules.sort((a,b) => new Date(a.date) - new Date(b.date));
+                    renderScheduleList();
+                }
+
+                // Reset form
+                document.querySelectorAll('.sched-assistant-cb').forEach(cb => cb.checked = false);
+            } catch (err) {
+                console.error("Insert error:", err);
+                errorEl.textContent = "Failed to save schedule. Check console.";
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined icon-fill">calendar_add_on</span> Schedule Assignment`;
+            }
+        });
+
+        window.deleteSchedule = async function(id) {
+            if(confirm("Delete this schedule assignment?")) {
+                try {
+                    const { error } = await supabaseClient
+                        .from('schedule')
+                        .delete()
+                        .eq('id', id);
+                    if (error) throw error;
+
+                    State.schedules = State.schedules.filter(s => s.id !== id);
+                    renderScheduleList();
+                } catch(err) {
+                    alert("Error deleting schedule.");
+                    console.error(err);
+                }
+            }
+        };
+
+        // Listen for realtime updates from other admins (if any)
+        if (supabaseClient) {
+            supabaseClient
+                .channel('public:schedule')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule' }, payload => {
+                    // To keep it simple, just re-fetch the whole list if we are on schedule tab
+                    if(!document.getElementById('view-schedule').classList.contains('hidden')) {
+                        fetchSchedule();
+                    }
+                })
+                .subscribe();
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const hash = window.location.hash.replace('#', '');
+            if (['new-entry', 'records', 'manage', 'schedule'].includes(hash)) {
+                switchTab(hash);
+            } else {
+                switchTab('new-entry');
+            }
+        });
+
+    </script>
+</body>
+</html>

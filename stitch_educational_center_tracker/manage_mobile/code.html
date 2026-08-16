@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Manage - Center Tracker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#1b4332",
+                        "on-surface-variant": "#414844",
+                        "outline-variant": "#c1c8c2",
+                        "primary": "#012d1d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#274e3d",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary": "#0e6c4a",
+                        "secondary-fixed-dim": "#85d7ad",
+                        "inverse-on-surface": "#ecf2f0",
+                        "inverse-primary": "#a5d0b9",
+                        "tertiary": "#242623",
+                        "secondary-container": "#a0f4c8",
+                        "on-tertiary-fixed-variant": "#454744",
+                        "surface-container-low": "#eff5f3",
+                        "outline": "#717973",
+                        "surface-variant": "#dee4e2",
+                        "surface-bright": "#f5fbf9",
+                        "secondary-fixed": "#a0f4c8",
+                        "surface": "#f5fbf9",
+                        "on-surface": "#171d1c",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-background": "#171d1c",
+                        "surface-container": "#e9efed",
+                        "surface-tint": "#3f6653",
+                        "tertiary-container": "#3a3c39",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c7c2",
+                        "surface-dim": "#d5dbd9",
+                        "background": "#f5fbf9",
+                        "on-secondary-fixed": "#002113",
+                        "tertiary-fixed": "#e2e3de",
+                        "on-tertiary-container": "#a5a6a2",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#dee4e2",
+                        "on-primary-container": "#86af99",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2c3231",
+                        "on-secondary-fixed-variant": "#005236",
+                        "primary-fixed-dim": "#a5d0b9",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#c1ecd4",
+                        "on-secondary-container": "#19724f",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#002114",
+                        "on-tertiary-fixed": "#1a1c19"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "1.25rem",
+                        "stack-md": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "1.5rem",
+                        "gutter-mobile": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "30px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="docked full-width top-0 border-b border-outline-variant dark:border-outline flat no shadows bg-surface dark:bg-surface-dim transition-colors duration-200 z-40 relative">
+<div class="flex justify-between items-center px-margin-mobile h-12 w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" data-icon="account_balance" data-weight="fill">account_balance</span>
+<span class="font-headline-md text-headline-md-mobile text-primary dark:text-primary-fixed-dim font-bold tracking-tight">Center Tracker</span>
+</div>
+<div>
+<!-- Actions could go here -->
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="px-margin-mobile pt-stack-lg max-w-3xl mx-auto space-y-stack-lg">
+<div class="flex items-center justify-between mb-stack-md">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Manage</h1>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-lg">
+<!-- Centers Section (Bento style) -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-stack-md shadow-sm flex flex-col h-full">
+<div class="flex items-center gap-2 mb-stack-md">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-sm" data-icon="storefront">storefront</span>
+</div>
+<h2 class="font-headline-md text-headline-md-mobile text-on-surface">Centers</h2>
+</div>
+<div class="flex-grow flex flex-col gap-2 mb-stack-md">
+<!-- List Item -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group">
+<span class="font-body-lg text-body-lg text-on-surface">Downtown</span>
+<button aria-label="Delete Downtown" class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+<!-- List Item -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group">
+<span class="font-body-lg text-body-lg text-on-surface">North Side</span>
+<button aria-label="Delete North Side" class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+<!-- List Item -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group">
+<span class="font-body-lg text-body-lg text-on-surface">West End</span>
+<button aria-label="Delete West End" class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+<div class="mt-auto pt-stack-sm">
+<form class="flex gap-2">
+<div class="relative flex-grow">
+<input class="w-full h-12 bg-surface-container-lowest border-b border-outline-variant focus:border-primary focus:ring-0 px-3 font-body-md text-body-md text-on-surface placeholder-on-surface-variant" id="new-center" placeholder="New center name..." type="text"/>
+<label class="sr-only" for="new-center">Add new center</label>
+</div>
+<button class="h-12 px-4 bg-primary text-on-primary rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-on-primary-fixed-variant transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                            Add Center
+                        </button>
+</form>
+</div>
+</section>
+<!-- Assistants Section (Bento style) -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-stack-md shadow-sm flex flex-col h-full">
+<div class="flex items-center gap-2 mb-stack-md">
+<div class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center text-on-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="support_agent">support_agent</span>
+</div>
+<h2 class="font-headline-md text-headline-md-mobile text-on-surface">Assistants</h2>
+</div>
+<div class="flex-grow flex flex-col gap-2 mb-stack-md">
+<!-- List Item -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-inverse-primary text-on-primary-container flex items-center justify-center font-label-md text-label-md">SJ</div>
+<span class="font-body-lg text-body-lg text-on-surface">Sarah J.</span>
+</div>
+<button aria-label="Delete Sarah J." class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+<!-- List Item -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-label-md text-label-md">MT</div>
+<span class="font-body-lg text-body-lg text-on-surface">Mike T.</span>
+</div>
+<button aria-label="Delete Mike T." class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+<!-- List Item -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md">LK</div>
+<span class="font-body-lg text-body-lg text-on-surface">Lina K.</span>
+</div>
+<button aria-label="Delete Lina K." class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+<div class="mt-auto pt-stack-sm">
+<form class="flex gap-2">
+<div class="relative flex-grow">
+<input class="w-full h-12 bg-surface-container-lowest border-b border-outline-variant focus:border-primary focus:ring-0 px-3 font-body-md text-body-md text-on-surface placeholder-on-surface-variant" id="new-assistant" placeholder="New assistant name..." type="text"/>
+<label class="sr-only" for="new-assistant">Add new assistant</label>
+</div>
+<button class="h-12 px-4 border-2 border-outline text-on-surface rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-surface-container-high hover:border-primary transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]" data-icon="person_add">person_add</span>
+                            Add Assistant
+                        </button>
+</form>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar (Visible on Mobile, hidden on md+) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface dark:bg-surface-dim px-gutter-mobile border-t border-outline-variant dark:border-outline shadow-sm dark:shadow-none z-50">
+<!-- New Entry - Inactive -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-transform duration-150 scale-95 active:scale-90 rounded-full" href="#">
+<span class="material-symbols-outlined mb-1 text-[24px]" data-icon="add_box">add_box</span>
+<span class="font-label-md text-label-md">New Entry</span>
+</a>
+<!-- Records - Inactive -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-transform duration-150 scale-95 active:scale-90 rounded-full" href="#">
+<span class="material-symbols-outlined mb-1 text-[24px]" data-icon="list_alt">list_alt</span>
+<span class="font-label-md text-label-md">Records</span>
+</a>
+<!-- Manage - Active -->
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-secondary text-on-primary-container dark:text-on-secondary rounded-full px-4 py-1 transition-transform duration-150 scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined mb-1 text-[24px]" data-icon="group" data-weight="fill">group</span>
+<span class="font-label-md text-label-md">Manage</span>
+</a>
+</nav>
+<!-- Desktop Navigation Side/Top (Visible md+, hidden mobile) - simplified representation for canvas priority -->
+<nav class="hidden md:flex fixed top-0 right-0 h-12 items-center px-margin-mobile z-50 gap-4">
+<a class="text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md text-label-md transition-colors flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="add_box">add_box</span> New Entry
+        </a>
+<a class="text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md text-label-md transition-colors flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="list_alt">list_alt</span> Records
+        </a>
+<a class="bg-primary-container text-on-primary-container px-4 py-2 rounded-lg font-label-md text-label-md transition-colors flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="group" data-weight="fill">group</span> Manage
+        </a>
+</nav>
+</body></html>

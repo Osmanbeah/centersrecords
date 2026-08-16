@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Records - Center Tracker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#1b4332",
+                        "on-surface-variant": "#414844",
+                        "outline-variant": "#c1c8c2",
+                        "primary": "#012d1d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#274e3d",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary": "#0e6c4a",
+                        "secondary-fixed-dim": "#85d7ad",
+                        "inverse-on-surface": "#ecf2f0",
+                        "inverse-primary": "#a5d0b9",
+                        "tertiary": "#242623",
+                        "secondary-container": "#a0f4c8",
+                        "on-tertiary-fixed-variant": "#454744",
+                        "surface-container-low": "#eff5f3",
+                        "outline": "#717973",
+                        "surface-variant": "#dee4e2",
+                        "surface-bright": "#f5fbf9",
+                        "secondary-fixed": "#a0f4c8",
+                        "surface": "#f5fbf9",
+                        "on-surface": "#171d1c",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-background": "#171d1c",
+                        "surface-container": "#e9efed",
+                        "surface-tint": "#3f6653",
+                        "tertiary-container": "#3a3c39",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c7c2",
+                        "surface-dim": "#d5dbd9",
+                        "background": "#f5fbf9",
+                        "on-secondary-fixed": "#002113",
+                        "tertiary-fixed": "#e2e3de",
+                        "on-tertiary-container": "#a5a6a2",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#dee4e2",
+                        "on-primary-container": "#86af99",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2c3231",
+                        "on-secondary-fixed-variant": "#005236",
+                        "primary-fixed-dim": "#a5d0b9",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#c1ecd4",
+                        "on-secondary-container": "#19724f",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#002114",
+                        "on-tertiary-fixed": "#1a1c19"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "margin-mobile": "1.25rem",
+                        "stack-md": "1rem",
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "1.5rem",
+                        "gutter-mobile": "1rem"
+                    },
+                    fontFamily: {
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-lg": ["28px", { lineHeight: "34px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "30px", fontWeight: "700" }],
+                        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
+                        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-24 md:pb-0 md:pt-16">
+<!-- TopAppBar (Web) / Header -->
+<header class="bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-outline flex justify-between items-center px-margin-mobile h-12 w-full docked full-width top-0 hidden md:flex fixed z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" data-icon="account_balance">account_balance</span>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim">Center Tracker</h1>
+</div>
+<nav class="flex items-center gap-6">
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200 px-3 py-1.5 rounded-md font-label-md text-label-md" href="#">New Entry</a>
+<a class="text-on-surface dark:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200 px-3 py-1.5 rounded-md font-label-md text-label-md bg-surface-container-low" href="#">Records</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200 px-3 py-1.5 rounded-md font-label-md text-label-md" href="#">Manage</a>
+</nav>
+</header>
+<!-- Mobile Header -->
+<header class="md:hidden bg-surface border-b border-outline-variant px-margin-mobile h-16 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary">Records</h1>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-low hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface" data-icon="search">search</span>
+</button>
+</header>
+<main class="max-w-5xl mx-auto px-margin-mobile pt-stack-lg md:pt-stack-lg">
+<!-- Summary Stats (Bento-ish Grid) -->
+<section class="grid grid-cols-2 md:grid-cols-3 gap-stack-md mb-stack-lg">
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+<div class="absolute -right-4 -top-4 w-16 h-16 bg-primary-container/10 rounded-full blur-xl group-hover:bg-primary-container/20 transition-colors"></div>
+<div class="flex items-center gap-2 text-on-surface-variant mb-2 z-10">
+<span class="material-symbols-outlined text-sm" data-icon="menu_book">menu_book</span>
+<span class="font-label-md text-label-md">Lectures</span>
+</div>
+<div class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary z-10">
+                    42
+                </div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+<div class="absolute -right-4 -top-4 w-16 h-16 bg-secondary-container/10 rounded-full blur-xl group-hover:bg-secondary-container/20 transition-colors"></div>
+<div class="flex items-center gap-2 text-on-surface-variant mb-2 z-10">
+<span class="material-symbols-outlined text-sm" data-icon="group">group</span>
+<span class="font-label-md text-label-md">Students</span>
+</div>
+<div class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary z-10">
+                    840
+                </div>
+</div>
+<div class="bg-primary-container rounded-xl border border-outline-variant p-4 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow col-span-2 md:col-span-1">
+<div class="absolute -right-8 -top-8 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors"></div>
+<div class="flex items-center gap-2 text-on-primary-container mb-2 z-10">
+<span class="material-symbols-outlined text-sm" data-icon="payments">payments</span>
+<span class="font-label-md text-label-md">EGP collected</span>
+</div>
+<div class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-primary z-10">
+                    25,000
+                </div>
+</div>
+</section>
+<!-- Filter Area -->
+<section class="mb-stack-md flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-on-surface hidden md:block">Recent Entries</h2>
+<div class="relative w-full md:w-auto">
+<select class="appearance-none w-full md:w-48 bg-surface-container-lowest border border-outline-variant text-on-surface font-body-md text-body-md rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary shadow-sm cursor-pointer">
+<option>All centers</option>
+<option>Downtown Center</option>
+<option>North Side</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+</section>
+<!-- Entry Cards List -->
+<section class="flex flex-col gap-stack-md">
+<!-- Card 1 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm hover:shadow-md transition-shadow relative group">
+<button class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+<div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-1">
+<h3 class="font-body-lg text-body-lg font-bold text-on-surface">Downtown Center</h3>
+<span class="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded text-xs font-medium">Oct 24, 2023</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-3 flex items-center gap-4">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">person</span> 20 students</span>
+<span class="flex items-center gap-1 font-semibold text-primary"><span class="material-symbols-outlined text-[16px]">payments</span> 5,000 EGP</span>
+</p>
+<div class="bg-surface-container-low rounded-lg p-3 border border-outline-variant/50">
+<h4 class="font-label-md text-label-md text-on-surface-variant mb-2">Assistants</h4>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center gap-1 bg-secondary-container/30 text-on-secondary-container px-2 py-1 rounded text-xs border border-secondary-container/50">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Sarah J. (P)
+                                </span>
+<span class="inline-flex items-center gap-1 bg-error-container/30 text-on-error-container px-2 py-1 rounded text-xs border border-error-container/50">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span> Mike T. (A)
+                                </span>
+</div>
+</div>
+<div class="mt-3 flex items-start gap-2 text-on-surface-variant font-body-md text-body-md text-sm">
+<span class="material-symbols-outlined text-[16px] mt-0.5 text-outline">sticky_note_2</span>
+<p><span class="font-semibold">Note:</span> Regular session</p>
+</div>
+</div>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm hover:shadow-md transition-shadow relative group">
+<button class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+<div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-1">
+<h3 class="font-body-lg text-body-lg font-bold text-on-surface">North Side</h3>
+<span class="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded text-xs font-medium">Oct 23, 2023</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-3 flex items-center gap-4">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">person</span> 15 students</span>
+<span class="flex items-center gap-1 font-semibold text-primary"><span class="material-symbols-outlined text-[16px]">payments</span> 3,750 EGP</span>
+</p>
+<div class="bg-surface-container-low rounded-lg p-3 border border-outline-variant/50">
+<h4 class="font-label-md text-label-md text-on-surface-variant mb-2">Assistants</h4>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center gap-1 bg-secondary-container/30 text-on-secondary-container px-2 py-1 rounded text-xs border border-secondary-container/50">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Lina K. (P)
+                                </span>
+</div>
+</div>
+</div>
+</div>
+</article>
+</section>
+<!-- Load More (Optional UX improvement) -->
+<div class="mt-stack-lg flex justify-center">
+<button class="bg-surface-container-low hover:bg-surface-container-high text-on-surface border border-outline-variant px-6 py-2 rounded-full font-label-md text-label-md transition-colors shadow-sm">
+                Load More
+            </button>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 bg-surface dark:bg-surface-dim px-gutter-mobile border-t border-outline-variant dark:border-outline shadow-sm dark:shadow-none z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-high scale-95 active:scale-90 transition-transform duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="add_box">add_box</span>
+<span class="font-label-md text-label-md mt-1 text-[10px]">New Entry</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-secondary text-on-primary-container dark:text-on-secondary rounded-full px-4 py-1 scale-95 active:scale-90 transition-transform duration-150 shadow-sm" href="#">
+<span class="material-symbols-outlined icon-fill" data-icon="list_alt">list_alt</span>
+<span class="font-label-md text-label-md mt-1 text-[10px]">Records</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-high scale-95 active:scale-90 transition-transform duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-md text-label-md mt-1 text-[10px]">Manage</span>
+</a>
+</nav>
+</body></html>
