@@ -139,11 +139,24 @@
         </div>
         
         <!-- Filter/Search -->
-        <div class="relative max-w-md mx-auto w-full">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span class="material-symbols-outlined text-on-surface-variant text-[20px]">search</span>
+        <div class="relative max-w-md mx-auto w-full flex flex-col gap-3">
+            <div class="relative w-full">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="material-symbols-outlined text-on-surface-variant text-[20px]">search</span>
+                </div>
+                <input type="text" id="assistant_search" placeholder="Type your name to filter..." class="block w-full bg-surface-container-low border border-outline-variant rounded-full py-2 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors">
             </div>
-            <input type="text" id="assistant_search" placeholder="Type your name to filter..." class="block w-full bg-surface-container-low border border-outline-variant rounded-full py-2 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors">
+            <div class="relative w-full">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="material-symbols-outlined text-on-surface-variant text-[20px]">filter_list</span>
+                </div>
+                <select id="assistant_dropdown" class="block w-full bg-surface-container-low border border-outline-variant rounded-full py-2 pl-10 pr-10 text-on-surface focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors appearance-none">
+                    <option value="">Or select your name from the list...</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <span class="material-symbols-outlined text-on-surface-variant text-[20px]">expand_more</span>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -195,6 +208,7 @@
                 if (error) throw error;
                 
                 allSchedules = data || [];
+                populateDropdown();
                 document.getElementById('schedule_loading').classList.add('hidden');
                 renderScheduleList();
                 updateStatus('connected');
@@ -278,12 +292,14 @@
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
             const searchVal = document.getElementById('assistant_search').value.toLowerCase().trim();
+            const dropdownVal = document.getElementById('assistant_dropdown').value.toLowerCase();
+            const activeFilter = searchVal || dropdownVal;
             
             // Filter
             let filtered = allSchedules;
-            if (searchVal) {
+            if (activeFilter) {
                 filtered = allSchedules.filter(s => {
-                    return (s.assistants || []).some(a => a.toLowerCase().includes(searchVal));
+                    return (s.assistants || []).some(a => a.toLowerCase().includes(activeFilter));
                 });
             }
 
@@ -371,8 +387,40 @@
             updateCountdowns();
         }
 
-        // Search Input Listener
-        document.getElementById('assistant_search').addEventListener('input', renderScheduleList);
+        function populateDropdown() {
+            const dropdown = document.getElementById('assistant_dropdown');
+            const currentVal = dropdown.value;
+            
+            const uniqueAssistants = new Set();
+            allSchedules.forEach(s => {
+                if (s.assistants) {
+                    s.assistants.forEach(a => uniqueAssistants.add(a));
+                }
+            });
+            
+            const sorted = Array.from(uniqueAssistants).sort();
+            
+            let optionsHTML = '<option value="">Or select your name from the list...</option>';
+            sorted.forEach(a => {
+                optionsHTML += `<option value="${a}">${a}</option>`;
+            });
+            
+            dropdown.innerHTML = optionsHTML;
+            if (sorted.includes(currentVal)) {
+                dropdown.value = currentVal;
+            }
+        }
+
+        // Search Input Listeners
+        document.getElementById('assistant_search').addEventListener('input', () => {
+            document.getElementById('assistant_dropdown').value = '';
+            renderScheduleList();
+        });
+        
+        document.getElementById('assistant_dropdown').addEventListener('change', () => {
+            document.getElementById('assistant_search').value = '';
+            renderScheduleList();
+        });
 
         // Realtime Subscription
         if (supabaseClient) {
@@ -388,6 +436,7 @@
                         const index = allSchedules.findIndex(s => s.id === payload.new.id);
                         if (index !== -1) allSchedules[index] = payload.new;
                     }
+                    populateDropdown();
                     renderScheduleList();
                 })
                 .subscribe((status) => {
