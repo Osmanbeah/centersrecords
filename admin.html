@@ -391,6 +391,19 @@
             </div>
             
             <form id="new-schedule-form" class="space-y-stack-md mb-8">
+                <input type="hidden" id="schedule_edit_id" value=""/>
+                
+                <!-- Edit Mode Banner -->
+                <div id="schedule_form_mode_banner" class="hidden flex items-center justify-between bg-secondary-container/40 border border-secondary p-3 rounded-xl mb-3">
+                    <div class="flex items-center gap-2 text-on-secondary-container font-label-md">
+                        <span class="material-symbols-outlined text-[18px]">edit</span>
+                        <span>Editing Schedule Assignment</span>
+                    </div>
+                    <button type="button" onclick="cancelScheduleEdit()" class="text-xs font-semibold text-error hover:underline flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[14px]">close</span> Cancel
+                    </button>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
                     <!-- Date Picker -->
                     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
@@ -425,12 +438,17 @@
                         </div>
                     </div>
                 </div>
-                <!-- Submit Button -->
+                <!-- Submit & Cancel Buttons -->
                 <div class="pt-stack-md pb-stack-lg">
-                    <button type="submit" id="btn_save_schedule" class="w-full bg-primary-container text-on-primary h-14 rounded-full font-label-md ambient-shadow flex justify-center items-center gap-2 hover:bg-secondary transition-colors duration-200">
-                        <span class="material-symbols-outlined icon-fill">calendar_add_on</span>
-                        Schedule Assignment
-                    </button>
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <button type="submit" id="btn_save_schedule" class="flex-grow w-full bg-primary-container text-on-primary h-14 rounded-full font-label-md ambient-shadow flex justify-center items-center gap-2 hover:bg-secondary transition-colors duration-200">
+                            <span id="btn_save_schedule_icon" class="material-symbols-outlined icon-fill">calendar_add_on</span>
+                            <span id="btn_save_schedule_text">Schedule Assignment</span>
+                        </button>
+                        <button type="button" id="btn_cancel_schedule_edit" onclick="cancelScheduleEdit()" class="hidden w-full sm:w-auto px-6 h-14 rounded-full border border-outline-variant text-on-surface hover:bg-surface-container font-label-md transition-colors flex items-center justify-center gap-1">
+                            Cancel
+                        </button>
+                    </div>
                     <p id="schedule_error" class="text-error text-center mt-2 font-label-md hidden"></p>
                 </div>
             </form>
@@ -1170,9 +1188,14 @@
                             ${locationDisplay}
                             <div class="flex flex-wrap gap-2 mt-2">${assistantsTags}</div>
                         </div>
-                        <button onclick="deleteSchedule('${item.id}')" class="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
-                            <span class="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick="editSchedule('${item.id}')" title="Edit schedule" class="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                                <span class="material-symbols-outlined text-[20px]">edit</span>
+                            </button>
+                            <button onclick="deleteSchedule('${item.id}')" title="Delete schedule" class="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                                <span class="material-symbols-outlined text-[20px]">delete</span>
+                            </button>
+                        </div>
                     </article>
                     `);
                 });
@@ -1187,6 +1210,7 @@
             const errorEl = document.getElementById('schedule_error');
             errorEl.classList.add('hidden');
             
+            const editId = document.getElementById('schedule_edit_id').value;
             const date = document.getElementById('schedule_date').value;
             const time = document.getElementById('schedule_time').value;
             const center = document.getElementById('schedule_center').value;
@@ -1212,33 +1236,108 @@
             btn.innerHTML = `<div class="loading-spinner"></div> Saving...`;
 
             try {
-                const { data, error } = await supabaseClient
-                    .from('schedule')
-                    .insert([
-                        { date: date, time: time, center: center, address: locationVal, assistants: selectedAssistants }
-                    ])
-                    .select();
+                if (editId) {
+                    // Update existing
+                    const { data, error } = await supabaseClient
+                        .from('schedule')
+                        .update({ date: date, time: time, center: center, address: locationVal, assistants: selectedAssistants })
+                        .eq('id', editId)
+                        .select();
 
-                if (error) throw error;
-                
-                // Add to local state and re-render instantly instead of waiting for fetch
-                if(data && data.length > 0) {
-                    State.schedules.push(data[0]);
-                    State.schedules.sort((a,b) => new Date(a.date) - new Date(b.date));
-                    renderScheduleList();
+                    if (error) throw error;
+
+                    if (data && data.length > 0) {
+                        const idx = State.schedules.findIndex(s => s.id === editId);
+                        if (idx !== -1) State.schedules[idx] = data[0];
+                        State.schedules.sort((a,b) => new Date(a.date) - new Date(b.date));
+                        renderScheduleList();
+                    }
+                    cancelScheduleEdit();
+                } else {
+                    // Insert new
+                    const { data, error } = await supabaseClient
+                        .from('schedule')
+                        .insert([
+                            { date: date, time: time, center: center, address: locationVal, assistants: selectedAssistants }
+                        ])
+                        .select();
+
+                    if (error) throw error;
+                    
+                    if (data && data.length > 0) {
+                        State.schedules.push(data[0]);
+                        State.schedules.sort((a,b) => new Date(a.date) - new Date(b.date));
+                        renderScheduleList();
+                    }
+
+                    // Reset form
+                    document.querySelectorAll('.sched-assistant-cb').forEach(cb => cb.checked = false);
                 }
-
-                // Reset form
-                document.querySelectorAll('.sched-assistant-cb').forEach(cb => cb.checked = false);
             } catch (err) {
-                console.error("Insert error:", err);
+                console.error("Insert/Update error:", err);
                 errorEl.textContent = "Failed to save schedule. Check console.";
                 errorEl.classList.remove('hidden');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = `<span class="material-symbols-outlined icon-fill">calendar_add_on</span> Schedule Assignment`;
+                if (!document.getElementById('schedule_edit_id').value) {
+                    const iconEl = document.getElementById('btn_save_schedule_icon');
+                    const textEl = document.getElementById('btn_save_schedule_text');
+                    if (iconEl) iconEl.textContent = 'calendar_add_on';
+                    if (textEl) textEl.textContent = 'Schedule Assignment';
+                }
             }
         });
+
+        window.editSchedule = function(id) {
+            const item = State.schedules.find(s => s.id === id);
+            if (!item) return;
+
+            document.getElementById('schedule_edit_id').value = item.id;
+            document.getElementById('schedule_date').value = item.date || '';
+            document.getElementById('schedule_time').value = item.time || '';
+            
+            const centerSelect = document.getElementById('schedule_center');
+            centerSelect.value = item.center || '';
+
+            document.getElementById('schedule_location').value = item.address || '';
+
+            const assigned = item.assistants || [];
+            document.querySelectorAll('.sched-assistant-cb').forEach(cb => {
+                cb.checked = assigned.includes(cb.value);
+            });
+
+            document.getElementById('schedule_form_mode_banner').classList.remove('hidden');
+            const iconEl = document.getElementById('btn_save_schedule_icon');
+            const textEl = document.getElementById('btn_save_schedule_text');
+            if (iconEl) iconEl.textContent = 'save';
+            if (textEl) textEl.textContent = 'Update Schedule';
+            document.getElementById('btn_cancel_schedule_edit').classList.remove('hidden');
+
+            document.getElementById('new-schedule-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        window.cancelScheduleEdit = function() {
+            document.getElementById('schedule_edit_id').value = '';
+            document.getElementById('new-schedule-form').reset();
+            document.getElementById('schedule_date').value = new Date().toISOString().split('T')[0];
+            
+            const centerSelect = document.getElementById('schedule_center');
+            if (State.centers.length > 0) {
+                const centerObj = State.centers.find(c => c.name === centerSelect.value) || State.centers[0];
+                document.getElementById('schedule_location').value = centerObj.address || '';
+            } else {
+                document.getElementById('schedule_location').value = '';
+            }
+
+            document.querySelectorAll('.sched-assistant-cb').forEach(cb => cb.checked = false);
+
+            document.getElementById('schedule_form_mode_banner').classList.add('hidden');
+            const iconEl = document.getElementById('btn_save_schedule_icon');
+            const textEl = document.getElementById('btn_save_schedule_text');
+            if (iconEl) iconEl.textContent = 'calendar_add_on';
+            if (textEl) textEl.textContent = 'Schedule Assignment';
+            document.getElementById('btn_cancel_schedule_edit').classList.add('hidden');
+        };
 
         window.deleteSchedule = async function(id) {
             if(confirm("Delete this schedule assignment?")) {
@@ -1251,6 +1350,9 @@
 
                     State.schedules = State.schedules.filter(s => s.id !== id);
                     renderScheduleList();
+                    if (document.getElementById('schedule_edit_id').value === id) {
+                        cancelScheduleEdit();
+                    }
                 } catch(err) {
                     alert("Error deleting schedule.");
                     console.error(err);
