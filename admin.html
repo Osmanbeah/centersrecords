@@ -358,6 +358,23 @@
                     </div>
                 </section>
             </div>
+
+            <!-- Reset / Clear All Data -->
+            <section class="bg-surface-container-lowest rounded-xl border border-error/30 p-stack-md shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h3 class="font-headline-md text-error flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[20px]">delete_forever</span>
+                            Clear All Data
+                        </h3>
+                        <p class="font-body-md text-on-surface-variant mt-1">Permanently remove all centers, assistants, session entries, and assistant schedules.</p>
+                    </div>
+                    <button onclick="clearAllData()" id="btn_clear_all_data" class="px-5 py-2.5 bg-error text-on-error hover:bg-red-700 active:scale-95 rounded-lg font-label-md transition-all shadow-sm shrink-0 flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-[18px]">cleaning_services</span>
+                        Clear Everything
+                    </button>
+                </div>
+            </section>
         </div>
 
         <!-- ================= VIEW: SCHEDULE ================= -->
@@ -460,8 +477,8 @@
 
         // --- Local State Management ---
         const State = {
-            centers: (JSON.parse(localStorage.getItem('ct_centers')) || ['Downtown Center', 'North Side', 'West End']).map(c => typeof c === 'string' ? { name: c, address: '' } : c),
-            assistants: JSON.parse(localStorage.getItem('ct_assistants')) || ['Sarah J.', 'Mike T.', 'Lina K.'],
+            centers: (JSON.parse(localStorage.getItem('ct_centers')) || []).map(c => typeof c === 'string' ? { name: c, address: '' } : c),
+            assistants: JSON.parse(localStorage.getItem('ct_assistants')) || [],
             entries: JSON.parse(localStorage.getItem('ct_entries')) || [],
             schedules: [] // populated from supabase
         };
@@ -624,6 +641,57 @@
             State.assistants = State.assistants.filter(a => a !== assistant);
             saveState();
             renderManageAssistants();
+        };
+
+        window.clearAllData = async function() {
+            if (!confirm("Are you sure you want to clear ALL data? This will delete all centers, assistants, records, and schedules permanently.")) {
+                return;
+            }
+            const btn = document.getElementById('btn_clear_all_data');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<div class="loading-spinner"></div> Clearing...`;
+            }
+
+            try {
+                // Clear Supabase schedules
+                if (supabaseClient) {
+                    await supabaseClient
+                        .from('schedule')
+                        .delete()
+                        .neq('id', '00000000-0000-0000-0000-000000000000');
+                }
+
+                // Clear Local Storage
+                localStorage.removeItem('ct_centers');
+                localStorage.removeItem('ct_assistants');
+                localStorage.removeItem('ct_entries');
+
+                // Reset State
+                State.centers = [];
+                State.assistants = [];
+                State.entries = [];
+                State.schedules = [];
+
+                // Re-render
+                renderManageCenters();
+                renderManageAssistants();
+                initNewEntryView();
+                initRecordsView();
+                renderRecords();
+                initScheduleView();
+                renderScheduleList();
+
+                alert("All data has been cleared successfully!");
+            } catch (err) {
+                console.error("Error clearing data:", err);
+                alert("Error clearing some data. Check console.");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">cleaning_services</span> Clear Everything`;
+                }
+            }
         };
 
         // --- New Entry View ---
