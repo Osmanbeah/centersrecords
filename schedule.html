@@ -170,6 +170,10 @@
             <span id="status_text">Connecting to schedule...</span>
         </div>
 
+        <!-- Date Selector Pills -->
+        <div id="date_selector_container" class="flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none">
+        </div>
+
         <div id="schedule_loading" class="flex justify-center py-12">
             <div class="loading-spinner"></div>
         </div>
@@ -195,6 +199,9 @@
         }
 
         let allSchedules = [];
+        let selectedDateFilter = 'auto'; // 'auto' (active day), 'all', or specific 'YYYY-MM-DD'
+        let currentActiveDay = null;
+        const LECTURE_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours duration per lecture
 
         async function fetchSchedule() {
             try {
@@ -202,7 +209,6 @@
                 const { data, error } = await supabaseClient
                     .from('schedule')
                     .select('*')
-                    .gte('date', new Date().toISOString().split('T')[0]) // Optional: only show today and future
                     .order('date', { ascending: true })
                     .order('time', { ascending: true });
 
@@ -235,40 +241,87 @@
             }
         }
 
-        function updateCountdowns() {
+        function parseSessionDateTime(dateStr, timeStr) {
+            if (!dateStr) return null;
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const [h, min, s] = (timeStr || '00:00:00').split(':').map(Number);
+            return new Date(y, m - 1, d, h || 0, min || 0, s || 0);
+        }
+
+        function getSessionStatus(dateStr, timeStr) {
+            const start = parseSessionDateTime(dateStr, timeStr);
+            if (!start) return { status: 'upcoming', diffMs: 0 };
             const now = new Date();
+            const end = new Date(start.getTime() + LECTURE_DURATION_MS);
+            
+            if (now >= end) {
+                return { status: 'completed', start, end };
+            } else if (now >= start && now < end) {
+                const elapsedMs = now - start;
+                return { status: 'in_progress', start, end, elapsedMs };
+            } else {
+                const diffMs = start - now;
+                return { status: 'upcoming', start, end, diffMs };
+            }
+        }
+
+        function computeActiveDay(schedules) {
+            if (!schedules || schedules.length === 0) return null;
+
+            // Group by date
+            const grouped = {};
+            schedules.forEach(s => {
+                if (!grouped[s.date]) grouped[s.date] = [];
+                grouped[s.date].push(s);
+            });
+
+            const sortedDates = Object.keys(grouped).sort();
+            const now = new Date();
+
+            for (const date of sortedDates) {
+                const sessions = grouped[date];
+                // Find the latest end time among sessions on this date
+                let maxEndTime = 0;
+                sessions.forEach(s => {
+                    const start = parseSessionDateTime(s.date, s.time);
+                    if (start) {
+                        const end = start.getTime() + LECTURE_DURATION_MS;
+                        if (end > maxEndTime) maxEndTime = end;
+                    }
+                });
+
+                // If the last session has not ended yet, this date is active!
+                if (now.getTime() < maxEndTime) {
+                    return date;
+                }
+            }
+
+            // If all scheduled dates are done, default to the last available date
+            return sortedDates[sortedDates.length - 1];
+        }
+
+        function updateCountdowns() {
+            const newActive = computeActiveDay(allSchedules);
+            if (newActive && newActive !== currentActiveDay && selectedDateFilter === 'auto') {
+                currentActiveDay = newActive;
+                renderScheduleList();
+                return;
+            }
+
             document.querySelectorAll('.countdown-timer').forEach(el => {
                 const dateStr = el.getAttribute('data-date');
                 const timeStr = el.getAttribute('data-time');
-                if (!dateStr || !timeStr) {
-                    el.innerHTML = '';
-                    return;
-                }
+                if (!dateStr || !timeStr) return;
                 
-                // Parse date and time
-                const [y, m, d] = dateStr.split('-');
-                const [h, min, s] = timeStr.split(':');
-                const target = new Date(y, m - 1, d, h || 0, min || 0, s || 0);
+                const sessionInfo = getSessionStatus(dateStr, timeStr);
                 
-                const diffMs = target - now;
-                
-                if (diffMs < 0) {
-                    const diffMins = Math.floor(Math.abs(diffMs) / 60000);
-                    let startedText = "Started";
-                    if (diffMins > 0) {
-                        const hStr = Math.floor(diffMins / 60);
-                        const mStr = diffMins % 60;
-                        if (hStr > 0) {
-                            startedText += ` ${hStr}h ${mStr}m ago`;
-                        } else {
-                            startedText += ` ${mStr}m ago`;
-                        }
-                    } else {
-                        startedText += ` just now`;
-                    }
-                    el.innerHTML = `<span class="text-error font-medium">${startedText}</span>`;
+                if (sessionInfo.status === 'completed') {
+                    el.innerHTML = `<span class="inline-flex items-center gap-1 text-on-surface-variant font-medium text-xs"><span class="material-symbols-outlined text-[14px] text-outline">check_circle</span> Session Finished</span>`;
+                } else if (sessionInfo.status === 'in_progress') {
+                    const mins = Math.floor(sessionInfo.elapsedMs / 60000);
+                    el.innerHTML = `<span class="inline-flex items-center gap-1 text-secondary font-semibold text-xs animate-pulse"><span class="material-symbols-outlined text-[14px]">play_circle</span> Ongoing (${mins}m ago)</span>`;
                 } else {
-                    const diffSec = Math.floor(diffMs / 1000);
+                    const diffSec = Math.floor(sessionInfo.diffMs / 1000);
                     const hStr = Math.floor(diffSec / 3600);
                     const mStr = Math.floor((diffSec % 3600) / 60);
                     const sStr = diffSec % 60;
@@ -276,7 +329,7 @@
                     if (hStr > 0) text += `${hStr}h `;
                     if (mStr > 0 || hStr > 0) text += `${mStr}m `;
                     text += `${sStr}s`;
-                    el.innerHTML = `<span class="text-secondary font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>${text}</span>`;
+                    el.innerHTML = `<span class="text-secondary font-medium flex items-center gap-1 text-xs"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>${text}</span>`;
                 }
             });
         }
@@ -290,21 +343,89 @@
             return `${hour}:${m} ${ampm}`;
         }
 
+        function setDateFilter(dateVal) {
+            selectedDateFilter = dateVal;
+            renderScheduleList();
+        }
+
+        function renderDatePills(allDates, activeDate) {
+            const container = document.getElementById('date_selector_container');
+            if (!container) return;
+
+            if (allDates.length <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            let pillsHTML = `
+                <button type="button" onclick="setDateFilter('auto')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 ${selectedDateFilter === 'auto' ? 'bg-primary-container text-on-primary shadow-sm' : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'}">
+                    <span class="material-symbols-outlined text-[14px]">auto_awesome</span>
+                    <span>Current Day</span>
+                </button>
+            `;
+
+            allDates.forEach(date => {
+                const dateObj = new Date(date);
+                const dayLabel = dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+                const isSelected = selectedDateFilter === date || (selectedDateFilter === 'auto' && date === activeDate);
+                const isToday = date === todayStr;
+                const isCurrentActive = date === activeDate;
+
+                pillsHTML += `
+                    <button type="button" onclick="setDateFilter('${date}')" class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 flex items-center gap-1 ${isSelected && selectedDateFilter !== 'auto' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'}">
+                        ${isCurrentActive ? '<span class="w-1.5 h-1.5 rounded-full bg-secondary-fixed-dim"></span>' : ''}
+                        <span>${isToday ? 'Today, ' : ''}${dayLabel}</span>
+                    </button>
+                `;
+            });
+
+            pillsHTML += `
+                <button type="button" onclick="setDateFilter('all')" class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 ${selectedDateFilter === 'all' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'}">
+                    All Dates
+                </button>
+            `;
+
+            container.innerHTML = pillsHTML;
+        }
+
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
             const searchVal = document.getElementById('assistant_search').value.toLowerCase().trim();
             const dropdownVal = document.getElementById('assistant_dropdown').value.toLowerCase();
             const activeFilter = searchVal || dropdownVal;
-            
-            // Filter
-            let filtered = allSchedules;
+
+            currentActiveDay = computeActiveDay(allSchedules);
+
+            // Group all schedules by date
+            const groupedAll = {};
+            allSchedules.forEach(s => {
+                if(!groupedAll[s.date]) groupedAll[s.date] = [];
+                groupedAll[s.date].push(s);
+            });
+            const allDates = Object.keys(groupedAll).sort();
+
+            renderDatePills(allDates, currentActiveDay);
+
+            // Determine target dates to display
+            let targetDates = [];
+            if (selectedDateFilter === 'all') {
+                targetDates = allDates;
+            } else if (selectedDateFilter === 'auto') {
+                targetDates = currentActiveDay ? [currentActiveDay] : allDates;
+            } else {
+                targetDates = [selectedDateFilter];
+            }
+
+            // Filter schedules
+            let filtered = allSchedules.filter(s => targetDates.includes(s.date));
             if (activeFilter) {
-                filtered = allSchedules.filter(s => {
+                filtered = filtered.filter(s => {
                     return (s.assistants || []).some(a => a.toLowerCase().includes(activeFilter));
                 });
             }
 
-            // Before grouping, sort by date and time (fallback in case supabase sorting isn't perfect for realtime inserts)
             filtered.sort((a, b) => {
                 const dateA = a.date || '';
                 const dateB = b.date || '';
@@ -319,12 +440,12 @@
                 <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4">
                     <span class="material-symbols-outlined text-[48px] text-outline-variant mb-2">event_busy</span>
                     <p class="text-on-surface font-body-lg">No assignments found.</p>
-                    ${searchVal ? `<p class="text-on-surface-variant font-body-md mt-1">Try a different name.</p>` : ''}
+                    ${searchVal ? `<p class="text-on-surface-variant font-body-md mt-1">Try a different name or select 'All Dates'.</p>` : ''}
                 </div>`;
                 return;
             }
 
-            // Group by date
+            // Group filtered for display
             const grouped = {};
             filtered.forEach(s => {
                 if(!grouped[s.date]) grouped[s.date] = [];
@@ -333,19 +454,23 @@
 
             const html = [];
             Object.keys(grouped).sort().forEach(date => {
-                // Determine if date is today
                 const isToday = (date === new Date().toISOString().split('T')[0]);
+                const isActive = (date === currentActiveDay);
                 const dateObj = new Date(date);
-                // Adjust for local time mapping if needed, but assuming yyyy-mm-dd matches local
                 const dateFormatted = dateObj.toLocaleDateString(undefined, {weekday: 'long', month:'long', day:'numeric'});
                 
-                const dateLabelClass = isToday 
-                    ? "font-label-md text-primary bg-primary-fixed px-3 py-1 rounded-full inline-block uppercase tracking-wider shadow-sm"
-                    : "font-label-md text-on-surface-variant px-1 inline-block uppercase tracking-wider";
+                const dateBadge = isActive 
+                    ? `<span class="bg-primary-container text-on-primary text-[10px] font-bold px-2 py-0.5 rounded-full tracking-normal">ACTIVE SCHEDULE</span>`
+                    : '';
 
-                const datePrefix = isToday ? "Today: " : "";
-
-                html.push(`<div class="mt-6 mb-3 sticky top-[104px] z-0"><h2 class="${dateLabelClass}">${datePrefix}${dateFormatted}</h2></div>`);
+                html.push(`
+                    <div class="mt-4 mb-2 flex items-center justify-between sticky top-[104px] z-0 bg-background/90 backdrop-blur-sm py-1.5">
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-label-md text-on-surface uppercase tracking-wider font-bold">${isToday ? 'Today: ' : ''}${dateFormatted}</h2>
+                            ${dateBadge}
+                        </div>
+                    </div>
+                `);
                 
                 grouped[date].forEach(item => {
                     const assistantsTags = (item.assistants || []).map(a => {
@@ -356,8 +481,20 @@
                         return `<span class="${tagClass}">${a}</span>`;
                     }).join('');
 
+                    const statusInfo = getSessionStatus(date, item.time);
+                    let badgeHtml = '';
+                    if (statusInfo.status === 'completed') {
+                        badgeHtml = `<span class="inline-flex items-center gap-1 bg-surface-variant text-on-surface-variant px-2.5 py-0.5 rounded-full text-[11px] font-semibold"><span class="material-symbols-outlined text-[13px]">check_circle</span> Completed</span>`;
+                    } else if (statusInfo.status === 'in_progress') {
+                        badgeHtml = `<span class="inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-2.5 py-0.5 rounded-full text-[11px] font-bold animate-pulse"><span class="material-symbols-outlined text-[13px]">play_circle</span> In Progress</span>`;
+                    }
+
                     const timeDisplay = item.time 
-                        ? `<div class="font-label-md text-on-surface-variant flex items-center gap-1 mt-1"><span class="material-symbols-outlined text-[16px]">schedule</span> ${formatTime(item.time)}</div><div class="countdown-timer font-label-sm mt-1" data-date="${date}" data-time="${item.time}"></div>` 
+                        ? `<div class="font-label-md text-on-surface-variant flex items-center gap-2 mt-1">
+                             <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> ${formatTime(item.time)}</span>
+                             ${badgeHtml}
+                           </div>
+                           <div class="countdown-timer font-label-sm mt-1" data-date="${date}" data-time="${item.time}"></div>` 
                         : '';
 
                     let locationButton = '';
@@ -376,8 +513,10 @@
                         `;
                     }
 
+                    const cardOpacity = statusInfo.status === 'completed' ? 'opacity-75 bg-surface-container-low' : 'bg-surface-container-lowest';
+
                     html.push(`
-                    <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm relative transition-all duration-300">
+                    <article class="${cardOpacity} rounded-xl border border-outline-variant p-5 shadow-sm relative transition-all duration-300">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 pb-3 border-b border-surface-variant/50">
                             <div class="flex items-start gap-3">
                                 <span class="material-symbols-outlined text-secondary-fixed-dim bg-secondary/10 p-2.5 rounded-xl shrink-0 mt-0.5">storefront</span>
