@@ -1228,9 +1228,23 @@
             listContainer.innerHTML = html.join('');
         }
 
+        function setScheduleButtonState(mode = 'create') {
+            const btn = document.getElementById('btn_save_schedule');
+            if (!btn) return;
+            if (mode === 'loading') {
+                btn.disabled = true;
+                btn.innerHTML = `<div class="loading-spinner"></div> <span>Saving...</span>`;
+            } else if (mode === 'edit') {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined icon-fill">save</span> <span>Update Schedule</span>`;
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined icon-fill">calendar_add_on</span> <span>Schedule Assignment</span>`;
+            }
+        }
+
         document.getElementById('new-schedule-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const btn = document.getElementById('btn_save_schedule');
             const errorEl = document.getElementById('schedule_error');
             errorEl.classList.add('hidden');
             
@@ -1256,8 +1270,7 @@
                 return;
             }
 
-            btn.disabled = true;
-            btn.innerHTML = `<div class="loading-spinner"></div> Saving...`;
+            setScheduleButtonState('loading');
 
             try {
                 if (editId) {
@@ -1296,19 +1309,13 @@
 
                     // Reset form
                     document.querySelectorAll('.sched-assistant-cb').forEach(cb => cb.checked = false);
+                    setScheduleButtonState('create');
                 }
             } catch (err) {
                 console.error("Insert/Update error:", err);
                 errorEl.textContent = "Failed to save schedule. Check console.";
                 errorEl.classList.remove('hidden');
-            } finally {
-                btn.disabled = false;
-                if (!document.getElementById('schedule_edit_id').value) {
-                    const iconEl = document.getElementById('btn_save_schedule_icon');
-                    const textEl = document.getElementById('btn_save_schedule_text');
-                    if (iconEl) iconEl.textContent = 'calendar_add_on';
-                    if (textEl) textEl.textContent = 'Schedule Assignment';
-                }
+                setScheduleButtonState(editId ? 'edit' : 'create');
             }
         });
 
@@ -1331,10 +1338,7 @@
             });
 
             document.getElementById('schedule_form_mode_banner').classList.remove('hidden');
-            const iconEl = document.getElementById('btn_save_schedule_icon');
-            const textEl = document.getElementById('btn_save_schedule_text');
-            if (iconEl) iconEl.textContent = 'save';
-            if (textEl) textEl.textContent = 'Update Schedule';
+            setScheduleButtonState('edit');
             document.getElementById('btn_cancel_schedule_edit').classList.remove('hidden');
 
             document.getElementById('new-schedule-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1356,10 +1360,7 @@
             document.querySelectorAll('.sched-assistant-cb').forEach(cb => cb.checked = false);
 
             document.getElementById('schedule_form_mode_banner').classList.add('hidden');
-            const iconEl = document.getElementById('btn_save_schedule_icon');
-            const textEl = document.getElementById('btn_save_schedule_text');
-            if (iconEl) iconEl.textContent = 'calendar_add_on';
-            if (textEl) textEl.textContent = 'Schedule Assignment';
+            setScheduleButtonState('create');
             document.getElementById('btn_cancel_schedule_edit').classList.add('hidden');
         };
 
