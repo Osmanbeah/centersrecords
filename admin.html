@@ -647,16 +647,27 @@
             const input = document.getElementById('new-center-input');
             const addressInput = document.getElementById('new-center-address');
             const val = input.value.trim();
-            const addressVal = addressInput.value.trim();
-            if (val && !State.centers.find(c => c.name === val)) {
-                State.centers.push({ name: val, address: addressVal });
-                saveState();
-                input.value = '';
-                addressInput.value = '';
-                renderManageCenters();
-                initNewEntryView(); 
+            const addressVal = addressInput ? addressInput.value.trim() : '';
+            if (!val) return;
+
+            const exists = State.centers.some(c => c.name.toLowerCase() === val.toLowerCase());
+            if (exists) {
+                alert(`Center "${val}" is already in the list.`);
+                return;
+            }
+
+            State.centers.push({ name: val, address: addressVal });
+            saveState();
+            input.value = '';
+            if (addressInput) addressInput.value = '';
+            renderManageCenters();
+            
+            // Sync other views if open
+            if (!document.getElementById('view-new-entry').classList.contains('hidden')) {
+                initNewEntryView();
+            }
+            if (!document.getElementById('view-records').classList.contains('hidden')) {
                 initRecordsView();
-                initScheduleView();
             }
         });
 
@@ -664,13 +675,22 @@
             e.preventDefault();
             const input = document.getElementById('new-assistant-input');
             const val = input.value.trim();
-            if (val && !State.assistants.includes(val)) {
-                State.assistants.push(val);
-                saveState();
-                input.value = '';
-                renderManageAssistants();
-                initNewEntryView();
-                initScheduleView();
+            if (!val) return;
+
+            const exists = State.assistants.some(a => a.toLowerCase() === val.toLowerCase());
+            if (exists) {
+                alert(`Assistant "${val}" is already in the list.`);
+                return;
+            }
+
+            State.assistants.push(val);
+            saveState();
+            input.value = '';
+            renderManageAssistants();
+            
+            // Sync New Entry view if open
+            if (!document.getElementById('view-new-entry').classList.contains('hidden')) {
+                renderEntryAssistants();
             }
         });
 
@@ -682,9 +702,12 @@
             }
             saveState();
             renderManageCenters();
-            initNewEntryView();
-            initRecordsView();
-            initScheduleView();
+            if (!document.getElementById('view-new-entry').classList.contains('hidden')) {
+                initNewEntryView();
+            }
+            if (!document.getElementById('view-records').classList.contains('hidden')) {
+                initRecordsView();
+            }
         };
 
         window.deleteAssistant = function(target) {
@@ -695,8 +718,9 @@
             }
             saveState();
             renderManageAssistants();
-            initNewEntryView();
-            initScheduleView();
+            if (!document.getElementById('view-new-entry').classList.contains('hidden')) {
+                renderEntryAssistants();
+            }
         };
 
         window.clearAllData = async function() {
