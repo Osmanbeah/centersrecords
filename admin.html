@@ -578,7 +578,11 @@
         function renderManageCenters() {
             const container = document.getElementById('manage_centers_list');
             container.innerHTML = '';
-            State.centers.forEach(center => {
+            if (State.centers.length === 0) {
+                container.innerHTML = `<p class="text-sm text-on-surface-variant italic py-4 text-center">No centers added yet.</p>`;
+                return;
+            }
+            State.centers.forEach((center, index) => {
                 const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group";
                 div.innerHTML = `
@@ -586,8 +590,8 @@
                         <span class="font-body-lg text-on-surface font-medium">${center.name}</span>
                         ${center.address ? `<span class="text-xs text-on-surface-variant flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-[14px]">location_on</span>${center.address}</span>` : ''}
                     </div>
-                    <button onclick="deleteCenter('${center.name}')" class="text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container/20">
-                        <span class="material-symbols-outlined text-sm">delete</span>
+                    <button type="button" onclick="deleteCenter(${index})" title="Delete ${center.name}" class="text-on-surface-variant hover:text-error hover:bg-error-container/30 transition-colors p-2 rounded-full active:scale-95">
+                        <span class="material-symbols-outlined text-[20px]">delete</span>
                     </button>
                 `;
                 container.appendChild(div);
@@ -597,6 +601,10 @@
         function renderManageAssistants() {
             const container = document.getElementById('manage_assistants_list');
             container.innerHTML = '';
+            if (State.assistants.length === 0) {
+                container.innerHTML = `<p class="text-sm text-on-surface-variant italic py-4 text-center">No assistants added yet.</p>`;
+                return;
+            }
             State.assistants.forEach((assistant, index) => {
                 const colorClass = `avatar-color-${index % 3}`;
                 const div = document.createElement('div');
@@ -608,7 +616,7 @@
                         </div>
                         <span class="font-body-lg text-on-surface">${assistant}</span>
                     </div>
-                    <button onclick="deleteAssistant('${assistant}')" class="text-on-surface-variant hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+                    <button type="button" onclick="deleteAssistant(${index})" title="Delete ${assistant}" class="text-on-surface-variant hover:text-error hover:bg-error-container/30 transition-colors p-2 rounded-full active:scale-95">
                         <span class="material-symbols-outlined text-[20px]">delete</span>
                     </button>
                 `;
@@ -630,6 +638,7 @@
                 renderManageCenters();
                 initNewEntryView(); 
                 initRecordsView();
+                initScheduleView();
             }
         });
 
@@ -643,19 +652,33 @@
                 input.value = '';
                 renderManageAssistants();
                 initNewEntryView();
+                initScheduleView();
             }
         });
 
-        window.deleteCenter = function(centerName) {
-            State.centers = State.centers.filter(c => c.name !== centerName);
+        window.deleteCenter = function(target) {
+            if (typeof target === 'number') {
+                State.centers.splice(target, 1);
+            } else {
+                State.centers = State.centers.filter(c => c.name !== target);
+            }
             saveState();
             renderManageCenters();
+            initNewEntryView();
+            initRecordsView();
+            initScheduleView();
         };
 
-        window.deleteAssistant = function(assistant) {
-            State.assistants = State.assistants.filter(a => a !== assistant);
+        window.deleteAssistant = function(target) {
+            if (typeof target === 'number') {
+                State.assistants.splice(target, 1);
+            } else {
+                State.assistants = State.assistants.filter(a => a !== target);
+            }
             saveState();
             renderManageAssistants();
+            initNewEntryView();
+            initScheduleView();
         };
 
         window.clearAllData = async function() {
