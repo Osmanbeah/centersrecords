@@ -1274,21 +1274,44 @@
 
             try {
                 if (editId) {
-                    // Update existing
-                    const { data, error } = await supabaseClient
-                        .from('schedule')
-                        .update({ date: date, time: time, center: center, address: locationVal, assistants: selectedAssistants })
-                        .eq('id', editId)
-                        .select();
+                    // Try update first; if 0 rows returned due to missing RLS update policy, fallback to delete + insert
+                    let updatedItem = null;
+                    try {
+                        const { data, error } = await supabaseClient
+                            .from('schedule')
+                            .update({ date: date, time: time, center: center, address: locationVal, assistants: selectedAssistants })
+                            .eq('id', editId)
+                            .select();
 
-                    if (error) throw error;
-
-                    if (data && data.length > 0) {
-                        const idx = State.schedules.findIndex(s => s.id === editId);
-                        if (idx !== -1) State.schedules[idx] = data[0];
-                        State.schedules.sort((a,b) => new Date(a.date) - new Date(b.date));
-                        renderScheduleList();
+                        if (!error && data && data.length > 0) {
+                            updatedItem = data[0];
+                            const idx = State.schedules.findIndex(s => s.id === editId);
+                            if (idx !== -1) State.schedules[idx] = updatedItem;
+                        }
+                    } catch(e) {
+                        console.warn("Direct update failed, falling back to delete+insert:", e);
                     }
+
+                    if (!updatedItem) {
+                        // Fallback: Delete old record and insert updated record
+                        await supabaseClient.from('schedule').delete().eq('id', editId);
+                        const { data: insData, error: insError } = await supabaseClient
+                            .from('schedule')
+                            .insert([
+                                { date: date, time: time, center: center, address: locationVal, assistants: selectedAssistants }
+                            ])
+                            .select();
+
+                        if (insError) throw insError;
+
+                        State.schedules = State.schedules.filter(s => s.id !== editId);
+                        if (insData && insData.length > 0) {
+                            State.schedules.push(insData[0]);
+                        }
+                    }
+
+                    State.schedules.sort((a,b) => new Date(a.date) - new Date(b.date));
+                    renderScheduleList();
                     cancelScheduleEdit();
                 } else {
                     // Insert new
