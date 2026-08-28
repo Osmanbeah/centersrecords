@@ -749,44 +749,106 @@
                 centerSelect.value = currentCenter;
             }
 
+            renderEntryAssistants();
+        }
+
+        function renderEntryAssistants(forceShowAll = false) {
+            const centerSelect = document.getElementById('entry_center');
+            const center = centerSelect ? centerSelect.value : '';
+            const dateInput = document.getElementById('entry_date');
+            const date = dateInput ? dateInput.value : '';
             const assistantsList = document.getElementById('entry_assistants_list');
-            if (State.assistants.length === 0) {
-                assistantsList.innerHTML = `
-                    <div class="p-4 rounded-lg bg-surface-container-low border border-dashed border-outline-variant text-center">
-                        <p class="text-sm text-on-surface-variant italic mb-2">No assistants added yet.</p>
-                        <button type="button" onclick="switchTab('manage')" class="text-xs text-primary font-semibold hover:underline inline-flex items-center gap-1">
-                            <span class="material-symbols-outlined text-[14px]">add</span> Go to Manage to add assistants
-                        </button>
-                    </div>
-                `;
-            } else {
-                assistantsList.innerHTML = State.assistants.map((assistant) => `
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-surface-variant bg-surface gap-3 transition-colors hover:bg-surface-container-low">
-                        <label class="flex items-center cursor-pointer flex-grow select-none">
-                            <input type="checkbox" name="assistants" value="${assistant}" checked 
-                                class="assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
-                            <span class="ml-3 font-body-lg text-on-surface font-medium">${assistant}</span>
-                        </label>
-                        <div class="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                            <!-- Bonus Input -->
-                            <div class="flex items-center gap-1 bg-secondary/10 border border-secondary/30 px-2.5 py-1 rounded-lg">
-                                <span class="text-xs font-bold text-secondary">+</span>
-                                <input type="number" min="0" step="any" placeholder="Bonus" data-assistant="${assistant}"
-                                    class="assistant-bonus-input w-20 sm:w-24 text-right bg-surface-container-lowest border border-secondary/30 rounded px-2 py-1 text-xs font-semibold text-secondary focus:outline-none focus:ring-1 focus:ring-secondary" title="Bonus (EGP)"/>
-                                <span class="text-[10px] text-secondary font-medium">EGP</span>
-                            </div>
-                            <!-- Deduction Input -->
-                            <div class="flex items-center gap-1 bg-error/10 border border-error/30 px-2.5 py-1 rounded-lg">
-                                <span class="text-xs font-bold text-error">-</span>
-                                <input type="number" min="0" step="any" placeholder="Deduct" data-assistant="${assistant}"
-                                    class="assistant-deduct-input w-20 sm:w-24 text-right bg-surface-container-lowest border border-error/30 rounded px-2 py-1 text-xs font-semibold text-error focus:outline-none focus:ring-1 focus:ring-error" title="Deduction (EGP)"/>
-                                <span class="text-[10px] text-error font-medium">EGP</span>
+            if (!assistantsList) return;
+
+            if (!center || State.centers.length === 0) {
+                assistantsList.innerHTML = `<p class="text-sm text-on-surface-variant italic py-3 text-center">Please select a center first.</p>`;
+                return;
+            }
+
+            // Find scheduled assistants for the selected center
+            let scheduledAssistants = [];
+            if (!forceShowAll && State.schedules && State.schedules.length > 0) {
+                // First check matching center & date
+                const exactMatches = State.schedules.filter(s => s.center === center && (!date || s.date === date));
+                if (exactMatches.length > 0) {
+                    exactMatches.forEach(s => {
+                        if (Array.isArray(s.assistants)) scheduledAssistants.push(...s.assistants);
+                    });
+                } else {
+                    // Fallback to any schedule for this center
+                    const centerMatches = State.schedules.filter(s => s.center === center);
+                    if (centerMatches.length > 0) {
+                        centerMatches.forEach(s => {
+                            if (Array.isArray(s.assistants)) scheduledAssistants.push(...s.assistants);
+                        });
+                    }
+                }
+                scheduledAssistants = Array.from(new Set(scheduledAssistants));
+            }
+
+            const listToRender = (!forceShowAll && scheduledAssistants.length > 0)
+                ? scheduledAssistants
+                : (forceShowAll ? State.assistants : []);
+
+            if (listToRender.length === 0) {
+                if (State.assistants.length === 0) {
+                    assistantsList.innerHTML = `
+                        <div class="p-4 rounded-lg bg-surface-container-low border border-dashed border-outline-variant text-center">
+                            <p class="text-sm text-on-surface-variant italic mb-2">No assistants added yet.</p>
+                            <button type="button" onclick="switchTab('manage')" class="text-xs text-primary font-semibold hover:underline inline-flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">add</span> Go to Manage to add assistants
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    assistantsList.innerHTML = `
+                        <div class="p-4 rounded-lg bg-surface-container-low border border-dashed border-outline-variant text-center">
+                            <span class="material-symbols-outlined text-outline text-[28px] mb-1">event_busy</span>
+                            <p class="text-sm text-on-surface font-medium mb-1">No assistants scheduled for <span class="text-primary font-semibold">${center}</span>.</p>
+                            <p class="text-xs text-on-surface-variant mb-3">Only assistants assigned in the Schedule tab for this center will appear.</p>
+                            <div class="flex items-center justify-center gap-3">
+                                <button type="button" onclick="switchTab('schedule')" class="px-3 py-1.5 bg-primary-container text-on-primary rounded-lg text-xs font-semibold hover:bg-secondary transition-colors">
+                                    Assign in Schedule
+                                </button>
+                                <button type="button" onclick="renderEntryAssistants(true)" class="px-3 py-1.5 border border-outline-variant text-on-surface hover:bg-surface-container rounded-lg text-xs font-medium transition-colors">
+                                    Show All Assistants
+                                </button>
                             </div>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }
+                return;
             }
+
+            assistantsList.innerHTML = listToRender.map((assistant) => `
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-surface-variant bg-surface gap-3 transition-colors hover:bg-surface-container-low">
+                    <label class="flex items-center cursor-pointer flex-grow select-none">
+                        <input type="checkbox" name="assistants" value="${assistant}" checked 
+                            class="assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
+                        <span class="ml-3 font-body-lg text-on-surface font-medium">${assistant}</span>
+                    </label>
+                    <div class="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        <!-- Bonus Input -->
+                        <div class="flex items-center gap-1 bg-secondary/10 border border-secondary/30 px-2.5 py-1 rounded-lg">
+                            <span class="text-xs font-bold text-secondary">+</span>
+                            <input type="number" min="0" step="any" placeholder="Bonus" data-assistant="${assistant}"
+                                class="assistant-bonus-input w-20 sm:w-24 text-right bg-surface-container-lowest border border-secondary/30 rounded px-2 py-1 text-xs font-semibold text-secondary focus:outline-none focus:ring-1 focus:ring-secondary" title="Bonus (EGP)"/>
+                            <span class="text-[10px] text-secondary font-medium">EGP</span>
+                        </div>
+                        <!-- Deduction Input -->
+                        <div class="flex items-center gap-1 bg-error/10 border border-error/30 px-2.5 py-1 rounded-lg">
+                            <span class="text-xs font-bold text-error">-</span>
+                            <input type="number" min="0" step="any" placeholder="Deduct" data-assistant="${assistant}"
+                                class="assistant-deduct-input w-20 sm:w-24 text-right bg-surface-container-lowest border border-error/30 rounded px-2 py-1 text-xs font-semibold text-error focus:outline-none focus:ring-1 focus:ring-error" title="Deduction (EGP)"/>
+                            <span class="text-[10px] text-error font-medium">EGP</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
         }
+
+        document.getElementById('entry_center').addEventListener('change', () => renderEntryAssistants());
+        document.getElementById('entry_date').addEventListener('change', () => renderEntryAssistants());
 
         document.getElementById('new-entry-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1031,7 +1093,8 @@
         async function fetchSchedule() {
             if (fetchingSchedule) return;
             fetchingSchedule = true;
-            document.getElementById('schedule_list_loading').classList.remove('hidden');
+            const loadingEl = document.getElementById('schedule_list_loading');
+            if (loadingEl) loadingEl.classList.remove('hidden');
             
             try {
                 const { data, error } = await supabaseClient
@@ -1042,11 +1105,14 @@
                 if (error) throw error;
                 State.schedules = data || [];
                 renderScheduleList();
+                const newEntryView = document.getElementById('view-new-entry');
+                if (newEntryView && !newEntryView.classList.contains('hidden')) {
+                    renderEntryAssistants();
+                }
             } catch (err) {
                 console.error("Error fetching schedule:", err);
-                // Optionally show error to user
             } finally {
-                document.getElementById('schedule_list_loading').classList.add('hidden');
+                if (loadingEl) loadingEl.classList.add('hidden');
                 fetchingSchedule = false;
             }
         }
@@ -1197,16 +1263,14 @@
             supabaseClient
                 .channel('public:schedule')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule' }, payload => {
-                    // To keep it simple, just re-fetch the whole list if we are on schedule tab
-                    if(!document.getElementById('view-schedule').classList.contains('hidden')) {
-                        fetchSchedule();
-                    }
+                    fetchSchedule();
                 })
                 .subscribe();
         }
 
         // --- Init ---
         document.addEventListener('DOMContentLoaded', () => {
+            fetchSchedule();
             const hash = window.location.hash.replace('#', '');
             if (['new-entry', 'records', 'manage', 'schedule'].includes(hash)) {
                 switchTab(hash);
