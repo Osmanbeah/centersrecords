@@ -728,15 +728,39 @@
 
             const assistantsList = document.getElementById('entry_assistants_list');
             if (State.assistants.length === 0) {
-                assistantsList.innerHTML = `<p class="text-sm text-on-surface-variant italic">No assistants added yet.</p>`;
+                assistantsList.innerHTML = `
+                    <div class="p-4 rounded-lg bg-surface-container-low border border-dashed border-outline-variant text-center">
+                        <p class="text-sm text-on-surface-variant italic mb-2">No assistants added yet.</p>
+                        <button type="button" onclick="switchTab('manage')" class="text-xs text-primary font-semibold hover:underline inline-flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">add</span> Go to Manage to add assistants
+                        </button>
+                    </div>
+                `;
             } else {
                 assistantsList.innerHTML = State.assistants.map((assistant) => `
-                    <label class="flex items-center p-3 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low cursor-pointer transition-colors">
-                        <input type="checkbox" name="assistants" value="${assistant}" checked 
-                            class="assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
-                        <span class="ml-3 font-body-lg text-on-surface flex-grow">${assistant}</span>
-                        <span class="material-symbols-outlined text-secondary-fixed-dim text-sm icon-fill">check_circle</span>
-                    </label>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-surface-variant bg-surface gap-3 transition-colors hover:bg-surface-container-low">
+                        <label class="flex items-center cursor-pointer flex-grow select-none">
+                            <input type="checkbox" name="assistants" value="${assistant}" checked 
+                                class="assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
+                            <span class="ml-3 font-body-lg text-on-surface font-medium">${assistant}</span>
+                        </label>
+                        <div class="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                            <!-- Bonus Input -->
+                            <div class="flex items-center gap-1 bg-secondary/10 border border-secondary/30 px-2.5 py-1 rounded-lg">
+                                <span class="text-xs font-bold text-secondary">+</span>
+                                <input type="number" min="0" step="any" placeholder="Bonus" data-assistant="${assistant}"
+                                    class="assistant-bonus-input w-20 sm:w-24 text-right bg-surface-container-lowest border border-secondary/30 rounded px-2 py-1 text-xs font-semibold text-secondary focus:outline-none focus:ring-1 focus:ring-secondary" title="Bonus (EGP)"/>
+                                <span class="text-[10px] text-secondary font-medium">EGP</span>
+                            </div>
+                            <!-- Deduction Input -->
+                            <div class="flex items-center gap-1 bg-error/10 border border-error/30 px-2.5 py-1 rounded-lg">
+                                <span class="text-xs font-bold text-error">-</span>
+                                <input type="number" min="0" step="any" placeholder="Deduct" data-assistant="${assistant}"
+                                    class="assistant-deduct-input w-20 sm:w-24 text-right bg-surface-container-lowest border border-error/30 rounded px-2 py-1 text-xs font-semibold text-error focus:outline-none focus:ring-1 focus:ring-error" title="Deduction (EGP)"/>
+                                <span class="text-[10px] text-error font-medium">EGP</span>
+                            </div>
+                        </div>
+                    </div>
                 `).join('');
             }
         }
@@ -760,9 +784,30 @@
 
             const present = [];
             const absent = [];
+            const adjustments = {};
+
             document.querySelectorAll('.assistant-cb').forEach(cb => {
                 if (cb.checked) present.push(cb.value);
                 else absent.push(cb.value);
+            });
+
+            // Gather bonuses and deductions
+            document.querySelectorAll('.assistant-bonus-input').forEach(input => {
+                const name = input.getAttribute('data-assistant');
+                const val = parseFloat(input.value) || 0;
+                if (val > 0) {
+                    if (!adjustments[name]) adjustments[name] = { bonus: 0, deduction: 0 };
+                    adjustments[name].bonus = val;
+                }
+            });
+
+            document.querySelectorAll('.assistant-deduct-input').forEach(input => {
+                const name = input.getAttribute('data-assistant');
+                const val = parseFloat(input.value) || 0;
+                if (val > 0) {
+                    if (!adjustments[name]) adjustments[name] = { bonus: 0, deduction: 0 };
+                    adjustments[name].deduction = val;
+                }
             });
 
             State.entries.unshift({
@@ -773,6 +818,7 @@
                 amount: parseFloat(amountStr) || 0,
                 present,
                 absent,
+                adjustments,
                 note,
                 createdAt: new Date().toISOString()
             });
@@ -823,16 +869,42 @@
                 const dateFormatted = new Date(entry.date).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
                 
                 const assistantsHtml = [
-                    ...entry.present.map(a => `
-                        <span class="inline-flex items-center gap-1 bg-secondary-container/30 text-on-secondary-container px-2 py-1 rounded text-xs border border-secondary-container/50">
-                            <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> ${a} (P)
+                    ...entry.present.map(a => {
+                        const adj = entry.adjustments && entry.adjustments[a];
+                        const bonusBadge = (adj && adj.bonus > 0) 
+                            ? `<span class="bg-secondary text-on-secondary px-1.5 py-0.5 rounded text-[10px] font-bold tracking-tight">+${adj.bonus} EGP</span>` 
+                            : '';
+                        const deductBadge = (adj && adj.deduction > 0) 
+                            ? `<span class="bg-error text-on-error px-1.5 py-0.5 rounded text-[10px] font-bold tracking-tight">-${adj.deduction} EGP</span>` 
+                            : '';
+
+                        return `
+                        <span class="inline-flex items-center gap-1.5 bg-secondary-container/30 text-on-secondary-container px-2.5 py-1 rounded-lg text-xs border border-secondary-container/50 font-medium">
+                            <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> 
+                            <span>${a} (P)</span>
+                            ${bonusBadge}
+                            ${deductBadge}
                         </span>
-                    `),
-                    ...entry.absent.map(a => `
-                        <span class="inline-flex items-center gap-1 bg-error-container/30 text-on-error-container px-2 py-1 rounded text-xs border border-error-container/50">
-                            <span class="w-1.5 h-1.5 rounded-full bg-error"></span> ${a} (A)
+                        `;
+                    }),
+                    ...entry.absent.map(a => {
+                        const adj = entry.adjustments && entry.adjustments[a];
+                        const bonusBadge = (adj && adj.bonus > 0) 
+                            ? `<span class="bg-secondary text-on-secondary px-1.5 py-0.5 rounded text-[10px] font-bold tracking-tight">+${adj.bonus} EGP</span>` 
+                            : '';
+                        const deductBadge = (adj && adj.deduction > 0) 
+                            ? `<span class="bg-error text-on-error px-1.5 py-0.5 rounded text-[10px] font-bold tracking-tight">-${adj.deduction} EGP</span>` 
+                            : '';
+
+                        return `
+                        <span class="inline-flex items-center gap-1.5 bg-error-container/30 text-on-error-container px-2.5 py-1 rounded-lg text-xs border border-error-container/50 font-medium">
+                            <span class="w-1.5 h-1.5 rounded-full bg-error"></span> 
+                            <span>${a} (A)</span>
+                            ${bonusBadge}
+                            ${deductBadge}
                         </span>
-                    `)
+                        `;
+                    })
                 ].join('');
 
                 const noteHtml = entry.note ? `
