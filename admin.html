@@ -368,7 +368,7 @@
             </div>
             
             <form id="new-schedule-form" class="space-y-stack-md mb-8">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-stack-md">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
                     <!-- Date Picker -->
                     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
                         <label class="block font-label-md text-on-surface mb-2" for="schedule_date">Date</label>
@@ -389,6 +389,11 @@
                                 <span class="material-symbols-outlined">expand_more</span>
                             </div>
                         </div>
+                    </div>
+                    <!-- Center Location / Link -->
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                        <label class="block font-label-md text-on-surface mb-2" for="schedule_location">Center Location / Maps Link</label>
+                        <input id="schedule_location" type="text" placeholder="Address or Google Maps link..." class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0 placeholder-on-surface-variant"/>
                     </div>
                     <!-- Assistants to Schedule -->
                     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
@@ -545,7 +550,10 @@
                 const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-surface-variant hover:bg-surface-container transition-colors group";
                 div.innerHTML = `
-                    <span class="font-body-lg text-on-surface">${center.name}</span>
+                    <div class="flex flex-col">
+                        <span class="font-body-lg text-on-surface font-medium">${center.name}</span>
+                        ${center.address ? `<span class="text-xs text-on-surface-variant flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-[14px]">location_on</span>${center.address}</span>` : ''}
+                    </div>
                     <button onclick="deleteCenter('${center.name}')" class="text-on-surface-variant hover:text-error transition-colors p-2 rounded-full hover:bg-error-container/20">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
@@ -799,9 +807,17 @@
 
             // Populate Center Dropdown
             const centerSelect = document.getElementById('schedule_center');
+            const locationInput = document.getElementById('schedule_location');
             centerSelect.innerHTML = State.centers.length 
                 ? State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
                 : `<option value="">No centers available</option>`;
+            
+            if (State.centers.length > 0) {
+                const currentCenter = State.centers.find(c => c.name === centerSelect.value) || State.centers[0];
+                locationInput.value = currentCenter.address || '';
+            } else {
+                locationInput.value = '';
+            }
             
             // Populate Assistants checklist
             const assistantsList = document.getElementById('schedule_assistants_list');
@@ -819,6 +835,12 @@
 
             await fetchSchedule();
         }
+
+        // Auto-fill location when center is selected
+        document.getElementById('schedule_center').addEventListener('change', (e) => {
+            const centerObj = State.centers.find(c => c.name === e.target.value);
+            document.getElementById('schedule_location').value = (centerObj && centerObj.address) ? centerObj.address : '';
+        });
 
         async function fetchSchedule() {
             if (fetchingSchedule) return;
@@ -871,10 +893,29 @@
                         </span>
                     `).join('');
 
+                    let locationDisplay = '';
+                    if (item.address && item.address.trim() !== '') {
+                        const mapsUrl = (item.address.startsWith('http://') || item.address.startsWith('https://'))
+                            ? item.address
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`;
+                        locationDisplay = `
+                            <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline mt-1">
+                                <span class="material-symbols-outlined text-[14px]">location_on</span>
+                                <span>${item.address}</span>
+                            </a>
+                        `;
+                    }
+
+                    const timeDisplay = item.time ? `<span class="text-xs text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">schedule</span> ${item.time}</span>` : '';
+
                     html.push(`
                     <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 shadow-sm relative group flex justify-between items-center mb-2">
                         <div>
-                            <h3 class="font-body-lg font-bold text-on-surface">${item.center}</h3>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-body-lg font-bold text-on-surface">${item.center}</h3>
+                                ${timeDisplay}
+                            </div>
+                            ${locationDisplay}
                             <div class="flex flex-wrap gap-2 mt-2">${assistantsTags}</div>
                         </div>
                         <button onclick="deleteSchedule('${item.id}')" class="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
@@ -897,6 +938,7 @@
             const date = document.getElementById('schedule_date').value;
             const time = document.getElementById('schedule_time').value;
             const center = document.getElementById('schedule_center').value;
+            const locationVal = document.getElementById('schedule_location').value.trim();
             
             const selectedAssistants = [];
             document.querySelectorAll('.sched-assistant-cb').forEach(cb => {
@@ -917,14 +959,11 @@
             btn.disabled = true;
             btn.innerHTML = `<div class="loading-spinner"></div> Saving...`;
 
-            const centerObj = State.centers.find(c => c.name === center);
-            const address = centerObj ? centerObj.address : '';
-
             try {
                 const { data, error } = await supabaseClient
                     .from('schedule')
                     .insert([
-                        { date: date, time: time, center: center, address: address, assistants: selectedAssistants }
+                        { date: date, time: time, center: center, address: locationVal, assistants: selectedAssistants }
                     ])
                     .select();
 

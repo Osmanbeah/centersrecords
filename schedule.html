@@ -356,24 +356,37 @@
                         return `<span class="${tagClass}">${a}</span>`;
                     }).join('');
 
-                    let centerDisplay = `<h3 class="font-headline-md text-on-surface">${item.center}</h3>`;
-                    if (item.address) {
-                        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`;
-                        centerDisplay = `<a href="${mapsUrl}" target="_blank" class="font-headline-md text-primary hover:underline hover:text-primary-fixed transition-colors">${item.center}</a>`;
-                    }
-
                     const timeDisplay = item.time 
                         ? `<div class="font-label-md text-on-surface-variant flex items-center gap-1 mt-1"><span class="material-symbols-outlined text-[16px]">schedule</span> ${formatTime(item.time)}</div><div class="countdown-timer font-label-sm mt-1" data-date="${date}" data-time="${item.time}"></div>` 
                         : '';
 
+                    let locationButton = '';
+                    if (item.address && item.address.trim() !== '') {
+                        const rawAddress = item.address.trim();
+                        const mapsUrl = (rawAddress.startsWith('http://') || rawAddress.startsWith('https://'))
+                            ? rawAddress
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
+
+                        locationButton = `
+                            <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-container text-on-primary hover:bg-secondary active:scale-95 transition-all duration-150 font-label-md shadow-sm self-start sm:self-center shrink-0">
+                                <span class="material-symbols-outlined text-[18px]">location_on</span>
+                                <span>Center Location</span>
+                                <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                            </a>
+                        `;
+                    }
+
                     html.push(`
                     <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm relative transition-all duration-300">
-                        <div class="flex items-start gap-3 mb-3">
-                            <span class="material-symbols-outlined text-secondary-fixed-dim bg-secondary/10 p-2 rounded-lg mt-1">storefront</span>
-                            <div>
-                                ${centerDisplay}
-                                ${timeDisplay}
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 pb-3 border-b border-surface-variant/50">
+                            <div class="flex items-start gap-3">
+                                <span class="material-symbols-outlined text-secondary-fixed-dim bg-secondary/10 p-2.5 rounded-xl shrink-0 mt-0.5">storefront</span>
+                                <div>
+                                    <h3 class="font-headline-md text-on-surface font-semibold">${item.center}</h3>
+                                    ${timeDisplay}
+                                </div>
                             </div>
+                            ${locationButton}
                         </div>
                         <div class="mt-2">
                             <p class="font-label-md text-outline mb-2">ASSIGNED ASSISTANTS</p>
