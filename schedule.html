@@ -214,11 +214,7 @@
             </div>
             
             <div class="flex items-center gap-1.5 ml-2">
-                <button onclick="document.getElementById('request-shift-modal').classList.remove('hidden'); populateRequestCenters();" class="bg-secondary text-on-secondary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm hover:bg-secondary/90 transition-colors flex items-center gap-1 shrink-0">
-                    <span class="material-symbols-outlined text-[16px]">add_circle</span>
-                    <span class="hidden sm:inline">Request Shift</span>
-                    <span class="sm:hidden">Request</span>
-                </button>
+
                 <button onclick="showQRCode()" class="bg-primary text-on-primary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 transition-colors flex items-center gap-1 shrink-0">
                     <span class="material-symbols-outlined text-[16px]">qr_code_2</span>
                     <span class="hidden sm:inline">Show ID</span>
@@ -290,48 +286,6 @@
         </div>
 
         <!-- Request Shift Modal -->
-        <div id="request-shift-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/40 backdrop-blur-sm">
-            <div class="bg-surface rounded-2xl shadow-elevation-3 max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-4 border-b border-outline-variant/30 flex justify-between items-center bg-surface-container-low">
-                    <h2 class="font-headline-md text-on-surface flex items-center gap-2">
-                        <span class="material-symbols-outlined text-primary">edit_calendar</span>
-                        Request Shift
-                    </h2>
-                    <button type="button" onclick="document.getElementById('request-shift-modal').classList.add('hidden')" class="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-full hover:bg-surface-container-high">
-                        <span class="material-symbols-outlined">close</span>
-                    </button>
-                </div>
-                <div class="p-4 overflow-y-auto">
-                    <form id="request-shift-form" class="flex flex-col gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-on-surface mb-1.5 ml-1">Center</label>
-                            <select id="request_center" required class="w-full h-11 px-3.5 rounded-xl border border-outline bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none"></select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-on-surface mb-1.5 ml-1">Date</label>
-                            <input type="date" id="request_date" required class="w-full h-11 px-3.5 rounded-xl border border-outline bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"/>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-on-surface mb-1.5 ml-1">Time</label>
-                            <input type="time" id="request_time" required class="w-full h-11 px-3.5 rounded-xl border border-outline bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"/>
-                        </div>
-                        
-                        <div id="request-error" class="hidden bg-error-container text-on-error-container p-3 rounded-xl text-sm border border-error/20 flex items-start gap-2">
-                            <span class="material-symbols-outlined text-[18px] shrink-0 mt-0.5">error</span>
-                            <span id="request-error-text"></span>
-                        </div>
-                        
-                        <div class="pt-2">
-                            <button type="submit" id="btn_submit_request" class="w-full h-12 bg-primary text-on-primary rounded-xl font-label-lg shadow-sm hover:bg-primary/90 transition-colors flex justify-center items-center gap-2">
-                                <span class="material-symbols-outlined text-[18px]">send</span>
-                                <span>Submit Request</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
         <!-- QR Code Modal -->
         <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/40 backdrop-blur-sm">
             <div class="bg-surface rounded-2xl shadow-elevation-3 max-w-sm w-full overflow-hidden flex flex-col items-center p-6 text-center">
@@ -470,9 +424,7 @@
         }
 
         let allSchedules = [];
-        let selectedDateFilter = 'auto'; // 'auto' (active day), 'all', or specific 'YYYY-MM-DD'
-        let currentActiveDay = null;
-        const LECTURE_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours duration per lecture
+        let scheduleScope = 'all'; // 'my' (only assigned sessions) or 'all'
 
         async function fetchSchedule() {
             try {
@@ -480,7 +432,6 @@
                 const { data, error } = await supabaseClient
                     .from('schedule')
                     .select('*')
-                    .order('date', { ascending: true })
                     .order('time', { ascending: true });
 
                 if (error) throw error;
@@ -499,6 +450,7 @@
         function updateStatus(state) {
             const dot = document.getElementById('status_dot');
             const text = document.getElementById('status_text');
+            if (!dot || !text) return;
             
             if(state === 'fetching') {
                 dot.className = "w-2 h-2 rounded-full bg-secondary-fixed-dim animate-pulse";
@@ -512,99 +464,6 @@
             }
         }
 
-        function parseSessionDateTime(dateStr, timeStr) {
-            if (!dateStr) return null;
-            const [y, m, d] = dateStr.split('-').map(Number);
-            const [h, min, s] = (timeStr || '00:00:00').split(':').map(Number);
-            return new Date(y, m - 1, d, h || 0, min || 0, s || 0);
-        }
-
-        function getSessionStatus(dateStr, timeStr) {
-            const start = parseSessionDateTime(dateStr, timeStr);
-            if (!start) return { status: 'upcoming', diffMs: 0 };
-            const now = new Date();
-            const end = new Date(start.getTime() + LECTURE_DURATION_MS);
-            
-            if (now >= end) {
-                return { status: 'completed', start, end };
-            } else if (now >= start && now < end) {
-                const elapsedMs = now - start;
-                return { status: 'in_progress', start, end, elapsedMs };
-            } else {
-                const diffMs = start - now;
-                return { status: 'upcoming', start, end, diffMs };
-            }
-        }
-
-        function computeActiveDay(schedules) {
-            if (!schedules || schedules.length === 0) return null;
-
-            // Group by date
-            const grouped = {};
-            schedules.forEach(s => {
-                if (!grouped[s.date]) grouped[s.date] = [];
-                grouped[s.date].push(s);
-            });
-
-            const sortedDates = Object.keys(grouped).sort();
-            const now = new Date();
-
-            for (const date of sortedDates) {
-                const sessions = grouped[date];
-                // Find the latest end time among sessions on this date
-                let maxEndTime = 0;
-                sessions.forEach(s => {
-                    const start = parseSessionDateTime(s.date, s.time);
-                    if (start) {
-                        const end = start.getTime() + LECTURE_DURATION_MS;
-                        if (end > maxEndTime) maxEndTime = end;
-                    }
-                });
-
-                // If the last session has not ended yet, this date is active!
-                if (now.getTime() < maxEndTime) {
-                    return date;
-                }
-            }
-
-            // If all scheduled dates are done, default to the last available date
-            return sortedDates[sortedDates.length - 1];
-        }
-
-        function updateCountdowns() {
-            const newActive = computeActiveDay(allSchedules);
-            if (newActive && newActive !== currentActiveDay && selectedDateFilter === 'auto') {
-                currentActiveDay = newActive;
-                renderScheduleList();
-                return;
-            }
-
-            document.querySelectorAll('.countdown-timer').forEach(el => {
-                const dateStr = el.getAttribute('data-date');
-                const timeStr = el.getAttribute('data-time');
-                if (!dateStr || !timeStr) return;
-                
-                const sessionInfo = getSessionStatus(dateStr, timeStr);
-                
-                if (sessionInfo.status === 'completed') {
-                    el.innerHTML = `<span class="inline-flex items-center gap-1 text-on-surface-variant font-medium text-xs"><span class="material-symbols-outlined text-[14px] text-outline">check_circle</span> Session Finished</span>`;
-                } else if (sessionInfo.status === 'in_progress') {
-                    const mins = Math.floor(sessionInfo.elapsedMs / 60000);
-                    el.innerHTML = `<span class="inline-flex items-center gap-1 text-secondary font-semibold text-xs animate-pulse"><span class="material-symbols-outlined text-[14px]">play_circle</span> Ongoing (${mins}m ago)</span>`;
-                } else {
-                    const diffSec = Math.floor(sessionInfo.diffMs / 1000);
-                    const hStr = Math.floor(diffSec / 3600);
-                    const mStr = Math.floor((diffSec % 3600) / 60);
-                    const sStr = diffSec % 60;
-                    let text = "Starts in: ";
-                    if (hStr > 0) text += `${hStr}h `;
-                    if (mStr > 0 || hStr > 0) text += `${mStr}m `;
-                    text += `${sStr}s`;
-                    el.innerHTML = `<span class="text-secondary font-medium flex items-center gap-1 text-xs"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>${text}</span>`;
-                }
-            });
-        }
-
         function formatTime(timeStr) {
             if (!timeStr) return '';
             const [h, m] = timeStr.split(':');
@@ -614,85 +473,18 @@
             return `${hour}:${m} ${ampm}`;
         }
 
-        function setDateFilter(dateVal) {
-            selectedDateFilter = dateVal;
-            renderScheduleList();
-        }
-
-        function renderDatePills(allDates, activeDate) {
-            const container = document.getElementById('date_selector_container');
-            if (!container) return;
-
-            if (allDates.length <= 1) {
-                container.innerHTML = '';
-                return;
-            }
-
-            const todayStr = new Date().toISOString().split('T')[0];
-
-            let pillsHTML = `
-                <button type="button" onclick="setDateFilter('auto')" class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 ${selectedDateFilter === 'auto' ? 'bg-primary-container text-on-primary shadow-sm' : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'}">
-                    <span class="material-symbols-outlined text-[14px]">auto_awesome</span>
-                    <span>Current Day</span>
-                </button>
-            `;
-
-            allDates.forEach(date => {
-                const dateObj = new Date(date);
-                const dayLabel = dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-                const isSelected = selectedDateFilter === date || (selectedDateFilter === 'auto' && date === activeDate);
-                const isToday = date === todayStr;
-                const isCurrentActive = date === activeDate;
-
-                pillsHTML += `
-                    <button type="button" onclick="setDateFilter('${date}')" class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 flex items-center gap-1 ${isSelected && selectedDateFilter !== 'auto' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'}">
-                        ${isCurrentActive ? '<span class="w-1.5 h-1.5 rounded-full bg-secondary-fixed-dim"></span>' : ''}
-                        <span>${isToday ? 'Today, ' : ''}${dayLabel}</span>
-                    </button>
-                `;
-            });
-
-            pillsHTML += `
-                <button type="button" onclick="setDateFilter('all')" class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 ${selectedDateFilter === 'all' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'}">
-                    All Dates
-                </button>
-            `;
-
-            container.innerHTML = pillsHTML;
-        }
-
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
             const searchVal = document.getElementById('assistant_search').value.toLowerCase().trim();
             const dropdownVal = document.getElementById('assistant_dropdown').value.toLowerCase();
             const activeFilter = searchVal || dropdownVal;
+            
+            // Remove the date pills container since we use days now
+            const pillsContainer = document.getElementById('date_selector_container');
+            if (pillsContainer) pillsContainer.innerHTML = '';
 
-            currentActiveDay = computeActiveDay(allSchedules);
+            let filtered = [...allSchedules];
 
-            // Group all schedules by date
-            const groupedAll = {};
-            allSchedules.forEach(s => {
-                if(!groupedAll[s.date]) groupedAll[s.date] = [];
-                groupedAll[s.date].push(s);
-            });
-            const allDates = Object.keys(groupedAll).sort();
-
-            renderDatePills(allDates, currentActiveDay);
-
-            // Determine target dates to display
-            let targetDates = [];
-            if (selectedDateFilter === 'all') {
-                targetDates = allDates;
-            } else if (selectedDateFilter === 'auto') {
-                targetDates = currentActiveDay ? [currentActiveDay] : allDates;
-            } else {
-                targetDates = [selectedDateFilter];
-            }
-
-            // Filter schedules by date
-            let filtered = allSchedules.filter(s => targetDates.includes(s.date));
-
-            // Personalized scope filter: Show only current assistant's assigned sessions
             if (scheduleScope === 'my' && currentAssistant.name) {
                 const myName = currentAssistant.name.toLowerCase();
                 filtered = filtered.filter(s => {
@@ -703,7 +495,6 @@
                 });
             }
 
-            // Search filter if typed
             if (activeFilter) {
                 filtered = filtered.filter(s => {
                     const matchAssistant = (s.assistants || []).some(a => {
@@ -711,19 +502,9 @@
                         return aName.includes(activeFilter);
                     });
                     const matchCenter = (s.center || '').toLowerCase().includes(activeFilter);
-                    const matchSubject = (s.subject || '').toLowerCase().includes(activeFilter);
-                    return matchAssistant || matchCenter || matchSubject;
+                    return matchAssistant || matchCenter;
                 });
             }
-
-            filtered.sort((a, b) => {
-                const dateA = a.date || '';
-                const dateB = b.date || '';
-                if (dateA !== dateB) return dateA.localeCompare(dateB);
-                const timeA = a.time || '';
-                const timeB = b.time || '';
-                return timeA.localeCompare(timeB);
-            });
 
             if (filtered.length === 0) {
                 if (scheduleScope === 'my') {
@@ -731,7 +512,6 @@
                     <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4 shadow-sm">
                         <span class="material-symbols-outlined text-[48px] text-secondary mb-2">event_available</span>
                         <p class="text-on-surface font-body-lg font-bold">No assigned sessions for ${currentAssistant.name || 'you'}.</p>
-                        <p class="text-on-surface-variant text-xs mt-1">You are not scheduled for any lectures on this date.</p>
                         <button type="button" onclick="setScope('all')" class="mt-4 px-4 py-2 bg-secondary text-on-secondary rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-secondary/90 transition-colors shadow-sm">
                             <span class="material-symbols-outlined text-[16px]">groups</span>
                             <span>View All Center Schedules</span>
@@ -742,134 +522,117 @@
                     <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4">
                         <span class="material-symbols-outlined text-[48px] text-outline-variant mb-2">event_busy</span>
                         <p class="text-on-surface font-body-lg font-medium">No assignments found.</p>
-                        ${searchVal ? `<p class="text-on-surface-variant font-body-md mt-1">Try a different search term or select 'All Dates'.</p>` : ''}
                     </div>`;
                 }
                 return;
             }
 
-            // Group filtered for display
-            const grouped = {};
-            filtered.forEach(s => {
-                if(!grouped[s.date]) grouped[s.date] = [];
-                grouped[s.date].push(s);
-            });
-
             const html = [];
-            Object.keys(grouped).sort().forEach(date => {
-                const isToday = (date === new Date().toISOString().split('T')[0]);
-                const isActive = (date === currentActiveDay);
-                const dateObj = new Date(date);
-                const dateFormatted = dateObj.toLocaleDateString(undefined, {weekday: 'long', month:'long', day:'numeric'});
+            filtered.forEach(item => {
+                const amAssigned = item.assistants && item.assistants.includes(currentAssistant.name);
+                const daysStr = (item.days || []).join(', ');
                 
-                const dateBadge = isActive 
-                    ? `<span class="bg-primary-container text-on-primary text-[10px] font-bold px-2 py-0.5 rounded-full tracking-normal">ACTIVE SCHEDULE</span>`
-                    : '';
+                let locationButton = '';
+                if (item.address && item.address.trim() !== '') {
+                    const rawAddress = item.address.trim();
+                    const mapsUrl = (rawAddress.startsWith('http://') || rawAddress.startsWith('https://'))
+                        ? rawAddress
+                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
+
+                    locationButton = `
+                        <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-container text-on-primary hover:bg-secondary active:scale-95 transition-all duration-150 font-label-md shadow-sm self-start sm:self-center shrink-0">
+                            <span class="material-symbols-outlined text-[18px]">location_on</span>
+                            <span>Center Location</span>
+                        </a>
+                    `;
+                }
+
+                const actionButton = amAssigned 
+                    ? `<span class="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-xl font-semibold"><span class="material-symbols-outlined text-[18px]">check_circle</span> Assigned</span>`
+                    : `<button onclick="pickLecture('${item.id}')" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-semibold shadow-sm hover:bg-primary/90 transition-colors flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span> Pick Lecture</button>`;
+
+                const assistantsTags = (item.assistants || []).map(a => {
+                    const isMatch = searchVal && a.toLowerCase().includes(searchVal);
+                    const tagClass = isMatch 
+                        ? "inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-3 py-1.5 rounded-lg text-sm font-semibold border border-secondary"
+                        : "inline-flex items-center gap-1 bg-surface-variant text-on-surface px-3 py-1.5 rounded-lg text-sm border border-outline-variant/50";
+                    return `<span class="${tagClass}">${a}</span>`;
+                }).join('');
 
                 html.push(`
-                    <div class="mt-4 mb-2 flex items-center justify-between sticky top-[104px] z-0 bg-background/90 backdrop-blur-sm py-1.5">
-                        <div class="flex items-center gap-2">
-                            <h2 class="font-label-md text-on-surface uppercase tracking-wider font-bold">${isToday ? 'Today: ' : ''}${dateFormatted}</h2>
-                            ${dateBadge}
-                        </div>
-                    </div>
-                `);
-                
-                grouped[date].forEach(item => {
-                    const assistantsTags = (item.assistants || []).map(a => {
-                        const isMatch = searchVal && a.toLowerCase().includes(searchVal);
-                        const tagClass = isMatch 
-                            ? "inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-3 py-1.5 rounded-lg text-sm font-semibold border border-secondary"
-                            : "inline-flex items-center gap-1 bg-surface-variant text-on-surface px-3 py-1.5 rounded-lg text-sm border border-outline-variant/50";
-                        return `<span class="${tagClass}">${a}</span>`;
-                    }).join('');
-
-                    const statusInfo = getSessionStatus(date, item.time);
-                    let badgeHtml = '';
-                    if (statusInfo.status === 'completed') {
-                        badgeHtml = `<span class="inline-flex items-center gap-1 bg-surface-variant text-on-surface-variant px-2.5 py-0.5 rounded-full text-[11px] font-semibold"><span class="material-symbols-outlined text-[13px]">check_circle</span> Completed</span>`;
-                    } else if (statusInfo.status === 'in_progress') {
-                        badgeHtml = `<span class="inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-2.5 py-0.5 rounded-full text-[11px] font-bold animate-pulse"><span class="material-symbols-outlined text-[13px]">play_circle</span> In Progress</span>`;
-                    }
-
-                    const timeDisplay = item.time 
-                        ? `<div class="font-label-md text-on-surface-variant flex items-center gap-2 mt-1">
-                             <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> ${formatTime(item.time)}</span>
-                             ${badgeHtml}
-                           </div>
-                           <div class="countdown-timer font-label-sm mt-1" data-date="${date}" data-time="${item.time}"></div>` 
-                        : '';
-
-                    let locationButton = '';
-                    if (item.address && item.address.trim() !== '') {
-                        const rawAddress = item.address.trim();
-                        const mapsUrl = (rawAddress.startsWith('http://') || rawAddress.startsWith('https://'))
-                            ? rawAddress
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
-
-                        locationButton = `
-                            <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-container text-on-primary hover:bg-secondary active:scale-95 transition-all duration-150 font-label-md shadow-sm self-start sm:self-center shrink-0">
-                                <span class="material-symbols-outlined text-[18px]">location_on</span>
-                                <span>Center Location</span>
-                                <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-                            </a>
-                        `;
-                    }
-
-                    const cardOpacity = statusInfo.status === 'completed' ? 'opacity-75 bg-surface-container-low' : 'bg-surface-container-lowest';
-
-                    html.push(`
-                    <article class="${cardOpacity} rounded-xl border border-outline-variant p-5 shadow-sm relative transition-all duration-300">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 pb-3 border-b border-surface-variant/50">
-                            <div class="flex items-start gap-3">
-                                <span class="material-symbols-outlined text-secondary-fixed-dim bg-secondary/10 p-2.5 rounded-xl shrink-0 mt-0.5">storefront</span>
-                                <div>
-                                    <h3 class="font-headline-md text-on-surface font-semibold">${item.center}</h3>
-                                    ${timeDisplay}
+                <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm relative transition-all duration-300 mb-4">
+                    <div class="flex flex-col sm:flex-row justify-between gap-4">
+                        <div class="space-y-3 flex-grow">
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                <h3 class="font-headline-sm text-on-surface font-bold leading-tight">${item.center}</h3>
+                            </div>
+                            
+                            <div class="flex flex-col gap-1">
+                                <div class="font-label-md text-primary flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-[18px]">event</span>
+                                    <span>${daysStr || 'No days specified'}</span>
+                                </div>
+                                <div class="font-label-md text-on-surface-variant flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-[18px]">schedule</span>
+                                    <span>${formatTime(item.time)}</span>
                                 </div>
                             </div>
+
+                            <div class="flex flex-wrap gap-2 pt-1">
+                                ${assistantsTags}
+                            </div>
+                        </div>
+                        
+                        <div class="flex sm:flex-col justify-end sm:justify-start items-center gap-3 border-t sm:border-t-0 sm:border-l border-outline-variant/30 pt-4 sm:pt-0 sm:pl-4 mt-2 sm:mt-0">
+                            ${actionButton}
                             ${locationButton}
                         </div>
-                        <div class="mt-2">
-                            <p class="font-label-md text-outline mb-2">ASSIGNED ASSISTANTS</p>
-                            <div class="flex flex-wrap gap-2">${assistantsTags}</div>
-                        </div>
-                    </article>
-                    `);
-                });
+                    </div>
+                </article>
+                `);
             });
 
             listContainer.innerHTML = html.join('');
-            updateCountdowns();
         }
+
+        window.pickLecture = async function(scheduleId) {
+            if (!confirm("Send request to join this lecture?")) return;
+            
+            try {
+                const payload = {
+                    assistant_name: currentAssistant.name,
+                    assistant_email: currentAssistant.email,
+                    schedule_id: scheduleId,
+                    status: 'pending'
+                };
+                const { error } = await supabaseClient.from('shift_requests').insert([payload]);
+                if (error) throw error;
+                alert('Request sent successfully! Wait for admin approval.');
+            } catch (err) {
+                console.error("Error requesting lecture:", err);
+                alert("Failed to send request. " + err.message);
+            }
+        };
 
         function populateDropdown() {
             const dropdown = document.getElementById('assistant_dropdown');
-            const currentVal = dropdown.value;
+            if (!dropdown) return;
             
             const uniqueAssistants = new Set();
             allSchedules.forEach(s => {
                 if (s.assistants) {
-                    s.assistants.forEach(a => uniqueAssistants.add(a));
+                    s.assistants.forEach(a => uniqueAssistants.add(typeof a === 'object' ? a.name : a));
                 }
             });
             
-            const sorted = Array.from(uniqueAssistants).sort();
+            const currentVal = dropdown.value;
+            const options = Array.from(uniqueAssistants).sort().map(a => `<option value="${a}">${a}</option>`);
             
-            let optionsHTML = '<option value="">Or select your name from the list...</option>';
-            sorted.forEach(a => {
-                optionsHTML += `<option value="${a}">${a}</option>`;
-            });
-            
-            dropdown.innerHTML = optionsHTML;
-            if (sorted.includes(currentVal)) {
-                dropdown.value = currentVal;
-            }
+            dropdown.innerHTML = `<option value="">All Assistants</option>` + options.join('');
+            dropdown.value = currentVal;
         }
 
-        // Search Input Listeners
         document.getElementById('assistant_search').addEventListener('input', () => {
-            document.getElementById('assistant_dropdown').value = '';
             renderScheduleList();
         });
         
@@ -878,12 +641,10 @@
             renderScheduleList();
         });
 
-        // Realtime Subscription
         if (supabaseClient) {
             supabaseClient
                 .channel('public:schedule')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule' }, payload => {
-                    console.log("Realtime update received:", payload);
                     if (payload.eventType === 'INSERT') {
                         allSchedules.push(payload.new);
                     } else if (payload.eventType === 'DELETE') {
@@ -901,65 +662,6 @@
                     }
                 });
         }
-
-        // --- Shift Requests ---
-        function populateRequestCenters() {
-            const centerSelect = document.getElementById('request_center');
-            const uniqueCenters = Array.from(new Set(allSchedules.map(s => s.center))).sort();
-            
-            if (uniqueCenters.length === 0) {
-                centerSelect.innerHTML = `<option value="">No centers available yet</option>`;
-            } else {
-                centerSelect.innerHTML = uniqueCenters.map(c => `<option value="${c}">${c}</option>`).join('');
-            }
-            
-            document.getElementById('request_date').value = new Date().toISOString().split('T')[0];
-        }
-
-        document.getElementById('request-shift-form')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const btn = document.getElementById('btn_submit_request');
-            const errorBox = document.getElementById('request-error');
-            const errorText = document.getElementById('request-error-text');
-            
-            errorBox.classList.add('hidden');
-            
-            const center = document.getElementById('request_center').value;
-            const date = document.getElementById('request_date').value;
-            const time = document.getElementById('request_time').value;
-            
-            if (!center || !date || !time) return;
-            
-            btn.disabled = true;
-            btn.innerHTML = `<div class="w-5 h-5 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div> Submitting...`;
-            
-            try {
-                const { error } = await supabaseClient
-                    .from('shift_requests')
-                    .insert([{
-                        assistant_name: currentAssistant.name,
-                        assistant_email: currentAssistant.email,
-                        center: center,
-                        date: date,
-                        time: time,
-                        status: 'pending'
-                    }]);
-                    
-                if (error) throw error;
-                
-                alert('Shift request submitted successfully! Wait for admin approval.');
-                document.getElementById('request-shift-modal').classList.add('hidden');
-                e.target.reset();
-            } catch (err) {
-                console.error("Error submitting shift request:", err);
-                errorText.textContent = err.message || "Failed to submit request. Tell your admin to create the shift_requests table in Supabase.";
-                errorBox.classList.remove('hidden');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">send</span><span>Submit Request</span>`;
-            }
-        });
 
         function showQRCode() {
             if (!currentAssistant) return;

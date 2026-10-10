@@ -522,37 +522,63 @@
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
-                    <!-- Date Picker -->
+                <div class="grid grid-cols-1 gap-stack-md">
+                    <!-- Days Picker -->
                     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <label class="block font-label-md text-on-surface mb-2" for="schedule_date">Date</label>
-                        <input id="schedule_date" type="date" required class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0"/>
-                    </div>
-                    <!-- Time Picker -->
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <label class="block font-label-md text-on-surface mb-2" for="schedule_time">Time</label>
-                        <input id="schedule_time" type="time" required class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0"/>
-                    </div>
-                    <!-- Center Selection -->
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <label class="block font-label-md text-on-surface mb-2" for="schedule_center">Center</label>
-                        <div class="relative">
-                            <select id="schedule_center" required class="block w-full rounded-lg font-body-lg py-3 pl-4 pr-10 appearance-none text-on-surface focus:ring-0">
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
-                                <span class="material-symbols-outlined">expand_more</span>
-                            </div>
+                        <label class="block font-label-md text-on-surface mb-3">Days of the Week</label>
+                        <div class="flex flex-wrap gap-3">
+                            <label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant hover:border-primary transition-colors">
+                                <input type="checkbox" name="schedule_days" value="Saturday" class="w-4 h-4 text-primary rounded border-outline-variant focus:ring-primary">
+                                <span class="font-body-md text-on-surface">Saturday</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant hover:border-primary transition-colors">
+                                <input type="checkbox" name="schedule_days" value="Sunday" class="w-4 h-4 text-primary rounded border-outline-variant focus:ring-primary">
+                                <span class="font-body-md text-on-surface">Sunday</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant hover:border-primary transition-colors">
+                                <input type="checkbox" name="schedule_days" value="Monday" class="w-4 h-4 text-primary rounded border-outline-variant focus:ring-primary">
+                                <span class="font-body-md text-on-surface">Monday</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant hover:border-primary transition-colors">
+                                <input type="checkbox" name="schedule_days" value="Tuesday" class="w-4 h-4 text-primary rounded border-outline-variant focus:ring-primary">
+                                <span class="font-body-md text-on-surface">Tuesday</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant hover:border-primary transition-colors">
+                                <input type="checkbox" name="schedule_days" value="Wednesday" class="w-4 h-4 text-primary rounded border-outline-variant focus:ring-primary">
+                                <span class="font-body-md text-on-surface">Wednesday</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant hover:border-primary transition-colors">
+                                <input type="checkbox" name="schedule_days" value="Thursday" class="w-4 h-4 text-primary rounded border-outline-variant focus:ring-primary">
+                                <span class="font-body-md text-on-surface">Thursday</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer bg-surface-container-low px-3 py-2 rounded-lg border border-outline-variant hover:border-primary transition-colors">
+                                <input type="checkbox" name="schedule_days" value="Friday" class="w-4 h-4 text-primary rounded border-outline-variant focus:ring-primary">
+                                <span class="font-body-md text-on-surface">Friday</span>
+                            </label>
                         </div>
                     </div>
-                    <!-- Center Location / Link -->
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <label class="block font-label-md text-on-surface mb-2" for="schedule_location">Center Location / Maps Link</label>
-                        <input id="schedule_location" type="text" placeholder="Address or Google Maps link..." class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0 placeholder-on-surface-variant"/>
-                    </div>
-                    <!-- Assistants to Schedule -->
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
-                        <label class="block font-label-md text-on-surface mb-3">Assign Assistants</label>
-                        <div id="schedule_assistants_list" class="space-y-3">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+                        <!-- Time Picker -->
+                        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <label class="block font-label-md text-on-surface mb-2" for="schedule_time">Time</label>
+                            <input id="schedule_time" type="time" required class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0"/>
+                        </div>
+                        <!-- Center Selection -->
+                        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <label class="block font-label-md text-on-surface mb-2" for="schedule_center">Center</label>
+                            <div class="relative">
+                                <select id="schedule_center" required class="block w-full rounded-lg font-body-lg py-3 pl-4 pr-10 appearance-none text-on-surface focus:ring-0">
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+                                    <span class="material-symbols-outlined">expand_more</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Center Location / Link -->
+                        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 md:col-span-2">
+                            <label class="block font-label-md text-on-surface mb-2" for="schedule_location">Center Location / Maps Link</label>
+                            <input id="schedule_location" type="text" placeholder="Address or Google Maps link..." class="block w-full rounded-lg font-body-lg py-3 px-4 text-on-surface focus:ring-0 placeholder-on-surface-variant"/>
                         </div>
                     </div>
                 </div>
@@ -1460,7 +1486,7 @@
                     .from('shift_requests')
                     .select('*')
                     .eq('status', 'pending')
-                    .order('date', { ascending: true });
+                    .order('created_at', { ascending: false });
 
                 if (error) throw error;
                 State.requests = data || [];
@@ -1480,18 +1506,23 @@
             }
             
             listContainer.innerHTML = State.requests.map(req => {
-                const dateFmt = new Date(req.date).toLocaleDateString(undefined, {month:'short', day:'numeric'});
+                // Find the associated schedule
+                const sched = State.schedules.find(s => s.id === req.schedule_id);
+                const centerName = sched ? sched.center : (req.center || 'Unknown Center');
+                const schedTime = sched ? sched.time : (req.time || '');
+                const daysFmt = sched ? (sched.days || []).join(', ') : 'Unknown Days';
+                
                 return `
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-surface-container-low rounded-xl border border-secondary/30 gap-3 shadow-sm">
                     <div>
                         <div class="font-label-lg text-on-surface flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-secondary">person</span> ${req.assistant_name}</div>
                         <div class="text-sm text-on-surface-variant mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">storefront</span> ${req.center}</span>
-                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">calendar_today</span> ${dateFmt} &bull; ${req.time}</span>
+                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">storefront</span> ${centerName}</span>
+                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">event</span> ${daysFmt} &bull; ${schedTime}</span>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <button onclick="approveRequest('${req.id}')" class="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 flex items-center gap-1">
+                        <button onclick="approveRequest('${req.id}', '${req.schedule_id}', '${req.assistant_name}')" class="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 flex items-center gap-1">
                             <span class="material-symbols-outlined text-[16px]">check_circle</span> Approve
                         </button>
                         <button onclick="rejectRequest('${req.id}')" class="px-3 py-1.5 bg-error/10 text-error rounded-lg text-xs font-semibold hover:bg-error/20 flex items-center gap-1">
@@ -1502,31 +1533,25 @@
             }).join('');
         }
         
-        window.approveRequest = async function(id) {
-            const req = State.requests.find(r => r.id === id);
-            if (!req) return;
-            
-            // Pre-fill Schedule Form
-            document.getElementById('schedule_date').value = req.date;
-            document.getElementById('schedule_time').value = req.time;
-            document.getElementById('schedule_center').value = req.center;
-            
-            // Auto location
-            const centerObj = State.centers.find(c => c.name === req.center);
-            document.getElementById('schedule_location').value = (centerObj && centerObj.address) ? centerObj.address : '';
-            
-            // Check assistant
-            document.querySelectorAll('.sched-assistant-cb').forEach(cb => {
-                cb.checked = (cb.value === req.assistant_name);
-            });
-            
-            // Highlight form
-            document.getElementById('new-schedule-form').scrollIntoView({behavior: 'smooth'});
-            
-            // Mark request as approved in DB
+        window.approveRequest = async function(id, scheduleId, assistantName) {
+            // Update request status
             try {
                 await supabaseClient.from('shift_requests').update({status: 'approved'}).eq('id', id);
+                
+                // Add assistant to the schedule
+                if (scheduleId && assistantName) {
+                    const sched = State.schedules.find(s => s.id === scheduleId);
+                    if (sched) {
+                        let currentAssistants = sched.assistants || [];
+                        if (!currentAssistants.includes(assistantName)) {
+                            currentAssistants.push(assistantName);
+                            await supabaseClient.from('schedule').update({assistants: currentAssistants}).eq('id', scheduleId);
+                        }
+                    }
+                }
+                
                 await fetchRequests();
+                await fetchSchedule(); // Refresh schedule list
             } catch(e) { console.error(e); }
         };
         
@@ -1546,62 +1571,56 @@
                 return;
             }
 
-            // Group by date
-            const grouped = {};
-            State.schedules.forEach(s => {
-                if(!grouped[s.date]) grouped[s.date] = [];
-                grouped[s.date].push(s);
-            });
-
             const html = [];
-            Object.keys(grouped).sort().forEach(date => {
-                const dateFormatted = new Date(date).toLocaleDateString(undefined, {weekday: 'short', month:'short', day:'numeric', year:'numeric'});
-                
-                html.push(`<div class="mt-4 mb-2"><h4 class="font-label-md text-on-surface-variant uppercase tracking-wider">${dateFormatted}</h4></div>`);
-                
-                grouped[date].forEach(item => {
-                    const assistantsTags = (item.assistants || []).map(a => `
-                        <span class="inline-flex items-center gap-1 bg-surface-variant text-on-surface px-2 py-1 rounded text-xs border border-outline-variant">
-                            ${a}
-                        </span>
-                    `).join('');
+            State.schedules.forEach(item => {
+                const assistantsTags = (item.assistants || []).map(a => `
+                    <span class="inline-flex items-center gap-1 bg-surface-variant text-on-surface px-2 py-1 rounded text-xs border border-outline-variant">
+                        ${a}
+                    </span>
+                `).join('');
 
-                    let locationDisplay = '';
-                    if (item.address && item.address.trim() !== '') {
-                        const mapsUrl = (item.address.startsWith('http://') || item.address.startsWith('https://'))
-                            ? item.address
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`;
-                        locationDisplay = `
-                            <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline mt-1">
-                                <span class="material-symbols-outlined text-[14px]">location_on</span>
-                                <span>${item.address}</span>
-                            </a>
-                        `;
-                    }
+                const daysTags = (item.days || []).map(d => `
+                    <span class="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-xs font-semibold">
+                        ${d}
+                    </span>
+                `).join('');
 
-                    const timeDisplay = item.time ? `<span class="text-xs text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">schedule</span> ${item.time}</span>` : '';
+                let locationDisplay = '';
+                if (item.address && item.address.trim() !== '') {
+                    const mapsUrl = (item.address.startsWith('http://') || item.address.startsWith('https://'))
+                        ? item.address
+                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`;
+                    locationDisplay = `
+                        <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline mt-1">
+                            <span class="material-symbols-outlined text-[14px]">location_on</span>
+                            <span>${item.address}</span>
+                        </a>
+                    `;
+                }
 
-                    html.push(`
-                    <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 shadow-sm relative group flex justify-between items-center mb-2">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h3 class="font-body-lg font-bold text-on-surface">${item.center}</h3>
-                                ${timeDisplay}
-                            </div>
-                            ${locationDisplay}
-                            <div class="flex flex-wrap gap-2 mt-2">${assistantsTags}</div>
+                const timeDisplay = item.time ? `<span class="text-xs text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">schedule</span> ${item.time}</span>` : '';
+
+                html.push(`
+                <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 shadow-sm relative group flex justify-between items-center mb-2">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <h3 class="font-body-lg font-bold text-on-surface">${item.center}</h3>
+                            ${timeDisplay}
                         </div>
-                        <div class="flex items-center gap-1 shrink-0">
-                            <button onclick="editSchedule('${item.id}')" title="Edit schedule" class="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
-                                <span class="material-symbols-outlined text-[20px]">edit</span>
-                            </button>
-                            <button onclick="deleteSchedule('${item.id}')" title="Delete schedule" class="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
-                                <span class="material-symbols-outlined text-[20px]">delete</span>
-                            </button>
-                        </div>
-                    </article>
-                    `);
-                });
+                        <div class="flex flex-wrap gap-1 mb-2">${daysTags}</div>
+                        ${locationDisplay}
+                        <div class="flex flex-wrap gap-2 mt-2">${assistantsTags}</div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-center gap-1 shrink-0">
+                        <button onclick="editSchedule('${item.id}')" title="Edit schedule" class="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                            <span class="material-symbols-outlined text-[20px]">edit</span>
+                        </button>
+                        <button onclick="deleteSchedule('${item.id}')" title="Delete schedule" class="w-8 h-8 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error-container/20 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                            <span class="material-symbols-outlined text-[20px]">delete</span>
+                        </button>
+                    </div>
+                </article>
+                `);
             });
 
             listContainer.innerHTML = html.join('');
@@ -1628,99 +1647,53 @@
             errorEl.classList.add('hidden');
             
             const editId = document.getElementById('schedule_edit_id').value;
-            const date = document.getElementById('schedule_date').value;
+            
+            // Get selected days
+            const selectedDays = [];
+            document.querySelectorAll('input[name="schedule_days"]:checked').forEach(cb => selectedDays.push(cb.value));
+            
             const time = document.getElementById('schedule_time').value;
             const center = document.getElementById('schedule_center').value;
             const locationVal = document.getElementById('schedule_location').value.trim();
+
+            if (selectedDays.length === 0 || !time || !center) {
+                errorEl.textContent = "Please select at least one day, time, and center.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            setScheduleButtonState('loading');
             
-            const selectedAssistants = [];
-            document.querySelectorAll('.sched-assistant-cb').forEach(cb => {
-                if(cb.checked) selectedAssistants.push(cb.value);
-            });
-
-            if (!date || !time || !center) {
-                errorEl.textContent = "Please select date, time and center.";
-                errorEl.classList.remove('hidden');
-                return;
-            }
-            if (selectedAssistants.length === 0) {
-                errorEl.textContent = "Please select at least one assistant.";
-                errorEl.classList.remove('hidden');
-                return;
-            }
-
-            // Optimistic UI Update: update UI instantly without lag
-            const tempId = editId || ('temp-' + Date.now());
-            const optimisticItem = {
-                id: tempId,
-                date: date,
-                time: time,
-                center: center,
-                address: locationVal,
-                assistants: selectedAssistants
-            };
-
-            if (editId) {
-                const idx = State.schedules.findIndex(s => s.id === editId);
-                if (idx !== -1) State.schedules[idx] = optimisticItem;
-            } else {
-                State.schedules.push(optimisticItem);
-            }
-            State.schedules.sort((a,b) => new Date(a.date) - new Date(b.date));
-            renderScheduleList();
-            cancelScheduleEdit();
-
-            // Perform fast background sync with Supabase
             try {
+                const payload = {
+                    days: selectedDays,
+                    time: time,
+                    center: center,
+                    address: locationVal,
+                    subject: 'Lecture' // generic subject
+                };
+                
                 if (editId) {
-                    // Run delete and insert in parallel for maximum speed
-                    const [delRes, insRes] = await Promise.all([
-                        supabaseClient.from('schedule').delete().eq('id', editId),
-                        supabaseClient.from('schedule').insert([{
-                            date: date,
-                            time: time,
-                            center: center,
-                            address: locationVal,
-                            assistants: selectedAssistants
-                        }]).select()
-                    ]);
-
-                    if (insRes.error) throw insRes.error;
-                    if (delRes.error) throw delRes.error;
-
-                    if (insRes.data && insRes.data.length > 0) {
-                        const realItem = insRes.data[0];
-                        const idx = State.schedules.findIndex(s => s.id === tempId || s.id === editId);
-                        if (idx !== -1) State.schedules[idx] = realItem;
-                        renderScheduleList();
-                    }
-                } else {
-                    const { data, error } = await supabaseClient
+                    const { error } = await supabaseClient
                         .from('schedule')
-                        .insert([{
-                            date: date,
-                            time: time,
-                            center: center,
-                            address: locationVal,
-                            assistants: selectedAssistants
-                        }])
-                        .select();
-
+                        .update(payload)
+                        .eq('id', editId);
                     if (error) throw error;
-
-                    if (data && data.length > 0) {
-                        const realItem = data[0];
-                        const idx = State.schedules.findIndex(s => s.id === tempId);
-                        if (idx !== -1) State.schedules[idx] = realItem;
-                        renderScheduleList();
-                    }
+                } else {
+                    const { error } = await supabaseClient
+                        .from('schedule')
+                        .insert([payload]);
+                    if (error) throw error;
                 }
-            } catch (err) {
-                console.error("Schedule sync error:", err);
-                errorEl.textContent = "Failed to sync schedule with server. Check connection.";
-                errorEl.classList.remove('hidden');
-                // Re-fetch to restore consistent state if failed
+                
+                e.target.reset();
+                cancelScheduleEdit();
                 fetchSchedule();
+            } catch (err) {
+                console.error("Error saving schedule:", err);
+                errorEl.textContent = err.message || "Failed to save schedule. Check console.";
+                errorEl.classList.remove('hidden');
+                setScheduleButtonState(editId ? 'edit' : 'create');
             }
         });
 
