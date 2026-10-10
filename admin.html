@@ -1220,7 +1220,7 @@
             const centerSelect = document.getElementById('entry_center');
             const currentCenter = centerSelect.value;
             centerSelect.innerHTML = State.centers.length 
-                ? State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
+                ? [...State.centers].sort((a,b) => a.name.includes('Newstar') ? -1 : b.name.includes('Newstar') ? 1 : 0).map(c => `<option value="${c.name}">${c.name}</option>`).join('')
                 : `<option value="">No centers available</option>`;
             
             if (currentCenter && State.centers.find(c => c.name === currentCenter)) {
@@ -1405,7 +1405,7 @@
             const centerSelect = document.getElementById('schedule_center');
             const locationInput = document.getElementById('schedule_location');
             centerSelect.innerHTML = State.centers.length 
-                ? State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
+                ? [...State.centers].sort((a,b) => a.name.includes('Newstar') ? -1 : b.name.includes('Newstar') ? 1 : 0).map(c => `<option value="${c.name}">${c.name}</option>`).join('')
                 : `<option value="">No centers available</option>`;
             
             if (State.centers.length > 0) {
@@ -1782,7 +1782,7 @@
         function initAttendanceView() {
             const centerSelect = document.getElementById('attendance_center');
             centerSelect.innerHTML = State.centers.length 
-                ? State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
+                ? [...State.centers].sort((a,b) => a.name.includes('Newstar') ? -1 : b.name.includes('Newstar') ? 1 : 0).map(c => `<option value="${c.name}">${c.name}</option>`).join('')
                 : `<option value="">No centers available</option>`;
                 
             fetchAttendance();
