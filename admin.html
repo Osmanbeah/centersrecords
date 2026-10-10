@@ -479,6 +479,104 @@
                 </section>
             </div>
 
+            <!-- Assistant Attendance & Financial Records Section -->
+            <section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-stack-md sm:p-6 shadow-sm mb-stack-lg space-y-5">
+                <!-- Section Header & Filter Controls -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-outline-variant/60 gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[24px]">receipt_long</span>
+                        </div>
+                        <div>
+                            <h2 class="font-headline-md text-headline-md-mobile text-on-surface font-bold">Assistant Attendance & Financial Records</h2>
+                            <p class="text-xs text-on-surface-variant mt-0.5">Review shift attendance history, bonus rewards (+), deductions (-), and net balance per assistant.</p>
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Assistant Select Filter -->
+                        <div class="relative min-w-[190px]">
+                            <span class="material-symbols-outlined absolute left-2.5 top-2.5 text-[16px] text-outline pointer-events-none">person</span>
+                            <select id="manage_records_assistant_filter" onchange="renderManageAssistantRecords()" 
+                                class="w-full h-9 bg-surface-container-lowest border border-outline-variant rounded-lg pl-8 pr-8 text-xs font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none cursor-pointer">
+                                <option value="ALL">All Assistants</option>
+                            </select>
+                            <span class="material-symbols-outlined absolute right-2.5 top-2.5 text-[16px] text-outline pointer-events-none">expand_more</span>
+                        </div>
+
+                        <!-- Day Select Filter -->
+                        <div class="relative min-w-[130px]">
+                            <span class="material-symbols-outlined absolute left-2.5 top-2.5 text-[16px] text-outline pointer-events-none">calendar_today</span>
+                            <select id="manage_records_day_filter" onchange="renderManageAssistantRecords()"
+                                class="w-full h-9 bg-surface-container-lowest border border-outline-variant rounded-lg pl-8 pr-8 text-xs font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none cursor-pointer">
+                                <option value="ALL">All Days</option>
+                                <option value="Sunday">Sunday</option>
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                            </select>
+                            <span class="material-symbols-outlined absolute right-2.5 top-2.5 text-[16px] text-outline pointer-events-none">expand_more</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI Metric Summary Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <!-- Total Shifts Attended -->
+                    <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-on-surface-variant block uppercase tracking-wider">Total Shifts</span>
+                            <span id="manage_kpi_shifts" class="font-headline-sm font-bold text-on-surface text-sm sm:text-base">0 Attended</span>
+                        </div>
+                    </div>
+
+                    <!-- Total Bonus -->
+                    <div class="p-3.5 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-secondary/20 text-secondary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">add_circle</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-secondary block uppercase tracking-wider">Total Bonus</span>
+                            <span id="manage_kpi_bonus" class="font-headline-sm font-bold text-secondary text-sm sm:text-base">+ 0 EGP</span>
+                        </div>
+                    </div>
+
+                    <!-- Total Deductions -->
+                    <div class="p-3.5 rounded-xl bg-error/10 border border-error/20 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-error/20 text-error flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">remove_circle</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-error block uppercase tracking-wider">Total Deductions</span>
+                            <span id="manage_kpi_deduct" class="font-headline-sm font-bold text-error text-sm sm:text-base">- 0 EGP</span>
+                        </div>
+                    </div>
+
+                    <!-- Net Financial Adjustment -->
+                    <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-tertiary-container/30 text-tertiary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-on-surface-variant block uppercase tracking-wider">Net Adjustment</span>
+                            <span id="manage_kpi_net" class="font-headline-sm font-bold text-on-surface text-sm sm:text-base">0 EGP</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Per-Assistant Summaries or Detailed Session Records Log -->
+                <div id="manage_records_content" class="space-y-4">
+                    <!-- Populated dynamically by renderManageAssistantRecords() -->
+                </div>
+            </section>
+
             <!-- Reset / Clear All Data -->
             <section class="bg-surface-container-lowest rounded-xl border border-error/30 p-stack-md shadow-sm">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -964,6 +1062,7 @@
         function initManageView() {
             renderManageCenters();
             renderManageAssistants();
+            renderManageAssistantRecords();
         }
 
         function renderManageCenters() {
@@ -1036,6 +1135,345 @@
                 container.appendChild(div);
             });
         }
+
+        // --- Assistant Attendance & Financial Records in Manage View ---
+        function renderManageAssistantRecords() {
+            const assistantSelect = document.getElementById('manage_records_assistant_filter');
+            const daySelect = document.getElementById('manage_records_day_filter');
+            const container = document.getElementById('manage_records_content');
+            if (!container) return;
+
+            // 1. Update Assistant Filter dropdown options
+            if (assistantSelect) {
+                const currentSelection = assistantSelect.value || 'ALL';
+                const namesSet = new Set();
+                State.assistants.forEach(a => {
+                    const n = getAssistantName(a);
+                    if (n) namesSet.add(n);
+                });
+                State.entries.forEach(e => {
+                    (e.present || []).forEach(n => namesSet.add(n));
+                    (e.absent || []).forEach(n => namesSet.add(n));
+                    if (e.adjustments) Object.keys(e.adjustments).forEach(n => namesSet.add(n));
+                });
+                State.attendances.forEach(a => {
+                    if (a.assistant_name) namesSet.add(a.assistant_name);
+                });
+
+                const sortedNames = Array.from(namesSet).sort();
+                let optionsHtml = `<option value="ALL">All Assistants (${sortedNames.length})</option>`;
+                sortedNames.forEach(name => {
+                    optionsHtml += `<option value="${name}">${name}</option>`;
+                });
+                assistantSelect.innerHTML = optionsHtml;
+                if (Array.from(assistantSelect.options).some(o => o.value === currentSelection)) {
+                    assistantSelect.value = currentSelection;
+                } else {
+                    assistantSelect.value = 'ALL';
+                }
+            }
+
+            const selectedAssistant = assistantSelect ? assistantSelect.value : 'ALL';
+            const selectedDay = daySelect ? daySelect.value : 'ALL';
+
+            // 2. Build list of records
+            const assistantRecords = [];
+
+            // A. From State.entries (official saved session entries)
+            State.entries.forEach(entry => {
+                if (selectedDay !== 'ALL' && entry.day && entry.day.toLowerCase() !== selectedDay.toLowerCase()) {
+                    return;
+                }
+
+                const presentList = entry.present || [];
+                const absentList = entry.absent || [];
+                const adjustments = entry.adjustments || {};
+
+                const involved = Array.from(new Set([
+                    ...presentList,
+                    ...absentList,
+                    ...Object.keys(adjustments)
+                ])).filter(Boolean);
+
+                involved.forEach(astName => {
+                    if (selectedAssistant !== 'ALL' && astName.toLowerCase() !== selectedAssistant.toLowerCase()) {
+                        return;
+                    }
+
+                    const isPresent = presentList.includes(astName);
+                    const bonus = parseFloat(adjustments[astName]?.bonus) || 0;
+                    const deduct = parseFloat(adjustments[astName]?.deduction) || 0;
+
+                    assistantRecords.push({
+                        entryId: entry.id,
+                        assistant: astName,
+                        center: entry.center,
+                        day: entry.day,
+                        date: entry.date || (entry.createdAt ? entry.createdAt.split('T')[0] : 'Today'),
+                        time: entry.savedAt || (entry.createdAt ? new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''),
+                        status: isPresent ? 'Attended' : 'Absent',
+                        bonus: bonus,
+                        deduction: deduct,
+                        net: bonus - deduct,
+                        createdAt: entry.createdAt || entry.date || '',
+                        isEntry: true
+                    });
+                });
+            });
+
+            // B. Also include any raw scans from State.attendances that haven't been saved in entries yet
+            State.attendances.forEach(att => {
+                const astName = att.assistant_name;
+                if (!astName) return;
+                if (selectedAssistant !== 'ALL' && astName.toLowerCase() !== selectedAssistant.toLowerCase()) {
+                    return;
+                }
+                const attDay = att.day || (att.center && att.center.match(/\(([^)]+)\)/) ? att.center.match(/\(([^)]+)\)/)[1] : '');
+                if (selectedDay !== 'ALL' && attDay && attDay.toLowerCase() !== selectedDay.toLowerCase()) {
+                    return;
+                }
+
+                const cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
+                const alreadyRecorded = assistantRecords.some(r => 
+                    r.assistant.toLowerCase() === astName.toLowerCase() &&
+                    r.center.toLowerCase().includes(cleanCenter.toLowerCase()) &&
+                    (attDay ? r.day.toLowerCase() === attDay.toLowerCase() : true)
+                );
+
+                if (!alreadyRecorded) {
+                    const scanDate = att.created_at ? att.created_at.split('T')[0] : 'Today';
+                    const scanTime = att.created_at ? new Date(att.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                    assistantRecords.push({
+                        entryId: null,
+                        assistant: astName,
+                        center: cleanCenter || att.center,
+                        day: attDay || 'Recent',
+                        date: scanDate,
+                        time: scanTime,
+                        status: 'Scanned',
+                        bonus: 0,
+                        deduction: 0,
+                        net: 0,
+                        createdAt: att.created_at || '',
+                        isEntry: false
+                    });
+                }
+            });
+
+            // Sort by date / createdAt descending
+            assistantRecords.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+            // 3. Compute KPI metrics
+            const totalShifts = assistantRecords.filter(r => r.status === 'Attended' || r.status === 'Scanned').length;
+            const totalBonus = assistantRecords.reduce((sum, r) => sum + (r.bonus || 0), 0);
+            const totalDeduct = assistantRecords.reduce((sum, r) => sum + (r.deduction || 0), 0);
+            const netAmount = totalBonus - totalDeduct;
+
+            // Update KPI badges
+            const kpiShiftsEl = document.getElementById('manage_kpi_shifts');
+            const kpiBonusEl = document.getElementById('manage_kpi_bonus');
+            const kpiDeductEl = document.getElementById('manage_kpi_deduct');
+            const kpiNetEl = document.getElementById('manage_kpi_net');
+
+            if (kpiShiftsEl) kpiShiftsEl.textContent = `${totalShifts} Shift${totalShifts !== 1 ? 's' : ''}`;
+            if (kpiBonusEl) kpiBonusEl.textContent = `+ ${totalBonus.toLocaleString()} EGP`;
+            if (kpiDeductEl) kpiDeductEl.textContent = `- ${totalDeduct.toLocaleString()} EGP`;
+            if (kpiNetEl) {
+                kpiNetEl.textContent = `${netAmount >= 0 ? '+' : ''}${netAmount.toLocaleString()} EGP`;
+                kpiNetEl.className = `font-headline-sm font-bold text-sm sm:text-base ${netAmount >= 0 ? 'text-secondary' : 'text-error'}`;
+            }
+
+            // 4. Render Records Content
+            if (assistantRecords.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-surface-container-low border border-dashed border-outline-variant rounded-xl p-8 text-center space-y-2">
+                        <span class="material-symbols-outlined text-outline text-[32px]">folder_off</span>
+                        <h4 class="font-label-lg font-bold text-on-surface">No Attendance Records Found</h4>
+                        <p class="text-xs text-on-surface-variant max-w-md mx-auto">
+                            No attendance records or adjustments have been saved yet for the selected filter.
+                            Go to <button type="button" onclick="switchTab('new-entry')" class="text-primary font-bold hover:underline">Attendance Records</button> to record attendance and adjustments.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            // If ALL assistants selected, build an Assistant Summary Overview Grid + History Log
+            let assistantOverviewHtml = '';
+            if (selectedAssistant === 'ALL') {
+                const astSummary = {};
+                assistantRecords.forEach(r => {
+                    if (!astSummary[r.assistant]) {
+                        astSummary[r.assistant] = { shifts: 0, bonus: 0, deduct: 0 };
+                    }
+                    if (r.status === 'Attended' || r.status === 'Scanned') astSummary[r.assistant].shifts++;
+                    astSummary[r.assistant].bonus += r.bonus;
+                    astSummary[r.assistant].deduct += r.deduction;
+                });
+
+                const summaryCards = Object.keys(astSummary).sort().map((name, i) => {
+                    const stats = astSummary[name];
+                    const colorClass = `avatar-color-${i % 3}`;
+                    return `
+                        <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 flex flex-col justify-between gap-3 hover:border-primary/50 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <div class="w-8 h-8 rounded-full ${colorClass} flex items-center justify-center font-bold text-xs shrink-0">
+                                        ${getInitials(name)}
+                                    </div>
+                                    <span class="font-bold text-xs sm:text-sm text-on-surface truncate">${name}</span>
+                                </div>
+                                <button type="button" onclick="filterManageAssistant('${name.replace(/'/g, "\\'")}')" 
+                                    class="text-[11px] font-semibold text-primary hover:text-secondary flex items-center gap-0.5 shrink-0 hover:underline">
+                                    <span>Logs</span>
+                                    <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-3 gap-1 pt-2 border-t border-outline-variant/40 text-center">
+                                <div class="bg-surface-container px-1 py-1 rounded">
+                                    <span class="block text-[9px] uppercase tracking-wider text-on-surface-variant font-medium">Shifts</span>
+                                    <span class="font-bold text-xs text-on-surface">${stats.shifts}</span>
+                                </div>
+                                <div class="bg-secondary/10 px-1 py-1 rounded">
+                                    <span class="block text-[9px] uppercase tracking-wider text-secondary font-medium">Bonus</span>
+                                    <span class="font-bold text-xs text-secondary">+${stats.bonus}</span>
+                                </div>
+                                <div class="bg-error/10 px-1 py-1 rounded">
+                                    <span class="block text-[9px] uppercase tracking-wider text-error font-medium">Deduct</span>
+                                    <span class="font-bold text-xs text-error">-${stats.deduct}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                assistantOverviewHtml = `
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] text-primary">groups</span>
+                                <span>Assistants Ledger Overview</span>
+                            </h3>
+                            <span class="text-[11px] text-on-surface-variant">${Object.keys(astSummary).length} Assistants with Records</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            ${summaryCards}
+                        </div>
+                    </div>
+                `;
+            } else {
+                assistantOverviewHtml = `
+                    <div class="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl p-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                ${getInitials(selectedAssistant)}
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-xs sm:text-sm text-on-surface">Filtered for: ${selectedAssistant}</h3>
+                                <p class="text-[11px] text-on-surface-variant">Showing complete shift history, bonuses, and deductions.</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="filterManageAssistant('ALL')" 
+                            class="px-2.5 py-1 bg-surface-container-lowest text-on-surface rounded-lg text-xs font-semibold hover:bg-surface-container border border-outline-variant/60 flex items-center gap-1 shadow-sm">
+                            <span class="material-symbols-outlined text-[14px]">close</span>
+                            <span>Show All</span>
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Detailed records rows
+            const rowsHtml = assistantRecords.map(r => {
+                const bonusDisplay = r.bonus > 0 
+                    ? `<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20">+${r.bonus} EGP</span>`
+                    : `<span class="text-xs text-on-surface-variant font-medium">—</span>`;
+
+                const deductDisplay = r.deduction > 0 
+                    ? `<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-bold bg-error/10 text-error border border-error/20">-${r.deduction} EGP</span>`
+                    : `<span class="text-xs text-on-surface-variant font-medium">—</span>`;
+
+                const statusBadge = r.status === 'Attended'
+                    ? `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full"><span class="material-symbols-outlined text-[13px]">check_circle</span> Attended</span>`
+                    : r.status === 'Scanned'
+                    ? `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full"><span class="material-symbols-outlined text-[13px]">qr_code_scanner</span> Scanned</span>`
+                    : `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-error bg-error/10 px-2 py-0.5 rounded-full"><span class="material-symbols-outlined text-[13px]">cancel</span> Absent</span>`;
+
+                const deleteBtn = r.isEntry && r.entryId
+                    ? `<button type="button" onclick="deleteSessionRecord('${r.entryId}')" title="Delete this session record" class="text-on-surface-variant hover:text-error hover:bg-error-container/30 p-1.5 rounded-full transition-colors active:scale-95"><span class="material-symbols-outlined text-[16px]">delete</span></button>`
+                    : ``;
+
+                return `
+                    <div class="p-3 sm:p-4 rounded-xl bg-surface-container-low border border-outline-variant/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container transition-colors">
+                        <div class="flex items-start sm:items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary shrink-0 border border-outline-variant/50">
+                                <span class="material-symbols-outlined text-[18px]">storefront</span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-bold text-xs sm:text-sm text-on-surface">${r.center}</span>
+                                    <span class="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">${r.day}</span>
+                                    ${statusBadge}
+                                </div>
+                                <div class="flex items-center gap-2 text-[11px] text-on-surface-variant mt-0.5">
+                                    <span class="font-semibold text-on-surface">${r.assistant}</span>
+                                    <span>&bull;</span>
+                                    <span>${r.date}</span>
+                                    ${r.time ? `<span>&bull;</span><span>${r.time}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-outline-variant/40 shrink-0">
+                            <div class="flex items-center gap-3">
+                                <div class="flex flex-col items-end">
+                                    <span class="text-[9px] uppercase tracking-wider text-secondary font-medium">Bonus</span>
+                                    ${bonusDisplay}
+                                </div>
+                                <div class="flex flex-col items-end">
+                                    <span class="text-[9px] uppercase tracking-wider text-error font-medium">Deduct</span>
+                                    ${deductDisplay}
+                                </div>
+                            </div>
+                            ${deleteBtn}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                ${assistantOverviewHtml}
+                <div class="space-y-2 pt-2">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px] text-primary">history</span>
+                            <span>Detailed Session Records Log (${assistantRecords.length})</span>
+                        </h3>
+                    </div>
+                    <div class="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                        ${rowsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function filterManageAssistant(assistantName) {
+            const select = document.getElementById('manage_records_assistant_filter');
+            if (select) {
+                select.value = assistantName;
+                renderManageAssistantRecords();
+            }
+        }
+
+        window.deleteSessionRecord = function(entryId) {
+            if (!confirm("Are you sure you want to delete this session attendance and financial record?")) return;
+            State.entries = State.entries.filter(e => e.id !== entryId);
+            saveState();
+            renderManageAssistantRecords();
+            const recordsView = document.getElementById('view-new-entry');
+            if (recordsView && !recordsView.classList.contains('hidden')) {
+                renderAttendanceRecordsView();
+            }
+        };
 
         document.getElementById('add-center-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1176,6 +1614,7 @@
             }
             saveState();
             renderManageAssistants();
+            renderManageAssistantRecords();
             initScheduleView();
             if (!document.getElementById('view-new-entry').classList.contains('hidden')) {
                 renderEntryAssistants();
@@ -1215,6 +1654,7 @@
                 // Re-render
                 renderManageCenters();
                 renderManageAssistants();
+                renderManageAssistantRecords();
                 initNewEntryView();
 
 
@@ -1360,11 +1800,19 @@
                         return false;
                     });
 
-                    // List of unique assistant names that scanned
-                    const scannedAssistantNames = Array.from(new Set(scannedRecordsForCenter.map(att => att.assistant_name).filter(Boolean)));
+                    // Check for existing saved entry for this schedule/center and day
+                    const existingEntry = State.entries.find(e => 
+                        ((e.scheduleId && e.scheduleId === sched.id) || (e.center === sched.center)) &&
+                        e.day && e.day.toLowerCase() === day.toLowerCase()
+                    );
 
-                    // We display the assistants who scanned their ID
-                    const displayAssistants = scannedAssistantNames;
+                    // List of unique assistant names that scanned OR were previously saved in this session
+                    const displayAssistants = Array.from(new Set([
+                        ...scannedAssistantNames,
+                        ...(existingEntry?.present || []),
+                        ...(existingEntry?.absent || []),
+                        ...Object.keys(existingEntry?.adjustments || {})
+                    ])).filter(Boolean);
 
                     let assistantsListHtml = '';
                     if (displayAssistants.length === 0) {
@@ -1377,10 +1825,14 @@
                         `;
                     } else {
                         assistantsListHtml = displayAssistants.map(name => {
+                            const isChecked = existingEntry ? (existingEntry.present || []).includes(name) : true;
+                            const savedBonus = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.bonus) ? existingEntry.adjustments[name].bonus : '';
+                            const savedDeduct = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.deduction) ? existingEntry.adjustments[name].deduction : '';
+
                             return `
                                 <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-outline-variant/60 bg-surface-container-low/70 gap-3 hover:bg-surface-container transition-colors">
                                     <label class="flex items-center cursor-pointer flex-grow select-none">
-                                        <input type="checkbox" name="att_${centerSafeId}" value="${name}" checked 
+                                        <input type="checkbox" name="att_${centerSafeId}" value="${name}" ${isChecked ? 'checked' : ''} 
                                             class="att-cb-${centerSafeId} h-5 w-5 rounded text-primary focus:ring-primary border-outline-variant bg-surface-container-lowest cursor-pointer"/>
                                         <div class="ml-3 flex flex-col">
                                             <span class="font-label-lg font-bold text-on-surface text-sm sm:text-base flex items-center gap-1.5">
@@ -1399,14 +1851,14 @@
                                         <!-- Bonus Input -->
                                         <div class="flex items-center gap-1 bg-secondary/10 border border-secondary/30 px-2 py-1 rounded-lg">
                                             <span class="text-xs font-bold text-secondary">+</span>
-                                            <input type="number" min="0" step="any" placeholder="Bonus" data-assistant="${name}"
+                                            <input type="number" min="0" step="any" placeholder="Bonus" data-assistant="${name}" value="${savedBonus}"
                                                 class="bonus-input-${centerSafeId} w-20 sm:w-24 text-right bg-surface-container-lowest border border-secondary/30 rounded px-2 py-1 text-xs font-semibold text-secondary focus:outline-none focus:ring-1 focus:ring-secondary" title="Bonus (EGP)"/>
                                             <span class="text-[10px] text-secondary font-medium">EGP</span>
                                         </div>
                                         <!-- Deduction Input -->
                                         <div class="flex items-center gap-1 bg-error/10 border border-error/30 px-2 py-1 rounded-lg">
                                             <span class="text-xs font-bold text-error">-</span>
-                                            <input type="number" min="0" step="any" placeholder="Deduct" data-assistant="${name}"
+                                            <input type="number" min="0" step="any" placeholder="Deduct" data-assistant="${name}" value="${savedDeduct}"
                                                 class="deduct-input-${centerSafeId} w-20 sm:w-24 text-right bg-surface-container-lowest border border-error/30 rounded px-2 py-1 text-xs font-semibold text-error focus:outline-none focus:ring-1 focus:ring-error" title="Deduction (EGP)"/>
                                             <span class="text-[10px] text-error font-medium">EGP</span>
                                         </div>
@@ -1415,6 +1867,13 @@
                             `;
                         }).join('');
                     }
+
+                    const savedBadgeHtml = existingEntry ? `
+                        <span class="inline-flex items-center gap-1 text-xs text-secondary font-semibold bg-secondary/10 px-2.5 py-1 rounded-full border border-secondary/20">
+                            <span class="material-symbols-outlined text-[14px]">cloud_done</span>
+                            <span>Saved${existingEntry.savedAt ? ` (${existingEntry.savedAt})` : ''}</span>
+                        </span>
+                    ` : '';
 
                     return `
                         <!-- Center Card under this Day -->
@@ -1430,15 +1889,16 @@
                                         ${sched.address ? `<p class="text-xs text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">location_on</span>${sched.address}</p>` : ''}
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     ${timeFmt ? `
                                         <span class="inline-flex items-center gap-1 text-xs text-secondary font-semibold bg-secondary/10 px-3 py-1 rounded-full">
                                             <span class="material-symbols-outlined text-[14px]">schedule</span>
                                             ${timeFmt}
                                         </span>
                                     ` : ''}
+                                    ${savedBadgeHtml}
                                     <span class="text-xs text-on-surface-variant bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/40 font-medium">
-                                        ${displayAssistants.length} scanned
+                                        ${displayAssistants.length} assistant${displayAssistants.length !== 1 ? 's' : ''}
                                     </span>
                                 </div>
                             </div>
@@ -1446,7 +1906,7 @@
                             <!-- Attended Members with Bonus & Deduct -->
                             <div class="space-y-2">
                                 <div class="flex items-center justify-between text-xs font-bold text-on-surface uppercase tracking-wider px-1">
-                                    <span>Scanned Assistants</span>
+                                    <span>Session Assistants</span>
                                     <span class="text-[11px] text-on-surface-variant font-normal">Add bonus / deduction adjustments</span>
                                 </div>
                                 <div class="space-y-2">
@@ -1463,7 +1923,7 @@
                                     id="btn_save_${centerSafeId}"
                                     class="ml-auto inline-flex items-center gap-1.5 px-5 py-2.5 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-sm">
                                     <span class="material-symbols-outlined text-[16px]">fact_check</span>
-                                    <span>Save Attendance & Adjustments</span>
+                                    <span>${existingEntry ? 'Update Attendance & Adjustments' : 'Save Attendance & Adjustments'}</span>
                                 </button>
                             </div>
                         </div>
@@ -1547,9 +2007,15 @@
             }
 
             try {
-                // 1. Save entry to local state
-                State.entries.unshift({
-                    id: generateId(),
+                // 1. Save entry to local state (update if already exists for this session, else unshift)
+                const existingIndex = State.entries.findIndex(e => 
+                    ((e.scheduleId && e.scheduleId === scheduleId) || (e.center === center)) &&
+                    e.day && e.day.toLowerCase() === day.toLowerCase()
+                );
+
+                const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const entryRecord = {
+                    id: existingIndex >= 0 ? State.entries[existingIndex].id : generateId(),
                     center,
                     day,
                     scheduleId,
@@ -1557,9 +2023,22 @@
                     present,
                     absent,
                     adjustments,
-                    createdAt: new Date().toISOString()
-                });
+                    savedAt: nowTimeStr,
+                    createdAt: existingIndex >= 0 ? (State.entries[existingIndex].createdAt || new Date().toISOString()) : new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (existingIndex >= 0) {
+                    State.entries[existingIndex] = entryRecord;
+                } else {
+                    State.entries.unshift(entryRecord);
+                }
                 saveState();
+
+                // Refresh Manage Assistant Records
+                if (typeof renderManageAssistantRecords === 'function') {
+                    renderManageAssistantRecords();
+                }
 
                 // 2. Sync attended assistants to Supabase attendance table
                 if (supabaseClient && present.length > 0) {
@@ -2231,6 +2710,12 @@
                 const recordsView = document.getElementById('view-new-entry');
                 if (recordsView && !recordsView.classList.contains('hidden')) {
                     renderAttendanceRecordsView();
+                }
+
+                // Also update Manage Assistant Records view if active
+                const manageView = document.getElementById('view-manage');
+                if (manageView && !manageView.classList.contains('hidden')) {
+                    renderManageAssistantRecords();
                 }
             } catch (err) {
                 console.error("Error fetching attendance:", err);
