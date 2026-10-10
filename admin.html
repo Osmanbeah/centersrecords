@@ -1653,33 +1653,62 @@
         }
         
         window.approveRequest = async function(id, scheduleId, assistantName) {
-            // Update request status
-            try {
-                await supabaseClient.from('shift_requests').update({status: 'approved'}).eq('id', id);
-                
-                // Add assistant to the schedule
-                if (scheduleId && assistantName) {
-                    const sched = State.schedules.find(s => s.id === scheduleId);
-                    if (sched) {
-                        let currentAssistants = sched.assistants || [];
-                        if (!currentAssistants.includes(assistantName)) {
-                            currentAssistants.push(assistantName);
-                            await supabaseClient.from('schedule').update({assistants: currentAssistants}).eq('id', scheduleId);
-                        }
-                    }
+            // 1. Optimistic instant UI update
+            const prevRequests = [...State.requests];
+            const prevSchedules = JSON.parse(JSON.stringify(State.schedules));
+
+            State.requests = State.requests.filter(r => r.id !== id);
+            
+            const sched = State.schedules.find(s => s.id === scheduleId);
+            if (sched) {
+                if (!sched.assistants) sched.assistants = [];
+                if (!sched.assistants.includes(assistantName)) {
+                    sched.assistants.push(assistantName);
                 }
-                
-                await fetchRequests();
-                await fetchSchedule(); // Refresh schedule list
-            } catch(e) { console.error(e); }
+            }
+
+            renderRequestsList();
+            renderScheduleList();
+
+            // 2. Perform DB operations in parallel in the background
+            try {
+                const reqPromise = supabaseClient.from('shift_requests').update({ status: 'approved' }).eq('id', id);
+                const schedPromise = (sched && scheduleId)
+                    ? supabaseClient.from('schedule').update({ assistants: sched.assistants }).eq('id', scheduleId)
+                    : Promise.resolve();
+
+                const [res1, res2] = await Promise.all([reqPromise, schedPromise]);
+                if (res1 && res1.error) throw res1.error;
+                if (res2 && res2.error) throw res2.error;
+            } catch(e) {
+                console.error("Error approving request:", e);
+                alert("Failed to approve request: " + (e.message || "Network error."));
+                // Revert on failure
+                State.requests = prevRequests;
+                State.schedules = prevSchedules;
+                renderRequestsList();
+                renderScheduleList();
+            }
         };
         
         window.rejectRequest = async function(id) {
             if (!confirm("Are you sure you want to reject this request?")) return;
+
+            // 1. Optimistic instant UI update
+            const prevRequests = [...State.requests];
+            State.requests = State.requests.filter(r => r.id !== id);
+            renderRequestsList();
+
+            // 2. Perform DB operation in background
             try {
-                await supabaseClient.from('shift_requests').update({status: 'rejected'}).eq('id', id);
-                await fetchRequests();
-            } catch(e) { console.error(e); }
+                const { error } = await supabaseClient.from('shift_requests').update({ status: 'rejected' }).eq('id', id);
+                if (error) throw error;
+            } catch(e) {
+                console.error("Error rejecting request:", e);
+                alert("Failed to reject request: " + (e.message || "Network error."));
+                State.requests = prevRequests;
+                renderRequestsList();
+            }
         };
 
         function renderScheduleList() {
