@@ -1461,6 +1461,9 @@
                 if (error) throw error;
                 State.schedules = data || [];
                 renderScheduleList();
+                if (State.requests && State.requests.length > 0) {
+                    renderRequestsList();
+                }
                 const newEntryView = document.getElementById('view-new-entry');
                 if (newEntryView && !newEntryView.classList.contains('hidden')) {
                     renderEntryAssistants();
@@ -1480,7 +1483,7 @@
             try {
                 const { data, error } = await supabaseClient
                     .from('shift_requests')
-                    .select('*')
+                    .select('*, schedule:schedule_id(center, time, days, address)')
                     .eq('status', 'pending')
                     .order('created_at', { ascending: false });
 
@@ -1513,7 +1516,7 @@
             // Group requests by Center
             const groupsByCenter = {};
             State.requests.forEach(req => {
-                const sched = State.schedules.find(s => s.id === req.schedule_id);
+                const sched = req.schedule || State.schedules.find(s => s.id === req.schedule_id);
                 const centerName = sched ? sched.center : (req.center || 'Other / General');
                 if (!groupsByCenter[centerName]) {
                     groupsByCenter[centerName] = [];
@@ -1961,8 +1964,8 @@
         // --- Init ---
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAdminAuth();
-            fetchSchedule();
-            fetchRequests();
+            await fetchSchedule();
+            await fetchRequests();
             const hash = window.location.hash.replace('#', '');
             if (['new-entry', 'records', 'manage', 'schedule'].includes(hash)) {
                 switchTab(hash);
