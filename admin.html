@@ -568,7 +568,16 @@
             </form>
 
             <div>
-                <h3 class="font-headline-md text-on-surface mb-4">Upcoming Schedule</h3>
+                <h3 class="font-headline-md text-on-surface mb-4">Pending Assistant Requests</h3>
+                <div id="requests_list_loading" class="flex justify-center py-4 hidden">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div id="requests_list" class="flex flex-col gap-3 mb-8">
+                    <!-- Populated from shift_requests -->
+                    <p class="text-on-surface-variant text-center text-sm py-4 italic">No pending requests.</p>
+                </div>
+                
+                <h3 class="font-headline-md text-on-surface mb-4 border-t border-outline-variant/30 pt-6">Upcoming Schedule</h3>
                 <div id="schedule_list_loading" class="flex justify-center py-4 hidden">
                     <div class="loading-spinner"></div>
                 </div>
@@ -1355,6 +1364,7 @@
             }
 
             await fetchSchedule();
+            await fetchRequests();
         }
 
         // Auto-fill location when center is selected
@@ -1389,6 +1399,93 @@
                 fetchingSchedule = false;
             }
         }
+
+        async function fetchRequests() {
+            const loadingEl = document.getElementById('requests_list_loading');
+            if (loadingEl) loadingEl.classList.remove('hidden');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('shift_requests')
+                    .select('*')
+                    .eq('status', 'pending')
+                    .order('date', { ascending: true });
+
+                if (error) throw error;
+                State.requests = data || [];
+                renderRequestsList();
+            } catch (err) {
+                console.error("Error fetching requests:", err);
+            } finally {
+                if (loadingEl) loadingEl.classList.add('hidden');
+            }
+        }
+
+        function renderRequestsList() {
+            const listContainer = document.getElementById('requests_list');
+            if (!State.requests || State.requests.length === 0) {
+                listContainer.innerHTML = `<p class="text-on-surface-variant text-center text-sm py-4 italic">No pending requests.</p>`;
+                return;
+            }
+            
+            listContainer.innerHTML = State.requests.map(req => {
+                const dateFmt = new Date(req.date).toLocaleDateString(undefined, {month:'short', day:'numeric'});
+                return `
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-surface-container-low rounded-xl border border-secondary/30 gap-3 shadow-sm">
+                    <div>
+                        <div class="font-label-lg text-on-surface flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-secondary">person</span> ${req.assistant_name}</div>
+                        <div class="text-sm text-on-surface-variant mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">storefront</span> ${req.center}</span>
+                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">calendar_today</span> ${dateFmt} &bull; ${req.time}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="approveRequest('${req.id}')" class="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[16px]">check_circle</span> Approve
+                        </button>
+                        <button onclick="rejectRequest('${req.id}')" class="px-3 py-1.5 bg-error/10 text-error rounded-lg text-xs font-semibold hover:bg-error/20 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[16px]">cancel</span> Reject
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        
+        window.approveRequest = async function(id) {
+            const req = State.requests.find(r => r.id === id);
+            if (!req) return;
+            
+            // Pre-fill Schedule Form
+            document.getElementById('schedule_date').value = req.date;
+            document.getElementById('schedule_time').value = req.time;
+            document.getElementById('schedule_center').value = req.center;
+            
+            // Auto location
+            const centerObj = State.centers.find(c => c.name === req.center);
+            document.getElementById('schedule_location').value = (centerObj && centerObj.address) ? centerObj.address : '';
+            
+            // Check assistant
+            document.querySelectorAll('.sched-assistant-cb').forEach(cb => {
+                cb.checked = (cb.value === req.assistant_name);
+            });
+            
+            // Highlight form
+            document.getElementById('new-schedule-form').scrollIntoView({behavior: 'smooth'});
+            
+            // Mark request as approved in DB
+            try {
+                await supabaseClient.from('shift_requests').update({status: 'approved'}).eq('id', id);
+                await fetchRequests();
+            } catch(e) { console.error(e); }
+        };
+        
+        window.rejectRequest = async function(id) {
+            if (!confirm("Are you sure you want to reject this request?")) return;
+            try {
+                await supabaseClient.from('shift_requests').update({status: 'rejected'}).eq('id', id);
+                await fetchRequests();
+            } catch(e) { console.error(e); }
+        };
 
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
@@ -1650,12 +1747,20 @@
                     fetchSchedule();
                 })
                 .subscribe();
+                
+            supabaseClient
+                .channel('public:shift_requests')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_requests' }, payload => {
+                    fetchRequests();
+                })
+                .subscribe();
         }
 
         // --- Init ---
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAdminAuth();
             fetchSchedule();
+            fetchRequests();
             const hash = window.location.hash.replace('#', '');
             if (['new-entry', 'records', 'manage', 'schedule'].includes(hash)) {
                 switchTab(hash);
