@@ -1328,14 +1328,44 @@
                     const assignedAssistants = Array.isArray(sched.assistants) ? sched.assistants : [];
                     const centerSafeId = `${day}_${sched.id}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-                    // Filter only assistants who scanned their ID for this center (and day if available)
+                    // Filter only assistants who scanned their ID for this center AND this specific day
                     const scannedRecordsForCenter = (State.attendances || []).filter(att => {
-                        const centerMatches = (att.center || '').trim().toLowerCase() === (sched.center || '').trim().toLowerCase();
-                        if (!centerMatches) return false;
+                        const rawCenter = (att.center || '').trim().toLowerCase();
+                        const schedCenter = (sched.center || '').trim().toLowerCase();
+                        
+                        // Extract center name and embedded day if present (e.g. "Center Name (Monday)")
+                        let attCenterName = rawCenter;
+                        let attEmbeddedDay = '';
+                        const parenMatch = rawCenter.match(/\((sunday|monday|tuesday|wednesday|thursday|friday|saturday)\)$/i);
+                        if (parenMatch) {
+                            attEmbeddedDay = parenMatch[1].toLowerCase();
+                            attCenterName = rawCenter.replace(/\s*\((sunday|monday|tuesday|wednesday|thursday|friday|saturday)\)$/i, '').trim();
+                        }
+
+                        // Must match center name
+                        if (attCenterName !== schedCenter && rawCenter !== schedCenter) return false;
+
+                        // Check day match:
+                        // 1. Explicit day column
                         if (att.day) {
                             return att.day.toLowerCase() === day.toLowerCase();
                         }
-                        return true;
+
+                        // 2. Embedded day in center string e.g. "i Learn Helwan (Monday)"
+                        if (attEmbeddedDay) {
+                            return attEmbeddedDay === day.toLowerCase();
+                        }
+
+                        // 3. Weekday of created_at timestamp
+                        if (att.created_at) {
+                            const scanDate = new Date(att.created_at);
+                            const WEEK_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                            const scanDay = WEEK_NAMES[scanDate.getDay()];
+                            return scanDay === day.toLowerCase();
+                        }
+
+                        // If no day info at all, don't cross-match to other days
+                        return false;
                     });
 
                     // List of unique assistant names that scanned
@@ -2237,7 +2267,7 @@
                             <div class="font-label-lg font-bold text-on-surface">${scan.assistant_name}</div>
                             <div class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
                                 <span class="material-symbols-outlined text-[13px]">storefront</span>
-                                <span>${scan.center}${dayDisplay}</span>
+                                <span>${scan.center.includes('(') ? scan.center : `${scan.center}${dayDisplay}`}</span>
                             </div>
                         </div>
                     </div>
@@ -2297,21 +2327,22 @@
             const day = document.getElementById('attendance_day').value;
             
             try {
+                // Try inserting with day column first
                 let { error } = await supabaseClient
                     .from('attendance')
                     .insert([{
                         assistant_name: assistantName,
-                        center: center,
+                        center: `${center} (${day})`,
                         day: day
                     }]);
                     
-                // Fallback if day column not yet in DB schema
+                // Fallback: if day column does not exist in DB schema, insert into center column as "CenterName (Day)"
                 if (error && error.code === 'PGRST204') {
                     const fallback = await supabaseClient
                         .from('attendance')
                         .insert([{
                             assistant_name: assistantName,
-                            center: center
+                            center: `${center} (${day})`
                         }]);
                     error = fallback.error;
                 }
