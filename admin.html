@@ -589,6 +589,8 @@
                     <!-- Populated from Supabase -->
                 </div>
             </div>
+        </div>
+        
         <!-- ================= VIEW: ATTENDANCE ================= -->
         <div id="view-attendance" class="view-section max-w-2xl mx-auto hidden">
             <div class="mb-stack-lg">
@@ -860,6 +862,7 @@
             if (tabId === 'records') titleEl.textContent = 'Records';
             if (tabId === 'manage') titleEl.textContent = 'Manage';
             if (tabId === 'schedule') titleEl.textContent = 'Schedule';
+            if (tabId === 'attendance') titleEl.textContent = 'Attendance';
 
             // Desktop Nav
             const desktopClassesActive = ['bg-primary-container', 'text-on-primary-container'];
