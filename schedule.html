@@ -436,7 +436,9 @@
                 if (error) throw error;
                 
                 allSchedules = data || [];
+                await fetchMyRequests();
                 populateDropdown();
+                renderDayPills();
                 document.getElementById('schedule_loading').classList.add('hidden');
                 renderScheduleList();
                 updateStatus('connected');
@@ -472,21 +474,77 @@
             return `${hour}:${m} ${ampm}`;
         }
 
+        const WEEK_DAYS = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        let selectedDayFilter = 'all';
+        let myPendingRequestIds = new Set();
+
+        async function fetchMyRequests() {
+            if (!supabaseClient) return;
+            const assistantIdent = currentAssistant.name || currentAssistant.email;
+            if (!assistantIdent) return;
+
+            try {
+                let query = supabaseClient.from('shift_requests').select('schedule_id').eq('status', 'pending');
+                if (currentAssistant.email) {
+                    query = query.eq('assistant_email', currentAssistant.email);
+                } else {
+                    query = query.eq('assistant_name', currentAssistant.name);
+                }
+                const { data, error } = await query;
+                if (!error && data) {
+                    myPendingRequestIds = new Set(data.map(r => r.schedule_id));
+                }
+            } catch(e) {
+                console.warn("Could not fetch assistant requests:", e);
+            }
+        }
+
+        function renderDayPills() {
+            const pillsContainer = document.getElementById('date_selector_container');
+            if (!pillsContainer) return;
+
+            const daysList = ['all', ...WEEK_DAYS];
+            pillsContainer.innerHTML = daysList.map(d => {
+                const isSelected = selectedDayFilter === d;
+                let count = 0;
+                if (d === 'all') {
+                    count = allSchedules.length;
+                } else {
+                    count = allSchedules.filter(s => (s.days || []).includes(d)).length;
+                }
+
+                const label = d === 'all' ? 'All Days' : d;
+                const activeClass = isSelected
+                    ? "bg-primary text-on-primary font-bold shadow-sm"
+                    : "bg-surface-container-low text-on-surface hover:bg-surface-container border border-outline-variant/60";
+
+                return `
+                    <button type="button" onclick="selectDayFilter('${d}')"
+                        class="px-3.5 py-1.5 rounded-full text-xs shrink-0 flex items-center gap-1.5 transition-all ${activeClass}">
+                        <span>${label}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-surface-variant text-on-surface-variant'}">${count}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        window.selectDayFilter = function(day) {
+            selectedDayFilter = day;
+            renderDayPills();
+            renderScheduleList();
+        };
+
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
             const searchVal = document.getElementById('assistant_search').value.toLowerCase().trim();
             const dropdownVal = document.getElementById('assistant_dropdown').value.toLowerCase();
             const activeFilter = searchVal || dropdownVal;
-            
-            // Remove the date pills container since we use days now
-            const pillsContainer = document.getElementById('date_selector_container');
-            if (pillsContainer) pillsContainer.innerHTML = '';
 
-            let filtered = [...allSchedules];
+            let baseList = [...allSchedules];
 
             if (scheduleScope === 'my' && currentAssistant.name) {
                 const myName = currentAssistant.name.toLowerCase();
-                filtered = filtered.filter(s => {
+                baseList = baseList.filter(s => {
                     return (s.assistants || []).some(a => {
                         const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
                         return aName.includes(myName) || myName.includes(aName);
@@ -495,7 +553,7 @@
             }
 
             if (activeFilter) {
-                filtered = filtered.filter(s => {
+                baseList = baseList.filter(s => {
                     const matchAssistant = (s.assistants || []).some(a => {
                         const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
                         return aName.includes(activeFilter);
@@ -505,93 +563,137 @@
                 });
             }
 
-            if (filtered.length === 0) {
-                if (scheduleScope === 'my') {
-                    listContainer.innerHTML = `
-                    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4 shadow-sm">
-                        <span class="material-symbols-outlined text-[48px] text-secondary mb-2">event_available</span>
-                        <p class="text-on-surface font-body-lg font-bold">No assigned sessions for ${currentAssistant.name || 'you'}.</p>
+            const daysToDisplay = selectedDayFilter === 'all' ? WEEK_DAYS : [selectedDayFilter];
+            const sectionsHtml = [];
+            let totalRendered = 0;
+
+            daysToDisplay.forEach(day => {
+                const dayLectures = baseList.filter(s => (s.days || []).includes(day));
+                if (dayLectures.length === 0) return;
+
+                totalRendered += dayLectures.length;
+
+                // Sort by lecture time
+                dayLectures.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+                const cardsHtml = dayLectures.map(item => {
+                    const amAssigned = item.assistants && item.assistants.includes(currentAssistant.name);
+                    const isPending = myPendingRequestIds.has(item.id);
+                    const daysStr = (item.days || []).join(', ');
+
+                    let locationButton = '';
+                    if (item.address && item.address.trim() !== '') {
+                        const rawAddress = item.address.trim();
+                        const mapsUrl = (rawAddress.startsWith('http://') || rawAddress.startsWith('https://'))
+                            ? rawAddress
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
+
+                        locationButton = `
+                            <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" 
+                                class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-container text-on-primary hover:bg-secondary active:scale-95 transition-all text-xs font-semibold shadow-sm shrink-0">
+                                <span class="material-symbols-outlined text-[16px]">location_on</span>
+                                <span>Center Location</span>
+                            </a>
+                        `;
+                    }
+
+                    let actionButton = '';
+                    if (amAssigned) {
+                        actionButton = `
+                            <span class="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0">
+                                <span class="material-symbols-outlined text-[16px]">check_circle</span> Assigned
+                            </span>
+                        `;
+                    } else if (isPending) {
+                        actionButton = `
+                            <span class="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0">
+                                <span class="material-symbols-outlined text-[16px]">hourglass_top</span> Requested
+                            </span>
+                        `;
+                    } else {
+                        actionButton = `
+                            <button onclick="pickLecture('${item.id}')" 
+                                class="bg-primary text-on-primary px-3.5 py-1.5 rounded-xl text-xs font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all flex items-center gap-1 shrink-0">
+                                <span class="material-symbols-outlined text-[16px]">add_circle</span> Pick Lecture
+                            </button>
+                        `;
+                    }
+
+                    const assistantsTags = (item.assistants || []).map(a => {
+                        const isMatch = searchVal && a.toLowerCase().includes(searchVal);
+                        const tagClass = isMatch 
+                            ? "inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-lg text-xs font-semibold border border-secondary"
+                            : "inline-flex items-center gap-1 bg-surface-variant text-on-surface px-2.5 py-1 rounded-lg text-xs border border-outline-variant/50";
+                        return `<span class="${tagClass}">${a}</span>`;
+                    }).join('');
+
+                    return `
+                    <article class="bg-surface-container-lowest rounded-xl border border-outline-variant/80 p-4 shadow-sm relative transition-all duration-200 hover:border-primary/40">
+                        <div class="flex flex-col sm:flex-row justify-between gap-3">
+                            <div class="space-y-2 flex-grow">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="font-body-lg font-bold text-on-surface text-base leading-tight">${item.center}</h3>
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary/10 text-secondary text-xs font-semibold">
+                                        <span class="material-symbols-outlined text-[14px]">schedule</span>
+                                        ${formatTime(item.time)}
+                                    </span>
+                                </div>
+                                
+                                <div class="text-xs text-on-surface-variant flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[16px] text-outline">repeat</span>
+                                    <span>Recurring: ${daysStr}</span>
+                                </div>
+
+                                <div class="flex flex-wrap gap-1.5 pt-1">
+                                    ${assistantsTags || '<span class="text-xs text-on-surface-variant italic">No assistants assigned yet</span>'}
+                                </div>
+                            </div>
+                            
+                            <div class="flex sm:flex-col justify-end sm:justify-center items-center gap-2 border-t sm:border-t-0 sm:border-l border-outline-variant/30 pt-3 sm:pt-0 sm:pl-3 mt-1 sm:mt-0">
+                                ${actionButton}
+                                ${locationButton}
+                            </div>
+                        </div>
+                    </article>
+                    `;
+                }).join('');
+
+                sectionsHtml.push(`
+                    <section class="mb-6">
+                        <div class="flex items-center justify-between pb-2 mb-3 border-b border-outline-variant/60">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
+                                <h2 class="font-headline-sm font-bold text-on-surface text-sm sm:text-base">${day}</h2>
+                            </div>
+                            <span class="bg-primary/10 text-primary text-[11px] font-semibold px-2 py-0.5 rounded-full">${dayLectures.length} lecture${dayLectures.length > 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="space-y-3">
+                            ${cardsHtml}
+                        </div>
+                    </section>
+                `);
+            });
+
+            if (totalRendered === 0) {
+                const emptyMsg = selectedDayFilter === 'all' 
+                    ? (scheduleScope === 'my' ? `No assigned sessions found for ${currentAssistant.name || 'you'}.` : 'No assignments found.')
+                    : `No lectures scheduled on ${selectedDayFilter}.`;
+
+                listContainer.innerHTML = `
+                <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4 shadow-sm">
+                    <span class="material-symbols-outlined text-[48px] text-outline-variant mb-2">event_busy</span>
+                    <p class="text-on-surface font-body-lg font-medium">${emptyMsg}</p>
+                    ${scheduleScope === 'my' ? `
                         <button type="button" onclick="setScope('all')" class="mt-4 px-4 py-2 bg-secondary text-on-secondary rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-secondary/90 transition-colors shadow-sm">
                             <span class="material-symbols-outlined text-[16px]">groups</span>
                             <span>View All Center Schedules</span>
                         </button>
-                    </div>`;
-                } else {
-                    listContainer.innerHTML = `
-                    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4">
-                        <span class="material-symbols-outlined text-[48px] text-outline-variant mb-2">event_busy</span>
-                        <p class="text-on-surface font-body-lg font-medium">No assignments found.</p>
-                    </div>`;
-                }
+                    ` : ''}
+                </div>`;
                 return;
             }
 
-            const html = [];
-            filtered.forEach(item => {
-                const amAssigned = item.assistants && item.assistants.includes(currentAssistant.name);
-                const daysStr = (item.days || []).join(', ');
-                
-                let locationButton = '';
-                if (item.address && item.address.trim() !== '') {
-                    const rawAddress = item.address.trim();
-                    const mapsUrl = (rawAddress.startsWith('http://') || rawAddress.startsWith('https://'))
-                        ? rawAddress
-                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddress)}`;
-
-                    locationButton = `
-                        <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-container text-on-primary hover:bg-secondary active:scale-95 transition-all duration-150 font-label-md shadow-sm self-start sm:self-center shrink-0">
-                            <span class="material-symbols-outlined text-[18px]">location_on</span>
-                            <span>Center Location</span>
-                        </a>
-                    `;
-                }
-
-                const actionButton = amAssigned 
-                    ? `<span class="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-xl font-semibold"><span class="material-symbols-outlined text-[18px]">check_circle</span> Assigned</span>`
-                    : `<button onclick="pickLecture('${item.id}')" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-semibold shadow-sm hover:bg-primary/90 transition-colors flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span> Pick Lecture</button>`;
-
-                const assistantsTags = (item.assistants || []).map(a => {
-                    const isMatch = searchVal && a.toLowerCase().includes(searchVal);
-                    const tagClass = isMatch 
-                        ? "inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-3 py-1.5 rounded-lg text-sm font-semibold border border-secondary"
-                        : "inline-flex items-center gap-1 bg-surface-variant text-on-surface px-3 py-1.5 rounded-lg text-sm border border-outline-variant/50";
-                    return `<span class="${tagClass}">${a}</span>`;
-                }).join('');
-
-                html.push(`
-                <article class="bg-surface-container-lowest rounded-xl border border-outline-variant p-5 shadow-sm relative transition-all duration-300 mb-4">
-                    <div class="flex flex-col sm:flex-row justify-between gap-4">
-                        <div class="space-y-3 flex-grow">
-                            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <h3 class="font-headline-sm text-on-surface font-bold leading-tight">${item.center}</h3>
-                            </div>
-                            
-                            <div class="flex flex-col gap-1">
-                                <div class="font-label-md text-primary flex items-center gap-2">
-                                    <span class="material-symbols-outlined text-[18px]">event</span>
-                                    <span>${daysStr || 'No days specified'}</span>
-                                </div>
-                                <div class="font-label-md text-on-surface-variant flex items-center gap-2">
-                                    <span class="material-symbols-outlined text-[18px]">schedule</span>
-                                    <span>${formatTime(item.time)}</span>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2 pt-1">
-                                ${assistantsTags}
-                            </div>
-                        </div>
-                        
-                        <div class="flex sm:flex-col justify-end sm:justify-start items-center gap-3 border-t sm:border-t-0 sm:border-l border-outline-variant/30 pt-4 sm:pt-0 sm:pl-4 mt-2 sm:mt-0">
-                            ${actionButton}
-                            ${locationButton}
-                        </div>
-                    </div>
-                </article>
-                `);
-            });
-
-            listContainer.innerHTML = html.join('');
+            listContainer.innerHTML = sectionsHtml.join('');
         }
 
         window.pickLecture = async function(scheduleId) {
@@ -606,10 +708,12 @@
                 };
                 const { error } = await supabaseClient.from('shift_requests').insert([payload]);
                 if (error) throw error;
-                alert('Request sent successfully! Wait for admin approval.');
+                myPendingRequestIds.add(scheduleId);
+                renderScheduleList();
+                alert('Request sent successfully! Admin will review and approve your request.');
             } catch (err) {
                 console.error("Error requesting lecture:", err);
-                alert("Failed to send request. " + err.message);
+                alert("Failed to send request: " + (err.message || 'Check database permissions.'));
             }
         };
 
@@ -674,7 +778,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAssistantAuth();
             fetchSchedule();
-            setInterval(updateCountdowns, 1000);
+            // countdowns removed
         });
 
     </script>
