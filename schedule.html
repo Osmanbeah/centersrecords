@@ -302,6 +302,81 @@
             </div>
         </div>
 
+
+        <!-- Pick Lecture Confirmation Modal -->
+        <div id="pick-lecture-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/50 backdrop-blur-sm transition-opacity">
+            <div class="bg-surface rounded-2xl shadow-elevation-4 max-w-sm w-full overflow-hidden p-6 border border-outline-variant/60 flex flex-col gap-4 animate-scale-up">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined text-[24px]">event_available</span>
+                    </div>
+                    <div>
+                        <h2 class="font-headline-sm font-bold text-on-surface text-base">Pick Lecture</h2>
+                        <p class="text-xs text-on-surface-variant">Send attendance request to Admin</p>
+                    </div>
+                </div>
+
+                <!-- Lecture Summary Card -->
+                <div class="bg-surface-container-low rounded-xl p-3.5 border border-outline-variant/50 space-y-2.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="text-on-surface-variant font-medium">Center</span>
+                        <span id="modal-lecture-center" class="font-bold text-on-surface text-right"></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-on-surface-variant font-medium">Time</span>
+                        <span id="modal-lecture-time" class="font-semibold text-secondary"></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-on-surface-variant font-medium">Days</span>
+                        <span id="modal-lecture-days" class="font-semibold text-primary"></span>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-on-surface-variant leading-relaxed">
+                    Once submitted, your request will be sent to the administrator for approval.
+                </p>
+
+                <div class="flex items-center gap-2.5 pt-1">
+                    <button type="button" onclick="closePickModal()" 
+                        class="flex-1 h-10 rounded-xl border border-outline-variant text-on-surface text-xs font-semibold hover:bg-surface-container transition-colors">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-confirm-pick" onclick="confirmPickLecture()" 
+                        class="flex-1 h-10 rounded-xl bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[16px]">send</span>
+                        <span>Confirm</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logout Confirmation Modal -->
+        <div id="logout-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/50 backdrop-blur-sm">
+            <div class="bg-surface rounded-2xl shadow-elevation-4 max-w-xs w-full p-6 border border-outline-variant/60 text-center flex flex-col items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-error-container/30 text-error flex items-center justify-center mb-1">
+                    <span class="material-symbols-outlined text-[24px]">logout</span>
+                </div>
+                <h3 class="font-headline-sm font-bold text-on-surface text-base">Log Out?</h3>
+                <p class="text-xs text-on-surface-variant">Are you sure you want to sign out of the Assistant Portal?</p>
+                <div class="flex items-center gap-2 w-full mt-2">
+                    <button type="button" onclick="document.getElementById('logout-modal').classList.add('hidden')"
+                        class="flex-1 h-9 rounded-xl border border-outline-variant text-on-surface text-xs font-semibold hover:bg-surface-container transition-colors">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="executeLogout()"
+                        class="flex-1 h-9 rounded-xl bg-error text-on-error text-xs font-semibold hover:bg-error/90 transition-colors shadow-sm">
+                        Log Out
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- In-App Toast Notification -->
+        <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl shadow-elevation-3 border text-xs font-semibold transition-all duration-300">
+            <span id="toast-icon" class="material-symbols-outlined text-[18px]"></span>
+            <span id="toast-message"></span>
+        </div>
+
     </main>
 
     <!-- Application Script -->
@@ -360,15 +435,19 @@
             }
         }
 
-        async function logoutAssistant() {
-            if (confirm("Are you sure you want to log out?")) {
-                if (supabaseClient) {
-                    await supabaseClient.auth.signOut();
-                }
-                const overlay = document.getElementById('assistant-auth-view');
-                if (overlay) overlay.classList.remove('hidden');
-                document.getElementById('login_assistant_password').value = '';
+        function logoutAssistant() {
+            document.getElementById('logout-modal').classList.remove('hidden');
+        }
+
+        async function executeLogout() {
+            document.getElementById('logout-modal').classList.add('hidden');
+            if (supabaseClient) {
+                await supabaseClient.auth.signOut();
             }
+            const overlay = document.getElementById('assistant-auth-view');
+            if (overlay) overlay.classList.remove('hidden');
+            document.getElementById('login_assistant_password').value = '';
+            showToast("Logged out successfully", "success");
         }
 
         document.getElementById('assistant-login-form').addEventListener('submit', async (e) => {
@@ -696,24 +775,82 @@
             listContainer.innerHTML = sectionsHtml.join('');
         }
 
-        window.pickLecture = async function(scheduleId) {
-            if (!confirm("Send request to join this lecture?")) return;
-            
+        let pendingPickScheduleId = null;
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+            if (!toast) return;
+
+            toastMsg.textContent = msg;
+            if (type === 'success') {
+                toast.className = "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl shadow-elevation-4 border border-emerald-500/30 bg-surface-container-highest text-on-surface";
+                toastIcon.className = "material-symbols-outlined text-[18px] text-emerald-500";
+                toastIcon.textContent = "check_circle";
+            } else {
+                toast.className = "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl shadow-elevation-4 border border-error/30 bg-surface-container-highest text-on-surface";
+                toastIcon.className = "material-symbols-outlined text-[18px] text-error";
+                toastIcon.textContent = "error";
+            }
+
+            toast.classList.remove('hidden');
+            clearTimeout(window._toastTimeout);
+            window._toastTimeout = setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        window.pickLecture = function(scheduleId) {
+            const sched = allSchedules.find(s => s.id === scheduleId);
+            if (!sched) return;
+
+            pendingPickScheduleId = scheduleId;
+            document.getElementById('modal-lecture-center').textContent = sched.center || 'Lecture';
+            document.getElementById('modal-lecture-time').textContent = formatTime(sched.time);
+            document.getElementById('modal-lecture-days').textContent = (sched.days || []).join(', ') || 'Regular';
+
+            const modal = document.getElementById('pick-lecture-modal');
+            modal.classList.remove('hidden');
+        };
+
+        window.closePickModal = function() {
+            pendingPickScheduleId = null;
+            const modal = document.getElementById('pick-lecture-modal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.confirmPickLecture = async function() {
+            if (!pendingPickScheduleId) return;
+
+            const btn = document.getElementById('btn-confirm-pick');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<div class="loading-spinner w-3.5 h-3.5 border-2"></div> <span>Sending...</span>`;
+            }
+
             try {
                 const payload = {
                     assistant_name: currentAssistant.name,
                     assistant_email: currentAssistant.email,
-                    schedule_id: scheduleId,
+                    schedule_id: pendingPickScheduleId,
                     status: 'pending'
                 };
                 const { error } = await supabaseClient.from('shift_requests').insert([payload]);
                 if (error) throw error;
-                myPendingRequestIds.add(scheduleId);
+
+                myPendingRequestIds.add(pendingPickScheduleId);
+                closePickModal();
                 renderScheduleList();
-                alert('Request sent successfully! Admin will review and approve your request.');
+                showToast("Request sent successfully! Awaiting admin approval.", "success");
             } catch (err) {
                 console.error("Error requesting lecture:", err);
-                alert("Failed to send request: " + (err.message || 'Check database permissions.'));
+                showToast(err.message || "Failed to send request", "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">send</span> <span>Confirm</span>`;
+                }
             }
         };
 
