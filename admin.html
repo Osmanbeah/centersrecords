@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html class="light" lang="en">
-<head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Center Tracker - Admin</title>
     <!-- Material Symbols Outlined -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -2000,12 +2002,14 @@
             }).join('');
         }
 
+        let _attendanceDayInitialized = false;
         function initAttendanceView() {
             const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             const todayDay = daysOfWeek[new Date().getDay()];
             const daySelect = document.getElementById('attendance_day');
-            if (daySelect && !daySelect.value) {
+            if (daySelect && !_attendanceDayInitialized) {
                 daySelect.value = todayDay;
+                _attendanceDayInitialized = true;
             }
 
             updateAttendanceCenters();
