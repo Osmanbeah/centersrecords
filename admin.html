@@ -1414,29 +1414,8 @@
                                 </div>
                             </div>
 
-                            <!-- Session Details (Students, Amount, Notes) -->
-                            <div class="pt-3 border-t border-outline-variant/40">
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <div>
-                                        <label class="block text-[11px] font-semibold text-on-surface mb-1">Students Attended</label>
-                                        <input id="students_${centerSafeId}" type="number" min="0" placeholder="0" 
-                                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"/>
-                                    </div>
-                                    <div>
-                                        <label class="block text-[11px] font-semibold text-on-surface mb-1">Amount Collected (EGP)</label>
-                                        <input id="amount_${centerSafeId}" type="number" min="0" step="0.01" placeholder="0.00" 
-                                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"/>
-                                    </div>
-                                    <div>
-                                        <label class="block text-[11px] font-semibold text-on-surface mb-1">Session Notes (Optional)</label>
-                                        <input id="notes_${centerSafeId}" type="text" placeholder="Observations..." 
-                                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"/>
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- Action Button -->
-                            <div class="pt-2 flex items-center justify-between">
+                            <div class="pt-1 flex items-center justify-between">
                                 <span id="status_${centerSafeId}" class="text-xs text-secondary font-semibold hidden flex items-center gap-1">
                                     <span class="material-symbols-outlined text-[16px]">check_circle</span> Saved!
                                 </span>
@@ -1520,13 +1499,6 @@
                 }
             });
 
-            const studentsInput = document.getElementById(`students_${centerSafeId}`);
-            const amountInput = document.getElementById(`amount_${centerSafeId}`);
-            const notesInput = document.getElementById(`notes_${centerSafeId}`);
-
-            const students = parseInt(studentsInput?.value, 10) || 0;
-            const amount = parseFloat(amountInput?.value) || 0;
-            const note = notesInput?.value || '';
             const todayStr = new Date().toISOString().split('T')[0];
 
             if (btn) {
@@ -1542,12 +1514,9 @@
                     day,
                     scheduleId,
                     date: todayStr,
-                    students,
-                    amount,
                     present,
                     absent,
                     adjustments,
-                    note,
                     createdAt: new Date().toISOString()
                 });
                 saveState();
