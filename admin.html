@@ -1351,20 +1351,12 @@
                             return att.day.toLowerCase() === day.toLowerCase();
                         }
 
-                        // 2. Embedded day in center string e.g. "i Learn Helwan (Monday)"
+                        // 2. Embedded day in center string e.g. "i Learn Helwan (Wednesday)"
                         if (attEmbeddedDay) {
                             return attEmbeddedDay === day.toLowerCase();
                         }
 
-                        // 3. Weekday of created_at timestamp
-                        if (att.created_at) {
-                            const scanDate = new Date(att.created_at);
-                            const WEEK_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                            const scanDay = WEEK_NAMES[scanDate.getDay()];
-                            return scanDay === day.toLowerCase();
-                        }
-
-                        // If no day info at all, don't cross-match to other days
+                        // If no day column and no embedded day, do NOT cross-match to any day
                         return false;
                     });
 
