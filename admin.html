@@ -882,7 +882,8 @@
             centers: (JSON.parse(localStorage.getItem('ct_centers')) || []).map(c => typeof c === 'string' ? { name: c, address: '' } : c),
             assistants: (JSON.parse(localStorage.getItem('ct_assistants')) || []).map(a => typeof a === 'string' ? { name: a, email: '' } : a),
             entries: JSON.parse(localStorage.getItem('ct_entries')) || [],
-            schedules: [] // populated from supabase
+            schedules: [], // populated from supabase
+            attendances: [] // populated from supabase attendance table
         };
 
         function saveState() {
@@ -1324,22 +1325,36 @@
 
                 const centersHtml = daySchedules.map(sched => {
                     const timeFmt = sched.time ? formatTime(sched.time) : '';
-                    const assistants = Array.isArray(sched.assistants) ? sched.assistants : [];
+                    const assignedAssistants = Array.isArray(sched.assistants) ? sched.assistants : [];
                     const centerSafeId = `${day}_${sched.id}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 
+                    // Filter only assistants who scanned their ID for this center (and day if available)
+                    const scannedRecordsForCenter = (State.attendances || []).filter(att => {
+                        const centerMatches = (att.center || '').trim().toLowerCase() === (sched.center || '').trim().toLowerCase();
+                        if (!centerMatches) return false;
+                        if (att.day) {
+                            return att.day.toLowerCase() === day.toLowerCase();
+                        }
+                        return true;
+                    });
+
+                    // List of unique assistant names that scanned
+                    const scannedAssistantNames = Array.from(new Set(scannedRecordsForCenter.map(att => att.assistant_name).filter(Boolean)));
+
+                    // We display the assistants who scanned their ID
+                    const displayAssistants = scannedAssistantNames;
+
                     let assistantsListHtml = '';
-                    if (assistants.length === 0) {
+                    if (displayAssistants.length === 0) {
                         assistantsListHtml = `
                             <div class="p-4 rounded-xl bg-surface-container-low border border-dashed border-outline-variant text-center space-y-1">
-                                <p class="text-xs text-on-surface-variant italic">No assistants assigned yet for this center on ${day}.</p>
-                                <button type="button" onclick="switchTab('schedule')" class="text-xs text-primary font-semibold hover:underline inline-flex items-center gap-1">
-                                    <span class="material-symbols-outlined text-[13px]">add</span> Assign in Schedule
-                                </button>
+                                <span class="material-symbols-outlined text-outline text-[24px]">qr_code_scanner</span>
+                                <p class="text-xs text-on-surface-variant italic">No assistants have scanned their ID badge for this lecture yet.</p>
+                                <p class="text-[11px] text-outline">Assistants must scan their QR ID on the Attendance tab to appear here.</p>
                             </div>
                         `;
                     } else {
-                        assistantsListHtml = assistants.map(ast => {
-                            const name = getAssistantName(ast);
+                        assistantsListHtml = displayAssistants.map(name => {
                             return `
                                 <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-outline-variant/60 bg-surface-container-low/70 gap-3 hover:bg-surface-container transition-colors">
                                     <label class="flex items-center cursor-pointer flex-grow select-none">
@@ -1350,7 +1365,10 @@
                                                 <span class="material-symbols-outlined text-[18px] text-secondary">person</span>
                                                 ${name}
                                             </span>
-                                            <span class="text-[11px] text-on-surface-variant font-medium">Attended</span>
+                                            <span class="text-[11px] text-secondary font-semibold flex items-center gap-1">
+                                                <span class="material-symbols-outlined text-[12px]">verified</span>
+                                                Scanned ID
+                                            </span>
                                         </div>
                                     </label>
 
@@ -1398,7 +1416,7 @@
                                         </span>
                                     ` : ''}
                                     <span class="text-xs text-on-surface-variant bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/40 font-medium">
-                                        ${assistants.length} member${assistants.length === 1 ? '' : 's'}
+                                        ${displayAssistants.length} scanned
                                     </span>
                                 </div>
                             </div>
@@ -1406,8 +1424,8 @@
                             <!-- Attended Members with Bonus & Deduct -->
                             <div class="space-y-2">
                                 <div class="flex items-center justify-between text-xs font-bold text-on-surface uppercase tracking-wider px-1">
-                                    <span>Assigned Members</span>
-                                    <span class="text-[11px] text-on-surface-variant font-normal">Check attended & add adjustments</span>
+                                    <span>Scanned Assistants</span>
+                                    <span class="text-[11px] text-on-surface-variant font-normal">Add bonus / deduction adjustments</span>
                                 </div>
                                 <div class="space-y-2">
                                     ${assistantsListHtml}
@@ -2101,6 +2119,13 @@
                     fetchRequests();
                 })
                 .subscribe();
+
+            supabaseClient
+                .channel('public:attendance')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, payload => {
+                    fetchAttendance();
+                })
+                .subscribe();
         }
 
         // --- Attendance View ---
@@ -2167,16 +2192,24 @@
             if (loadingEl) loadingEl.classList.remove('hidden');
             
             try {
-                // Fetch today's attendance only
-                const today = new Date().toISOString().split('T')[0];
                 const { data, error } = await supabaseClient
                     .from('attendance')
                     .select('*')
-                    .gte('created_at', today + 'T00:00:00Z')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
-                renderAttendanceList(data || []);
+                State.attendances = data || [];
+                
+                // Render Scanner tab's recent list
+                const today = new Date().toISOString().split('T')[0];
+                const todayScans = State.attendances.filter(a => a.created_at && a.created_at.startsWith(today));
+                renderAttendanceList(todayScans.length > 0 ? todayScans : State.attendances.slice(0, 20));
+
+                // Also update Attendance Records view if active
+                const recordsView = document.getElementById('view-new-entry');
+                if (recordsView && !recordsView.classList.contains('hidden')) {
+                    renderAttendanceRecordsView();
+                }
             } catch (err) {
                 console.error("Error fetching attendance:", err);
             } finally {
@@ -2296,6 +2329,7 @@
         // --- Init ---
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAdminAuth();
+            await fetchAttendance();
             await fetchSchedule();
             await fetchRequests();
             const hash = window.location.hash.replace('#', '');
