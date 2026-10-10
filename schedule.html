@@ -213,11 +213,18 @@
                 <h1 class="font-headline-md text-primary text-base sm:text-lg">Assistant Schedule</h1>
             </div>
             
-            <button onclick="document.getElementById('request-shift-modal').classList.remove('hidden'); populateRequestCenters();" class="ml-2 bg-secondary text-on-secondary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm hover:bg-secondary/90 transition-colors flex items-center gap-1 shrink-0">
-                <span class="material-symbols-outlined text-[16px]">add_circle</span>
-                <span class="hidden sm:inline">Request Shift</span>
-                <span class="sm:hidden">Request</span>
-            </button>
+            <div class="flex items-center gap-1.5 ml-2">
+                <button onclick="document.getElementById('request-shift-modal').classList.remove('hidden'); populateRequestCenters();" class="bg-secondary text-on-secondary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm hover:bg-secondary/90 transition-colors flex items-center gap-1 shrink-0">
+                    <span class="material-symbols-outlined text-[16px]">add_circle</span>
+                    <span class="hidden sm:inline">Request Shift</span>
+                    <span class="sm:hidden">Request</span>
+                </button>
+                <button onclick="showQRCode()" class="bg-primary text-on-primary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 transition-colors flex items-center gap-1 shrink-0">
+                    <span class="material-symbols-outlined text-[16px]">qr_code_2</span>
+                    <span class="hidden sm:inline">Show ID</span>
+                    <span class="sm:hidden">ID</span>
+                </button>
+            </div>
             
             <!-- User Status & Logout -->
             <div class="flex items-center gap-2">
@@ -322,6 +329,22 @@
                         </div>
                     </form>
                 </div>
+            </div>
+        </div>
+
+        <!-- QR Code Modal -->
+        <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/40 backdrop-blur-sm">
+            <div class="bg-surface rounded-2xl shadow-elevation-3 max-w-sm w-full overflow-hidden flex flex-col items-center p-6 text-center">
+                <h2 class="font-headline-md text-on-surface mb-2">Your ID Badge</h2>
+                <p class="font-body-sm text-on-surface-variant mb-6">Show this QR code to the Admin to check in.</p>
+                
+                <div class="bg-white p-4 rounded-xl border border-outline-variant shadow-sm mb-6">
+                    <img id="qr-image" src="" alt="QR Code" class="w-48 h-48 mx-auto">
+                </div>
+                
+                <button type="button" onclick="document.getElementById('qr-modal').classList.add('hidden')" class="w-full h-12 bg-primary text-on-primary rounded-xl font-label-lg shadow-sm hover:bg-primary/90 transition-colors">
+                    Close
+                </button>
             </div>
         </div>
 
@@ -937,6 +960,14 @@
                 btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">send</span><span>Submit Request</span>`;
             }
         });
+
+        function showQRCode() {
+            if (!currentAssistant) return;
+            const data = currentAssistant.name; // Use just the name to keep it simple and readable
+            const url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(data)}`;
+            document.getElementById('qr-image').src = url;
+            document.getElementById('qr-modal').classList.remove('hidden');
+        }
 
         // --- Init ---
         document.addEventListener('DOMContentLoaded', async () => {

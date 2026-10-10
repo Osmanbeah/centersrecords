@@ -161,6 +161,7 @@
     
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body class="text-on-background min-h-screen flex flex-col pt-12 md:pt-16 pb-20 md:pb-0 antialiased">
 
@@ -283,6 +284,9 @@
                 </button>
                 <button onclick="switchTab('schedule')" id="nav-desktop-schedule" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
                     <span class="material-symbols-outlined text-[20px]">calendar_today</span> Schedule
+                </button>
+                <button onclick="switchTab('attendance')" id="nav-desktop-attendance" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
+                    <span class="material-symbols-outlined text-[20px]">qr_code_scanner</span> Attendance
                 </button>
             </nav>
 
@@ -585,6 +589,45 @@
                     <!-- Populated from Supabase -->
                 </div>
             </div>
+        <!-- ================= VIEW: ATTENDANCE ================= -->
+        <div id="view-attendance" class="view-section max-w-2xl mx-auto hidden">
+            <div class="mb-stack-lg">
+                <h2 class="font-headline-lg-mobile md:text-headline-lg text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[28px] text-primary">qr_code_scanner</span>
+                    Scan Attendance
+                </h2>
+                <p class="font-body-md text-on-surface-variant mt-stack-sm">Select the current center and scan assistant QR codes.</p>
+            </div>
+
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-8 shadow-sm">
+                <label class="block font-label-md text-on-surface mb-2" for="attendance_center">Current Center</label>
+                <select id="attendance_center" class="block w-full rounded-lg font-body-lg py-3 px-4 bg-surface text-on-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all mb-4 appearance-none"></select>
+                
+                <div id="reader-container" class="w-full bg-black rounded-xl overflow-hidden hidden flex-col items-center justify-center relative min-h-[300px]">
+                    <div id="qr-reader" class="w-full h-full"></div>
+                </div>
+
+                <div class="mt-4 flex gap-3">
+                    <button id="btn_start_scan" onclick="startScanner()" class="flex-1 h-12 bg-primary text-on-primary rounded-xl font-label-lg shadow-sm hover:bg-primary/90 transition-colors flex justify-center items-center gap-2">
+                        <span class="material-symbols-outlined text-[18px]">camera_alt</span>
+                        Start Scanner
+                    </button>
+                    <button id="btn_stop_scan" onclick="stopScanner()" class="hidden flex-1 h-12 bg-error text-on-error rounded-xl font-label-lg shadow-sm hover:bg-error/90 transition-colors flex justify-center items-center gap-2">
+                        <span class="material-symbols-outlined text-[18px]">stop_circle</span>
+                        Stop
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="font-headline-md text-on-surface mb-4">Recent Scans</h3>
+                <div id="attendance_list_loading" class="flex justify-center py-4 hidden">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div id="attendance_list" class="flex flex-col gap-3">
+                    <p class="text-on-surface-variant text-center text-sm py-4 italic">No scans recorded yet.</p>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -602,6 +645,10 @@
         <button onclick="switchTab('manage')" id="nav-mobile-manage" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
             <span class="material-symbols-outlined nav-icon text-sm">group</span>
             <span class="font-label-md text-[10px] mt-1 leading-none text-center">Manage</span>
+        </button>
+        <button onclick="switchTab('attendance')" id="nav-mobile-attendance" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
+            <span class="material-symbols-outlined nav-icon text-sm">qr_code_scanner</span>
+            <span class="font-label-md text-[10px] mt-1 leading-none text-center">Attendance</span>
         </button>
     </nav>
 
@@ -858,6 +905,7 @@
 
             if (tabId === 'manage') initManageView();
             if (tabId === 'schedule') initScheduleView();
+            if (tabId === 'attendance') initAttendanceView();
         }
 
         // --- Manage View ---
@@ -1754,6 +1802,134 @@
                     fetchRequests();
                 })
                 .subscribe();
+        }
+
+        // --- Attendance View ---
+        let html5QrCode;
+        
+        function initAttendanceView() {
+            const centerSelect = document.getElementById('attendance_center');
+            centerSelect.innerHTML = State.centers.length 
+                ? State.centers.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
+                : `<option value="">No centers available</option>`;
+                
+            fetchAttendance();
+        }
+
+        async function fetchAttendance() {
+            const loadingEl = document.getElementById('attendance_list_loading');
+            if (loadingEl) loadingEl.classList.remove('hidden');
+            
+            try {
+                // Fetch today's attendance only
+                const today = new Date().toISOString().split('T')[0];
+                const { data, error } = await supabaseClient
+                    .from('attendance')
+                    .select('*')
+                    .gte('created_at', today + 'T00:00:00Z')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                renderAttendanceList(data || []);
+            } catch (err) {
+                console.error("Error fetching attendance:", err);
+            } finally {
+                if (loadingEl) loadingEl.classList.add('hidden');
+            }
+        }
+
+        function renderAttendanceList(scans) {
+            const listContainer = document.getElementById('attendance_list');
+            if (scans.length === 0) {
+                listContainer.innerHTML = `<p class="text-on-surface-variant text-center text-sm py-4 italic">No scans recorded today.</p>`;
+                return;
+            }
+            
+            listContainer.innerHTML = scans.map(scan => {
+                const timeStr = new Date(scan.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return `
+                <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-xl border border-outline-variant/50 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+                        </div>
+                        <div>
+                            <div class="font-label-lg text-on-surface">${scan.assistant_name}</div>
+                            <div class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">storefront</span> ${scan.center}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold text-secondary flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">schedule</span> ${timeStr}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function startScanner() {
+            if (!document.getElementById('attendance_center').value) {
+                alert("Please select a center first!");
+                return;
+            }
+            
+            document.getElementById('btn_start_scan').classList.add('hidden');
+            document.getElementById('btn_stop_scan').classList.remove('hidden');
+            document.getElementById('reader-container').classList.remove('hidden');
+            document.getElementById('reader-container').classList.add('flex');
+            
+            if (html5QrCode) {
+                html5QrCode.clear();
+            }
+            
+            html5QrCode = new Html5Qrcode("qr-reader");
+            
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrCode.start({ facingMode: "environment" }, config, async (decodedText) => {
+                // On success
+                stopScanner();
+                await processAttendance(decodedText);
+            }, (errorMessage) => {
+                // parse error, ignore
+            }).catch(err => {
+                console.error("Camera error:", err);
+                alert("Could not access camera. Please check permissions.");
+                stopScanner();
+            });
+        }
+        
+        function stopScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                }).catch(console.error);
+            }
+            document.getElementById('btn_start_scan').classList.remove('hidden');
+            document.getElementById('btn_stop_scan').classList.add('hidden');
+            document.getElementById('reader-container').classList.add('hidden');
+            document.getElementById('reader-container').classList.remove('flex');
+        }
+        
+        async function processAttendance(assistantName) {
+            const center = document.getElementById('attendance_center').value;
+            
+            try {
+                const { error } = await supabaseClient
+                    .from('attendance')
+                    .insert([{
+                        assistant_name: assistantName,
+                        center: center
+                    }]);
+                    
+                if (error) throw error;
+                
+                alert(`Successfully checked in ${assistantName} at ${center}!`);
+                fetchAttendance();
+            } catch(e) {
+                console.error(e);
+                alert("Error recording attendance. Make sure the attendance table exists in Supabase.");
+            }
         }
 
         // --- Init ---
