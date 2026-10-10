@@ -1456,7 +1456,7 @@
                 const { data, error } = await supabaseClient
                     .from('schedule')
                     .select('*')
-                    .order('date', { ascending: true });
+                    .order('created_at', { ascending: false });
 
                 if (error) throw error;
                 State.schedules = data || [];
