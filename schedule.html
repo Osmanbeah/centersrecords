@@ -228,11 +228,11 @@
 
         <!-- Scope Switcher: My Sessions vs All Sessions -->
         <div class="flex items-center justify-center p-1 bg-surface-container rounded-xl max-w-md mx-auto w-full">
-            <button type="button" id="btn_scope_my" onclick="setScope('my')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm">
+            <button type="button" id="btn_scope_my" onclick="setScope('my')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
                 <span class="material-symbols-outlined text-[16px]">person</span>
                 <span>My Assigned Sessions</span>
             </button>
-            <button type="button" id="btn_scope_all" onclick="setScope('all')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
+            <button type="button" id="btn_scope_all" onclick="setScope('all')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm">
                 <span class="material-symbols-outlined text-[16px]">groups</span>
                 <span>All Center Sessions</span>
             </button>
@@ -292,7 +292,7 @@
         }
 
         let currentAssistant = { name: '', email: '' };
-        let scheduleScope = 'my'; // 'my' (only assigned sessions) or 'all'
+        let scheduleScope = 'all'; // 'my' (only assigned sessions) or 'all'
 
         function toggleAssistantPassVisibility() {
             const input = document.getElementById('login_assistant_password');
