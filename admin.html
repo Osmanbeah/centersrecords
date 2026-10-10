@@ -628,8 +628,34 @@
             </div>
 
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-8 shadow-sm">
-                <label class="block font-label-md text-on-surface mb-2" for="attendance_center">Current Center</label>
-                <select id="attendance_center" class="block w-full rounded-lg font-body-lg py-3 px-4 bg-surface text-on-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all mb-4 appearance-none"></select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="block font-label-md text-on-surface mb-2" for="attendance_day">Day</label>
+                        <div class="relative">
+                            <select id="attendance_day" onchange="updateAttendanceCenters()" class="block w-full rounded-lg font-body-lg py-3 px-4 bg-surface text-on-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none">
+                                <option value="Saturday">Saturday</option>
+                                <option value="Sunday">Sunday</option>
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+                                <span class="material-symbols-outlined text-[18px]">expand_more</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-label-md text-on-surface mb-2" for="attendance_center">Current Center</label>
+                        <div class="relative">
+                            <select id="attendance_center" class="block w-full rounded-lg font-body-lg py-3 px-4 bg-surface text-on-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none"></select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+                                <span class="material-symbols-outlined text-[18px]">expand_more</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div id="reader-container" class="w-full bg-black rounded-xl overflow-hidden hidden flex-col items-center justify-center relative min-h-[300px]">
                     <div id="qr-reader" class="w-full h-full"></div>
@@ -1931,12 +1957,53 @@
         // --- Attendance View ---
         let html5QrCode;
         
-        function initAttendanceView() {
+        function updateAttendanceCenters() {
+            const daySelect = document.getElementById('attendance_day');
             const centerSelect = document.getElementById('attendance_center');
-            centerSelect.innerHTML = State.centers.length 
-                ? [...State.centers].sort((a,b) => a.name.includes('Newstar') ? -1 : b.name.includes('Newstar') ? 1 : 0).map(c => `<option value="${c.name}">${c.name}</option>`).join('')
-                : `<option value="">No centers available</option>`;
-                
+            if (!centerSelect) return;
+
+            const selectedDay = daySelect ? daySelect.value : '';
+            
+            // Find which centers have schedules on this day
+            const scheduledCentersOnDay = new Set();
+            (State.schedules || []).forEach(s => {
+                if ((s.days || []).includes(selectedDay)) {
+                    scheduledCentersOnDay.add(s.center);
+                }
+            });
+
+            // Sort centers: scheduled today first, then Newstar, then others
+            const sortedCenters = [...State.centers].sort((a, b) => {
+                const aOnDay = scheduledCentersOnDay.has(a.name);
+                const bOnDay = scheduledCentersOnDay.has(b.name);
+                if (aOnDay && !bOnDay) return -1;
+                if (!aOnDay && bOnDay) return 1;
+                if (a.name.includes('Newstar')) return -1;
+                if (b.name.includes('Newstar')) return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            if (sortedCenters.length === 0) {
+                centerSelect.innerHTML = `<option value="">No centers available</option>`;
+                return;
+            }
+
+            centerSelect.innerHTML = sortedCenters.map(c => {
+                const isScheduled = scheduledCentersOnDay.has(c.name);
+                const badge = isScheduled ? ` (${selectedDay})` : '';
+                return `<option value="${c.name}">${c.name}${badge}</option>`;
+            }).join('');
+        }
+
+        function initAttendanceView() {
+            const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const todayDay = daysOfWeek[new Date().getDay()];
+            const daySelect = document.getElementById('attendance_day');
+            if (daySelect && !daySelect.value) {
+                daySelect.value = todayDay;
+            }
+
+            updateAttendanceCenters();
             fetchAttendance();
         }
 
@@ -1971,6 +2038,7 @@
             
             listContainer.innerHTML = scans.map(scan => {
                 const timeStr = new Date(scan.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const dayDisplay = scan.day ? ` &bull; ${scan.day}` : '';
                 return `
                 <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-xl border border-outline-variant/50 shadow-sm">
                     <div class="flex items-center gap-3">
@@ -1978,14 +2046,15 @@
                             <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
                         </div>
                         <div>
-                            <div class="font-label-lg text-on-surface">${scan.assistant_name}</div>
+                            <div class="font-label-lg font-bold text-on-surface">${scan.assistant_name}</div>
                             <div class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
-                                <span class="material-symbols-outlined text-[12px]">storefront</span> ${scan.center}
+                                <span class="material-symbols-outlined text-[13px]">storefront</span>
+                                <span>${scan.center}${dayDisplay}</span>
                             </div>
                         </div>
                     </div>
-                    <div class="text-sm font-semibold text-secondary flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[16px]">schedule</span> ${timeStr}
+                    <div class="text-xs font-semibold text-secondary flex items-center gap-1 bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant/40">
+                        <span class="material-symbols-outlined text-[15px]">schedule</span> ${timeStr}
                     </div>
                 </div>`;
             }).join('');
@@ -2037,18 +2106,31 @@
         
         async function processAttendance(assistantName) {
             const center = document.getElementById('attendance_center').value;
+            const day = document.getElementById('attendance_day').value;
             
             try {
-                const { error } = await supabaseClient
+                let { error } = await supabaseClient
                     .from('attendance')
                     .insert([{
                         assistant_name: assistantName,
-                        center: center
+                        center: center,
+                        day: day
                     }]);
                     
+                // Fallback if day column not yet in DB schema
+                if (error && error.code === 'PGRST204') {
+                    const fallback = await supabaseClient
+                        .from('attendance')
+                        .insert([{
+                            assistant_name: assistantName,
+                            center: center
+                        }]);
+                    error = fallback.error;
+                }
+
                 if (error) throw error;
                 
-                alert(`Successfully checked in ${assistantName} at ${center}!`);
+                alert(`Successfully checked in ${assistantName} at ${center} (${day})!`);
                 fetchAttendance();
             } catch(e) {
                 console.error(e);
