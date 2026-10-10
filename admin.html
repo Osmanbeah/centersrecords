@@ -164,6 +164,107 @@
 </head>
 <body class="text-on-background min-h-screen flex flex-col pt-12 md:pt-16 pb-20 md:pb-0 antialiased">
 
+    <!-- ================= ADMIN AUTH VIEW OVERLAY ================= -->
+    <div id="admin-auth-view" class="fixed inset-0 z-[100] bg-surface flex flex-col justify-center items-center p-4">
+        <div class="w-full max-w-md">
+            <!-- Brand Header -->
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-container text-on-primary shadow-md mb-3">
+                    <span class="material-symbols-outlined text-[32px] icon-fill">shield_person</span>
+                </div>
+                <h1 class="text-2xl font-bold text-on-surface">Admin Portal</h1>
+                <p class="text-sm text-on-surface-variant mt-1">Centers Record & Schedule Management</p>
+            </div>
+
+            <!-- Login Card -->
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-6 sm:p-8">
+                <div class="mb-5">
+                    <h2 class="text-lg font-bold text-on-surface">Admin Sign In</h2>
+                    <p class="text-xs text-on-surface-variant mt-0.5">Please enter your administrator credentials to proceed.</p>
+                </div>
+
+                <div id="admin-login-error" class="hidden mb-4 p-3 bg-error-container text-on-error-container rounded-xl text-xs font-medium flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">error</span>
+                    <span id="admin-login-error-text">Invalid login credentials.</span>
+                </div>
+
+                <form id="admin-login-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-on-surface mb-1.5" for="login_admin_email">Admin Email</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-3 text-[20px] text-outline">mail</span>
+                            <input type="email" id="login_admin_email" required placeholder="admin@example.com"
+                                class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2.5 pl-10 pr-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-on-surface mb-1.5" for="login_admin_password">Password</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-3 text-[20px] text-outline">lock</span>
+                            <input type="password" id="login_admin_password" required placeholder="••••••••"
+                                class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2.5 pl-10 pr-10 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"/>
+                            <button type="button" onclick="toggleAdminPassVisibility()" class="absolute right-3 top-3 text-outline hover:text-on-surface">
+                                <span id="admin-pass-toggle-icon" class="material-symbols-outlined text-[20px]">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn_admin_login_submit"
+                        class="w-full h-11 bg-primary-container text-on-primary rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:bg-secondary active:scale-[0.99] transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-[18px]">login</span>
+                        <span>Sign In as Admin</span>
+                    </button>
+                </form>
+
+                <!-- First Time Setup Toggle -->
+                <div class="mt-6 pt-4 border-t border-surface-variant/80 text-center">
+                    <button type="button" onclick="toggleAdminSetupBox()" class="text-xs text-secondary hover:underline font-medium inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[14px]">person_add</span>
+                        <span>First time? Create Admin account</span>
+                    </button>
+                </div>
+
+                <!-- First Time Setup Form (Hidden by default) -->
+                <div id="admin-setup-box" class="hidden mt-4 p-4 rounded-xl bg-surface-container-low border border-outline-variant text-left">
+                    <h3 class="text-xs font-bold text-on-surface uppercase tracking-wider mb-1">Create Master Admin</h3>
+                    <p class="text-[11px] text-on-surface-variant mb-3">Set up your initial administrator credentials.</p>
+
+                    <form id="admin-setup-form" class="space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-on-surface mb-1">Your Name</label>
+                            <input type="text" id="setup_admin_name" required placeholder="Master Admin"
+                                class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-on-surface mb-1">Admin Email</label>
+                            <input type="email" id="setup_admin_email" required placeholder="admin@example.com"
+                                class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-on-surface mb-1">Password</label>
+                            <input type="password" id="setup_admin_password" minlength="6" required placeholder="Min 6 characters"
+                                class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                        <button type="submit" id="btn_admin_setup_submit"
+                            class="w-full h-9 bg-secondary text-on-secondary rounded-lg text-xs font-semibold hover:bg-secondary/90 transition-colors flex items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px]">verified_user</span>
+                            <span>Create Admin Account</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Link to Assistant Schedule -->
+            <div class="text-center mt-4">
+                <a href="schedule.html" class="text-xs text-on-surface-variant hover:text-primary underline flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">support_agent</span>
+                    <span>Assistant? Go to Assistant Schedule</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- TopAppBar -->
     <header class="fixed top-0 left-0 w-full z-50 bg-surface dark:bg-surface-dim flex justify-between items-center px-margin-mobile h-12 md:h-16 border-b border-outline-variant dark:border-outline">
         <div class="flex items-center gap-2">
@@ -522,24 +623,49 @@
             console.error("Failed to initialize Supabase client:", e);
         }
 
-        // --- Admin Authentication Guard ---
+        // --- Admin Authentication State & Functions ---
+        function toggleAdminPassVisibility() {
+            const input = document.getElementById('login_admin_password');
+            const icon = document.getElementById('admin-pass-toggle-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        function toggleAdminSetupBox() {
+            const box = document.getElementById('admin-setup-box');
+            if (box) box.classList.toggle('hidden');
+        }
+
         async function checkAdminAuth() {
-            if (!supabaseClient) return;
+            const overlay = document.getElementById('admin-auth-view');
+            if (!supabaseClient) {
+                if (overlay) overlay.classList.remove('hidden');
+                return false;
+            }
             try {
                 const { data: { session } } = await supabaseClient.auth.getSession();
-                if (!session || !session.user || session.user.user_metadata?.role !== 'admin') {
-                    window.location.href = 'index.html#admin';
-                    return;
-                }
-                const email = session.user.email || 'Admin';
-                const displayEl = document.getElementById('admin-user-display');
-                if (displayEl) {
-                    displayEl.textContent = email;
-                    displayEl.title = `Logged in as ${email}`;
+                if (session && session.user && session.user.user_metadata?.role === 'admin') {
+                    const email = session.user.email || 'Admin';
+                    const displayEl = document.getElementById('admin-user-display');
+                    if (displayEl) {
+                        displayEl.textContent = email;
+                        displayEl.title = `Logged in as ${email}`;
+                    }
+                    if (overlay) overlay.classList.add('hidden');
+                    return true;
+                } else {
+                    if (overlay) overlay.classList.remove('hidden');
+                    return false;
                 }
             } catch(e) {
                 console.error("Auth check failed:", e);
-                window.location.href = 'index.html#admin';
+                if (overlay) overlay.classList.remove('hidden');
+                return false;
             }
         }
 
@@ -548,9 +674,96 @@
                 if (supabaseClient) {
                     await supabaseClient.auth.signOut();
                 }
-                window.location.href = 'index.html#admin';
+                const overlay = document.getElementById('admin-auth-view');
+                if (overlay) overlay.classList.remove('hidden');
+                document.getElementById('login_admin_password').value = '';
             }
         }
+
+        document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login_admin_email').value.trim();
+            const password = document.getElementById('login_admin_password').value;
+            const btn = document.getElementById('btn_admin_login_submit');
+            const errorBox = document.getElementById('admin-login-error');
+            const errorText = document.getElementById('admin-login-error-text');
+
+            errorBox.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-spinner"></div> <span>Signing in...</span>`;
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) throw error;
+
+                const role = data.user.user_metadata?.role;
+                if (role !== 'admin') {
+                    await supabaseClient.auth.signOut();
+                    throw new Error("This account is not registered as an Administrator. Assistants must log in via the schedule page.");
+                }
+
+                // Success
+                const displayEl = document.getElementById('admin-user-display');
+                if (displayEl) {
+                    displayEl.textContent = data.user.email || 'Admin';
+                }
+                document.getElementById('admin-auth-view').classList.add('hidden');
+                fetchSchedule();
+            } catch(err) {
+                console.error("Admin login error:", err);
+                errorText.textContent = err.message || "Invalid administrator credentials.";
+                errorBox.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">login</span> <span>Sign In as Admin</span>`;
+            }
+        });
+
+        document.getElementById('admin-setup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('setup_admin_name').value.trim();
+            const email = document.getElementById('setup_admin_email').value.trim();
+            const password = document.getElementById('setup_admin_password').value;
+            const btn = document.getElementById('btn_admin_setup_submit');
+            const errorBox = document.getElementById('admin-login-error');
+            const errorText = document.getElementById('admin-login-error-text');
+
+            errorBox.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-spinner"></div> <span>Creating account...</span>`;
+
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            name,
+                            role: 'admin'
+                        }
+                    }
+                });
+
+                if (error) throw error;
+
+                alert(`Admin account created for ${email}! Welcome to Admin Portal.`);
+                const displayEl = document.getElementById('admin-user-display');
+                if (displayEl) displayEl.textContent = email;
+                document.getElementById('admin-auth-view').classList.add('hidden');
+                fetchSchedule();
+            } catch(err) {
+                console.error("Admin setup error:", err);
+                errorText.textContent = err.message || "Failed to create administrator account.";
+                errorBox.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">verified_user</span> <span>Create Admin Account</span>`;
+            }
+        });
 
         // Assistant Helpers
         function getAssistantName(a) {
