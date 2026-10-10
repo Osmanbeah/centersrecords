@@ -1490,6 +1490,7 @@
                 if (State.requests && State.requests.length > 0) {
                     renderRequestsList();
                 }
+                updateAttendanceCenters();
                 const newEntryView = document.getElementById('view-new-entry');
                 if (newEntryView && !newEntryView.classList.contains('hidden')) {
                     renderEntryAssistants();
@@ -1964,34 +1965,38 @@
 
             const selectedDay = daySelect ? daySelect.value : '';
             
-            // Find which centers have schedules on this day
-            const scheduledCentersOnDay = new Set();
+            // Strictly filter only the centers scheduled on this day
+            const scheduledCentersOnDay = [];
+            const seen = new Set();
+
             (State.schedules || []).forEach(s => {
                 if ((s.days || []).includes(selectedDay)) {
-                    scheduledCentersOnDay.add(s.center);
+                    const key = `${s.center}___${s.time || ''}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        scheduledCentersOnDay.push({
+                            center: s.center,
+                            time: s.time
+                        });
+                    }
                 }
             });
 
-            // Sort centers: scheduled today first, then Newstar, then others
-            const sortedCenters = [...State.centers].sort((a, b) => {
-                const aOnDay = scheduledCentersOnDay.has(a.name);
-                const bOnDay = scheduledCentersOnDay.has(b.name);
-                if (aOnDay && !bOnDay) return -1;
-                if (!aOnDay && bOnDay) return 1;
-                if (a.name.includes('Newstar')) return -1;
-                if (b.name.includes('Newstar')) return 1;
-                return a.name.localeCompare(b.name);
+            // Sort: Newstar first if present, then by time
+            scheduledCentersOnDay.sort((a, b) => {
+                if (a.center.includes('Newstar')) return -1;
+                if (b.center.includes('Newstar')) return 1;
+                return (a.time || '').localeCompare(b.time || '');
             });
 
-            if (sortedCenters.length === 0) {
-                centerSelect.innerHTML = `<option value="">No centers available</option>`;
+            if (scheduledCentersOnDay.length === 0) {
+                centerSelect.innerHTML = `<option value="">No centers scheduled on ${selectedDay}</option>`;
                 return;
             }
 
-            centerSelect.innerHTML = sortedCenters.map(c => {
-                const isScheduled = scheduledCentersOnDay.has(c.name);
-                const badge = isScheduled ? ` (${selectedDay})` : '';
-                return `<option value="${c.name}">${c.name}${badge}</option>`;
+            centerSelect.innerHTML = scheduledCentersOnDay.map(s => {
+                const timeFmt = s.time ? ` (${formatTime(s.time)})` : '';
+                return `<option value="${s.center}">${s.center}${timeFmt}</option>`;
             }).join('');
         }
 
