@@ -1399,11 +1399,7 @@
         let fetchingSchedule = false;
 
         async function initScheduleView() {
-            // Set date to today if empty
-            const dateInput = document.getElementById('schedule_date');
-            if (!dateInput.value) {
-                dateInput.value = new Date().toISOString().split('T')[0];
-            }
+
 
             // Populate Center Dropdown
             const centerSelect = document.getElementById('schedule_center');
@@ -1702,7 +1698,7 @@
             if (!item) return;
 
             document.getElementById('schedule_edit_id').value = item.id;
-            document.getElementById('schedule_date').value = item.date || '';
+
             document.getElementById('schedule_time').value = item.time || '';
             
             const centerSelect = document.getElementById('schedule_center');
@@ -1725,7 +1721,7 @@
         window.cancelScheduleEdit = function() {
             document.getElementById('schedule_edit_id').value = '';
             document.getElementById('new-schedule-form').reset();
-            document.getElementById('schedule_date').value = new Date().toISOString().split('T')[0];
+
             
             const centerSelect = document.getElementById('schedule_center');
             if (State.centers.length > 0) {
