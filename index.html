@@ -1,11 +1,440 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="refresh" content="0; url='/admin.html'" />
-    <title>Redirecting...</title>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Centers Record - Login</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23006d44'><path d='M4 22v-2h16v2H4Zm2-4v-7H4v-2l8-5 8 5v2h-2v7h-3v-7h-2v7h-3v-7H9v7H6Zm3-7h2v-5H9v5Zm5 0h2v-5h-2v5Z'/></svg>">
-  </head>
-  <body>
-    <p>Redirecting to Admin page...</p>
-  </body>
+    
+    <!-- Material Symbols Outlined -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#1b4332",
+                        "on-surface-variant": "#414844",
+                        "outline-variant": "#c1c8c2",
+                        "primary": "#012d1d",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary": "#0e6c4a",
+                        "secondary-fixed-dim": "#85d7ad",
+                        "surface-container-low": "#eff5f3",
+                        "outline": "#717973",
+                        "surface-variant": "#dee4e2",
+                        "surface": "#f5fbf9",
+                        "on-surface": "#171d1c",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "background": "#f5fbf9",
+                        "secondary-container": "#a0f4c8",
+                        "on-secondary-container": "#19724f",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a"
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5fbf9;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        .loading-spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border-left-color: #ffffff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="min-h-screen flex flex-col justify-center items-center p-4 antialiased selection:bg-secondary-container selection:text-on-secondary-container">
+
+    <div class="w-full max-w-md">
+        <!-- Brand Header -->
+        <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-container text-on-primary shadow-md mb-3">
+                <span class="material-symbols-outlined text-[32px] icon-fill">account_balance</span>
+            </div>
+            <h1 class="text-2xl font-bold text-on-surface">Centers Record</h1>
+            <p class="text-sm text-on-surface-variant mt-1">Educational Center & Schedule Portal</p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm p-6 sm:p-8">
+            
+            <!-- Role Tabs -->
+            <div class="grid grid-cols-2 p-1 bg-surface-container rounded-xl mb-6">
+                <button type="button" id="tab-admin" onclick="switchLoginTab('admin')"
+                    class="py-2.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 bg-surface-container-lowest text-primary shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                    <span>Admin</span>
+                </button>
+                <button type="button" id="tab-assistant" onclick="switchLoginTab('assistant')"
+                    class="py-2.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 text-on-surface-variant hover:text-on-surface">
+                    <span class="material-symbols-outlined text-[18px]">support_agent</span>
+                    <span>Assistant</span>
+                </button>
+            </div>
+
+            <!-- ================= ADMIN LOGIN SECTION ================= -->
+            <div id="section-admin">
+                <div class="mb-5">
+                    <h2 class="text-lg font-bold text-on-surface">Admin Sign In</h2>
+                    <p class="text-xs text-on-surface-variant mt-0.5">Manage session records, centers, and assistant accounts.</p>
+                </div>
+
+                <div id="admin-error" class="hidden mb-4 p-3 bg-error-container text-on-error-container rounded-xl text-xs font-medium flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">error</span>
+                    <span id="admin-error-text">Invalid login credentials.</span>
+                </div>
+
+                <form id="form-admin-login" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-on-surface mb-1.5" for="admin-email">Admin Email</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-3 text-[20px] text-outline">mail</span>
+                            <input type="email" id="admin-email" required placeholder="admin@example.com"
+                                class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2.5 pl-10 pr-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-on-surface mb-1.5" for="admin-password">Password</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-3 text-[20px] text-outline">lock</span>
+                            <input type="password" id="admin-password" required placeholder="••••••••"
+                                class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2.5 pl-10 pr-10 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"/>
+                            <button type="button" onclick="togglePasswordVisibility('admin-password', this)" class="absolute right-3 top-3 text-outline hover:text-on-surface">
+                                <span class="material-symbols-outlined text-[20px]">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-admin-submit"
+                        class="w-full h-11 bg-primary-container text-on-primary rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:bg-secondary active:scale-[0.99] transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-[18px]">login</span>
+                        <span>Sign In as Admin</span>
+                    </button>
+                </form>
+
+                <!-- First Time Setup Toggle -->
+                <div class="mt-6 pt-4 border-t border-surface-variant/80 text-center">
+                    <button type="button" onclick="toggleAdminSetup()" class="text-xs text-secondary hover:underline font-medium inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[14px]">person_add</span>
+                        <span>First time? Create Admin account</span>
+                    </button>
+                </div>
+
+                <!-- First Time Setup Form (Hidden by default) -->
+                <div id="section-admin-setup" class="hidden mt-4 p-4 rounded-xl bg-surface-container-low border border-outline-variant text-left">
+                    <h3 class="text-xs font-bold text-on-surface uppercase tracking-wider mb-1">Create Master Admin</h3>
+                    <p class="text-[11px] text-on-surface-variant mb-3">Set up your administrator credentials.</p>
+
+                    <form id="form-admin-setup" class="space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-on-surface mb-1">Your Name</label>
+                            <input type="text" id="setup-name" required placeholder="Master Admin"
+                                class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-on-surface mb-1">Admin Email</label>
+                            <input type="email" id="setup-email" required placeholder="admin@example.com"
+                                class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-on-surface mb-1">Password</label>
+                            <input type="password" id="setup-password" minlength="6" required placeholder="Min 6 characters"
+                                class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                        <button type="submit" id="btn-setup-submit"
+                            class="w-full h-9 bg-secondary text-on-secondary rounded-lg text-xs font-semibold hover:bg-secondary/90 transition-colors flex items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px]">verified_user</span>
+                            <span>Create Admin Account</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ================= ASSISTANT LOGIN SECTION ================= -->
+            <div id="section-assistant" class="hidden">
+                <div class="mb-5">
+                    <h2 class="text-lg font-bold text-on-surface">Assistant Sign In</h2>
+                    <p class="text-xs text-on-surface-variant mt-0.5">Sign in to check your upcoming lectures and center assignments.</p>
+                </div>
+
+                <div id="assistant-error" class="hidden mb-4 p-3 bg-error-container text-on-error-container rounded-xl text-xs font-medium flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">error</span>
+                    <span id="assistant-error-text">Invalid email or password.</span>
+                </div>
+
+                <form id="form-assistant-login" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-on-surface mb-1.5" for="assistant-email">Assistant Email</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-3 text-[20px] text-outline">alternate_email</span>
+                            <input type="email" id="assistant-email" required placeholder="assistant@example.com"
+                                class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2.5 pl-10 pr-3 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"/>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-on-surface mb-1.5" for="assistant-password">Password</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-3 text-[20px] text-outline">lock</span>
+                            <input type="password" id="assistant-password" required placeholder="••••••••"
+                                class="w-full bg-surface-container-low border border-outline-variant rounded-xl py-2.5 pl-10 pr-10 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"/>
+                            <button type="button" onclick="togglePasswordVisibility('assistant-password', this)" class="absolute right-3 top-3 text-outline hover:text-on-surface">
+                                <span class="material-symbols-outlined text-[20px]">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-assistant-submit"
+                        class="w-full h-11 bg-primary-container text-on-primary rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:bg-secondary active:scale-[0.99] transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                        <span>Sign In to Schedule</span>
+                    </button>
+                </form>
+
+                <div class="mt-6 pt-4 border-t border-surface-variant/80 text-center">
+                    <p class="text-xs text-on-surface-variant">
+                        Don't have an assistant account yet?
+                    </p>
+                    <p class="text-[11px] text-outline mt-1">
+                        Please contact your administrator to set up your email and password.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <p class="text-center text-[11px] text-outline mt-6">
+            &copy; Centers Record Portal &bull; All Rights Reserved
+        </p>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        const SUPABASE_URL = 'https://guscxutiucotybrzrlgr.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1c2N4dXRpdWNvdHlicnpybGdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyNTc1NjUsImV4cCI6MjA4NDgzMzU2NX0.6NeQYrtjOy-V2TfLjJJPfH0HE0BuHS7gejBkq1Mlllo';
+        
+        let supabaseClient;
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch(e) {
+            console.error("Failed to initialize Supabase:", e);
+        }
+
+        // --- Tab Switching ---
+        function switchLoginTab(tab) {
+            const adminSection = document.getElementById('section-admin');
+            const assistantSection = document.getElementById('section-assistant');
+            const tabAdmin = document.getElementById('tab-admin');
+            const tabAssistant = document.getElementById('tab-assistant');
+
+            if (tab === 'admin') {
+                adminSection.classList.remove('hidden');
+                assistantSection.classList.add('hidden');
+                tabAdmin.className = "py-2.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 bg-surface-container-lowest text-primary shadow-sm";
+                tabAssistant.className = "py-2.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 text-on-surface-variant hover:text-on-surface";
+                window.location.hash = 'admin';
+            } else {
+                adminSection.classList.add('hidden');
+                assistantSection.classList.remove('hidden');
+                tabAssistant.className = "py-2.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 bg-surface-container-lowest text-primary shadow-sm";
+                tabAdmin.className = "py-2.5 text-xs sm:text-sm font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 text-on-surface-variant hover:text-on-surface";
+                window.location.hash = 'assistant';
+            }
+        }
+
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('.material-symbols-outlined');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        function toggleAdminSetup() {
+            const setupSec = document.getElementById('section-admin-setup');
+            setupSec.classList.toggle('hidden');
+        }
+
+        // --- Check existing session ---
+        async function checkExistingSession() {
+            if (!supabaseClient) return;
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session && session.user) {
+                    const role = session.user.user_metadata?.role;
+                    if (role === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else if (role === 'assistant') {
+                        window.location.href = 'schedule.html';
+                    }
+                }
+            } catch(e) {
+                console.warn("Session check error:", e);
+            }
+        }
+
+        // --- Admin Login Form Submission ---
+        document.getElementById('form-admin-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('admin-email').value.trim();
+            const password = document.getElementById('admin-password').value;
+            const btn = document.getElementById('btn-admin-submit');
+            const errorEl = document.getElementById('admin-error');
+            const errorText = document.getElementById('admin-error-text');
+
+            errorEl.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-spinner"></div> <span>Signing in...</span>`;
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) throw error;
+
+                const role = data.user.user_metadata?.role;
+                if (role !== 'admin') {
+                    // Not an admin
+                    await supabaseClient.auth.signOut();
+                    throw new Error("This account does not have Administrator privileges. Please use the Assistant tab.");
+                }
+
+                // Redirect to admin portal
+                window.location.href = 'admin.html';
+            } catch(err) {
+                console.error("Admin signin error:", err);
+                errorText.textContent = err.message || "Failed to sign in. Please verify your credentials.";
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">login</span> <span>Sign In as Admin</span>`;
+            }
+        });
+
+        // --- First-time Master Admin Setup ---
+        document.getElementById('form-admin-setup').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('setup-name').value.trim();
+            const email = document.getElementById('setup-email').value.trim();
+            const password = document.getElementById('setup-password').value;
+            const btn = document.getElementById('btn-setup-submit');
+            const errorEl = document.getElementById('admin-error');
+            const errorText = document.getElementById('admin-error-text');
+
+            errorEl.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-spinner"></div> <span>Creating account...</span>`;
+
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            name,
+                            role: 'admin'
+                        }
+                    }
+                });
+
+                if (error) throw error;
+
+                alert(`Admin account created successfully for ${email}! Redirecting to Admin dashboard...`);
+                window.location.href = 'admin.html';
+            } catch(err) {
+                console.error("Admin setup error:", err);
+                errorText.textContent = err.message || "Failed to create admin account.";
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">verified_user</span> <span>Create Admin Account</span>`;
+            }
+        });
+
+        // --- Assistant Login Form Submission ---
+        document.getElementById('form-assistant-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('assistant-email').value.trim();
+            const password = document.getElementById('assistant-password').value;
+            const btn = document.getElementById('btn-assistant-submit');
+            const errorEl = document.getElementById('assistant-error');
+            const errorText = document.getElementById('assistant-error-text');
+
+            errorEl.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loading-spinner"></div> <span>Signing in...</span>`;
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) throw error;
+
+                // Redirect to assistant schedule
+                window.location.href = 'schedule.html';
+            } catch(err) {
+                console.error("Assistant signin error:", err);
+                errorText.textContent = err.message || "Invalid assistant email or password. Please verify your credentials.";
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">calendar_today</span> <span>Sign In to Schedule</span>`;
+            }
+        });
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            checkExistingSession();
+            if (window.location.hash === '#assistant') {
+                switchLoginTab('assistant');
+            } else {
+                switchLoginTab('admin');
+            }
+        });
+    </script>
+</body>
 </html>
