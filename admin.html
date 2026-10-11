@@ -1757,6 +1757,9 @@
         }
 
         function initNewEntryView() {
+            if (!State.schedules || State.schedules.length === 0) {
+                fetchSchedule();
+            }
             renderAttendanceRecordsView();
         }
 
@@ -1769,6 +1772,15 @@
             if (!container) return;
 
             if (!State.schedules || State.schedules.length === 0) {
+                if (typeof fetchingSchedule !== 'undefined' && fetchingSchedule) {
+                    container.innerHTML = `
+                        <div class="flex flex-col items-center justify-center py-12 text-on-surface-variant gap-3">
+                            <div class="loading-spinner"></div>
+                            <span class="text-xs font-medium">Loading schedules...</span>
+                        </div>
+                    `;
+                    return;
+                }
                 container.innerHTML = `
                     <div class="bg-surface-container-lowest border border-outline-variant/70 rounded-2xl p-8 text-center space-y-3">
                         <div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
@@ -1855,6 +1867,9 @@
                         // If no day column and no embedded day, do NOT cross-match to any day
                         return false;
                     });
+
+                    // List of unique assistant names that scanned
+                    const scannedAssistantNames = Array.from(new Set(scannedRecordsForCenter.map(att => att.assistant_name).filter(Boolean)));
 
                     // Check for existing saved entry for this schedule/center and day
                     const existingEntry = State.entries.find(e => 
@@ -2209,15 +2224,13 @@
 
                 if (error) throw error;
                 State.schedules = data || [];
+                fetchingSchedule = false;
                 renderScheduleList();
                 if (State.requests && State.requests.length > 0) {
                     renderRequestsList();
                 }
                 updateAttendanceCenters();
-                const newEntryView = document.getElementById('view-new-entry');
-                if (newEntryView && !newEntryView.classList.contains('hidden')) {
-                    renderEntryAssistants();
-                }
+                renderAttendanceRecordsView();
             } catch (err) {
                 console.error("Error fetching schedule:", err);
             } finally {
