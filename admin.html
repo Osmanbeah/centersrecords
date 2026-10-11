@@ -2115,19 +2115,34 @@
                 if (supabaseClient && present.length > 0) {
                     for (const astName of present) {
                         try {
+                            const b = adjustments && adjustments[astName] && parseFloat(adjustments[astName].bonus) || 0;
+                            const d = adjustments && adjustments[astName] && parseFloat(adjustments[astName].deduction) || 0;
+                            
+                            // Pack attendance metadata so assistant portal can read exact lecture details, date, bonus, deduction
+                            let centerPayload = center;
+                            if (b > 0 || d > 0 || day || todayStr) {
+                                centerPayload = JSON.stringify({
+                                    c: center,
+                                    d: day,
+                                    dt: todayStr,
+                                    b: b,
+                                    ded: d
+                                });
+                            }
+
                             let { error } = await supabaseClient
                                 .from('attendance')
                                 .insert([{
                                     assistant_name: astName,
-                                    center: center,
-                                    day: day
+                                    center: centerPayload
                                 }]);
-                            if (error && error.code === 'PGRST204') {
+                            if (error) {
+                                // Fallback to plain string if JSON exceeds or fails
                                 await supabaseClient
                                     .from('attendance')
                                     .insert([{
                                         assistant_name: astName,
-                                        center: center
+                                        center: `${center} (${day})`
                                     }]);
                             }
                         } catch(syncErr) {

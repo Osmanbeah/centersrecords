@@ -235,8 +235,23 @@
             </div>
         </div>
 
-        <!-- Scope Switcher: My Sessions vs All Sessions -->
-        <div class="flex items-center justify-center p-1 bg-surface-container rounded-xl max-w-md mx-auto w-full">
+        <!-- Main Navigation Tabs: Upcoming Schedule vs Attended Lectures -->
+        <div class="flex items-center justify-center p-1 bg-surface-container-high rounded-2xl max-w-md mx-auto w-full border border-outline-variant/60 shadow-sm">
+            <button type="button" id="tab_btn_schedule" onclick="switchAssistantTab('schedule')" 
+                class="flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">calendar_month</span>
+                <span>Upcoming Schedule</span>
+            </button>
+            <button type="button" id="tab_btn_attended" onclick="switchAssistantTab('attended')" 
+                class="flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
+                <span class="material-symbols-outlined text-[18px]">verified</span>
+                <span>Attended Lectures</span>
+                <span id="badge_attended_count" class="hidden ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary/10 text-primary"></span>
+            </button>
+        </div>
+
+        <!-- Scope Switcher: My Sessions vs All Sessions (Schedule tab only) -->
+        <div id="schedule_scope_wrapper" class="flex items-center justify-center p-1 bg-surface-container rounded-xl max-w-md mx-auto w-full">
             <button type="button" id="btn_scope_my" onclick="setScope('my')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
                 <span class="material-symbols-outlined text-[16px]">person</span>
                 <span>My Assigned Sessions</span>
@@ -247,8 +262,8 @@
             </button>
         </div>
         
-        <!-- Filter/Search -->
-        <div class="relative max-w-md mx-auto w-full flex flex-col gap-2">
+        <!-- Filter/Search (Schedule tab only) -->
+        <div id="schedule_search_wrapper" class="relative max-w-md mx-auto w-full flex flex-col gap-2">
             <div class="relative w-full">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <span class="material-symbols-outlined text-on-surface-variant text-[18px]">search</span>
@@ -272,17 +287,87 @@
             <span id="status_text">Connecting to schedule...</span>
         </div>
 
-        <!-- Date Selector Pills -->
-        <div id="date_selector_container" class="flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none">
+        <!-- =================== VIEW: SCHEDULE =================== -->
+        <div id="view_schedule" class="flex flex-col gap-4">
+            <!-- Date Selector Pills -->
+            <div id="date_selector_container" class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            </div>
+
+            <div id="schedule_loading" class="flex justify-center py-12">
+                <div class="loading-spinner"></div>
+            </div>
+
+            <!-- Schedule List -->
+            <div id="schedule_list" class="flex flex-col gap-stack-md">
+                <!-- Populated from Supabase -->
+            </div>
         </div>
 
-        <div id="schedule_loading" class="flex justify-center py-12">
-            <div class="loading-spinner"></div>
-        </div>
+        <!-- =================== VIEW: ATTENDED LECTURES =================== -->
+        <div id="view_attended_lectures" class="hidden flex flex-col gap-4">
+            <!-- Summary Stats Card -->
+            <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[20px]">workspace_premium</span>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold text-on-surface">Attended Lectures Record</h2>
+                            <p class="text-[11px] text-on-surface-variant">Summary of your completed sessions and adjustments</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="fetchAttendedLectures(true)" title="Refresh attendance"
+                        class="p-2 rounded-xl text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">refresh</span>
+                    </button>
+                </div>
 
-        <!-- Schedule List -->
-        <div id="schedule_list" class="flex flex-col gap-stack-md">
-            <!-- Populated from Supabase -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
+                        <span class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-0.5">Attended</span>
+                        <span id="stat_attended_count" class="text-xl font-bold text-primary font-mono">0</span>
+                        <span class="text-[10px] text-on-surface-variant">Lectures</span>
+                    </div>
+
+                    <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
+                        <span class="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider mb-0.5">Total Bonus</span>
+                        <span id="stat_total_bonus" class="text-xl font-bold text-emerald-600 font-mono">+0</span>
+                        <span class="text-[10px] text-emerald-600/80">EGP</span>
+                    </div>
+
+                    <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
+                        <span class="text-[10px] font-semibold text-rose-700 uppercase tracking-wider mb-0.5">Deductions</span>
+                        <span id="stat_total_deduction" class="text-xl font-bold text-rose-600 font-mono">-0</span>
+                        <span class="text-[10px] text-rose-600/80">EGP</span>
+                    </div>
+
+                    <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
+                        <span class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-0.5">Net Adjustment</span>
+                        <span id="stat_net_adjustment" class="text-xl font-bold text-on-surface font-mono">0</span>
+                        <span class="text-[10px] text-on-surface-variant">EGP</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search & Filter bar for attended lectures -->
+            <div class="relative w-full">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="material-symbols-outlined text-on-surface-variant text-[18px]">search</span>
+                </div>
+                <input type="text" id="attended_search" oninput="renderAttendedList()" placeholder="Search attended lectures by center or date..."
+                    class="block w-full bg-surface-container-low border border-outline-variant rounded-xl py-2 pl-9 pr-4 text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors">
+            </div>
+
+            <!-- Attended Lectures List Loading Spinner -->
+            <div id="attended_loading" class="hidden flex justify-center py-10">
+                <div class="loading-spinner"></div>
+            </div>
+
+            <!-- Attended Lectures List Container -->
+            <div id="attended_list" class="flex flex-col gap-3">
+                <!-- Dynamically populated -->
+            </div>
         </div>
 
         <!-- Request Shift Modal -->
@@ -487,6 +572,298 @@
                 btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">calendar_today</span> <span>Sign In to Schedule</span>`;
             }
         });
+
+        // =================== TAB SWITCHING ===================
+        let currentAssistantTab = 'schedule'; // 'schedule' or 'attended'
+        let allAttendedLectures = [];
+
+        function switchAssistantTab(tab) {
+            currentAssistantTab = tab;
+            const btnSched = document.getElementById('tab_btn_schedule');
+            const btnAttended = document.getElementById('tab_btn_attended');
+            const viewSched = document.getElementById('view_schedule');
+            const viewAttended = document.getElementById('view_attended_lectures');
+            const scopeWrapper = document.getElementById('schedule_scope_wrapper');
+            const searchWrapper = document.getElementById('schedule_search_wrapper');
+
+            if (tab === 'schedule') {
+                btnSched.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
+                btnAttended.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface";
+                viewSched.classList.remove('hidden');
+                viewAttended.classList.add('hidden');
+                if (scopeWrapper) scopeWrapper.classList.remove('hidden');
+                if (searchWrapper) searchWrapper.classList.remove('hidden');
+            } else {
+                btnAttended.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
+                btnSched.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface";
+                viewAttended.classList.remove('hidden');
+                viewSched.classList.add('hidden');
+                if (scopeWrapper) scopeWrapper.classList.add('hidden');
+                if (searchWrapper) searchWrapper.classList.add('hidden');
+
+                fetchAttendedLectures();
+            }
+        }
+
+        // =================== ATTENDED LECTURES LOGIC ===================
+        async function fetchAttendedLectures(forceRefresh = false) {
+            const loading = document.getElementById('attended_loading');
+            if (loading) loading.classList.remove('hidden');
+
+            try {
+                const astName = (currentAssistant.name || '').trim().toLowerCase();
+                const astEmail = (currentAssistant.email || '').trim().toLowerCase();
+
+                let combinedRecords = [];
+                const seenKeys = new Set();
+
+                // 1. Fetch from Supabase attendance table
+                if (supabaseClient) {
+                    try {
+                        const { data: supaLogs, error } = await supabaseClient
+                            .from('attendance')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (!error && Array.isArray(supaLogs)) {
+                            supaLogs.forEach(row => {
+                                const rName = (row.assistant_name || '').trim().toLowerCase();
+                                // Check if this log belongs to current assistant
+                                if (!astName || rName === astName || (astEmail && rName.includes(astName)) || astName.includes(rName)) {
+                                    let centerName = row.center || 'Center';
+                                    let lectureName = 'Regular Lecture';
+                                    let dateStr = row.created_at ? row.created_at.split('T')[0] : '';
+                                    let dayStr = '';
+                                    let bonus = 0;
+                                    let deduction = 0;
+
+                                    // Parse enriched JSON center metadata if present
+                                    if (typeof row.center === 'string' && row.center.trim().startsWith('{')) {
+                                        try {
+                                            const meta = JSON.parse(row.center);
+                                            centerName = meta.c || centerName;
+                                            dayStr = meta.d || '';
+                                            dateStr = meta.dt || dateStr;
+                                            bonus = parseFloat(meta.b) || 0;
+                                            deduction = parseFloat(meta.ded) || 0;
+                                            lectureName = meta.l || lectureName;
+                                        } catch(e) {}
+                                    }
+
+                                    const uniqueKey = `${dateStr}_${centerName}_${row.id || Math.random()}`;
+                                    if (!seenKeys.has(uniqueKey)) {
+                                        seenKeys.add(uniqueKey);
+                                        combinedRecords.push({
+                                            id: row.id,
+                                            center: centerName,
+                                            lecture: lectureName,
+                                            date: dateStr,
+                                            day: dayStr,
+                                            bonus: bonus,
+                                            deduction: deduction,
+                                            source: 'cloud',
+                                            rawDate: row.created_at || dateStr
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    } catch(e) {
+                        console.warn("Could not fetch attendance from Supabase:", e);
+                    }
+                }
+
+                // 2. Fetch from Local Storage Admin session records (ct_entries) if on same browser/device
+                try {
+                    const localEntries = JSON.parse(localStorage.getItem('ct_entries')) || [];
+                    localEntries.forEach(entry => {
+                        const isPresent = (entry.present || []).some(n => 
+                            n && astName && (n.toLowerCase() === astName || n.toLowerCase().includes(astName) || astName.includes(n.toLowerCase()))
+                        );
+
+                        if (isPresent) {
+                            // Find matching adjustment
+                            let matchedName = (entry.present || []).find(n => 
+                                n && astName && (n.toLowerCase() === astName || n.toLowerCase().includes(astName) || astName.includes(n.toLowerCase()))
+                            );
+                            const adj = (entry.adjustments && matchedName && entry.adjustments[matchedName]) || {};
+                            const bonus = parseFloat(adj.bonus) || 0;
+                            const deduction = parseFloat(adj.deduction) || 0;
+                            const dateStr = entry.date || (entry.createdAt ? entry.createdAt.split('T')[0] : '');
+
+                            const uniqueKey = `${dateStr}_${entry.center}_${entry.day}`;
+                            // If not already in list, or update bonuses/deductions for matching date & center
+                            const existingIdx = combinedRecords.findIndex(r => r.date === dateStr && r.center.toLowerCase() === (entry.center || '').toLowerCase());
+                            if (existingIdx >= 0) {
+                                if (bonus > 0) combinedRecords[existingIdx].bonus = bonus;
+                                if (deduction > 0) combinedRecords[existingIdx].deduction = deduction;
+                                if (entry.day && !combinedRecords[existingIdx].day) combinedRecords[existingIdx].day = entry.day;
+                            } else if (!seenKeys.has(uniqueKey)) {
+                                seenKeys.add(uniqueKey);
+                                combinedRecords.push({
+                                    id: entry.id || uniqueKey,
+                                    center: entry.center || 'Center',
+                                    lecture: 'Session Lecture',
+                                    date: dateStr,
+                                    day: entry.day || '',
+                                    bonus: bonus,
+                                    deduction: deduction,
+                                    source: 'local',
+                                    rawDate: entry.createdAt || dateStr
+                                });
+                            }
+                        }
+                    });
+                } catch(e) {
+                    console.warn("Could not read ct_entries:", e);
+                }
+
+                // Sort by date descending
+                combinedRecords.sort((a, b) => (b.date || b.rawDate || '').localeCompare(a.date || a.rawDate || ''));
+
+                allAttendedLectures = combinedRecords;
+
+                // Update badge
+                const badge = document.getElementById('badge_attended_count');
+                if (badge) {
+                    if (allAttendedLectures.length > 0) {
+                        badge.textContent = allAttendedLectures.length;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+
+                renderAttendedList();
+            } finally {
+                if (loading) loading.classList.add('hidden');
+            }
+        }
+
+        function renderAttendedList() {
+            const listEl = document.getElementById('attended_list');
+            if (!listEl) return;
+
+            const searchVal = (document.getElementById('attended_search')?.value || '').trim().toLowerCase();
+            const filtered = allAttendedLectures.filter(item => {
+                if (!searchVal) return true;
+                return (item.center || '').toLowerCase().includes(searchVal) ||
+                       (item.lecture || '').toLowerCase().includes(searchVal) ||
+                       (item.date || '').toLowerCase().includes(searchVal) ||
+                       (item.day || '').toLowerCase().includes(searchVal);
+            });
+
+            // Calculate Totals
+            let totalBonus = 0;
+            let totalDeduct = 0;
+            allAttendedLectures.forEach(item => {
+                totalBonus += item.bonus || 0;
+                totalDeduct += item.deduction || 0;
+            });
+            const netAdj = totalBonus - totalDeduct;
+
+            document.getElementById('stat_attended_count').textContent = allAttendedLectures.length;
+            document.getElementById('stat_total_bonus').textContent = `+${totalBonus}`;
+            document.getElementById('stat_total_deduction').textContent = `-${totalDeduct}`;
+            const netEl = document.getElementById('stat_net_adjustment');
+            netEl.textContent = (netAdj > 0 ? `+${netAdj}` : `${netAdj}`);
+            if (netAdj > 0) {
+                netEl.className = "text-xl font-bold text-emerald-600 font-mono";
+            } else if (netAdj < 0) {
+                netEl.className = "text-xl font-bold text-rose-600 font-mono";
+            } else {
+                netEl.className = "text-xl font-bold text-on-surface font-mono";
+            }
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `
+                    <div class="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/60 text-center flex flex-col items-center justify-center gap-3">
+                        <div class="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center text-outline">
+                            <span class="material-symbols-outlined text-[32px]">event_busy</span>
+                        </div>
+                        <div>
+                            <h3 class="font-headline-sm text-on-surface text-sm font-bold">No Attended Lectures Found</h3>
+                            <p class="text-xs text-on-surface-variant max-w-xs mt-1">
+                                ${searchVal ? 'No records match your search criteria.' : 'Lectures you attend and complete with the Admin will appear here with bonuses and deductions.'}
+                            </p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(item => {
+                const bonusBadge = item.bonus > 0 
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                         <span class="material-symbols-outlined text-[14px]">arrow_upward</span>
+                         +${item.bonus} EGP Bonus
+                       </span>` 
+                    : '';
+                
+                const deductBadge = item.deduction > 0
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                         <span class="material-symbols-outlined text-[14px]">arrow_downward</span>
+                         -${item.deduction} EGP Deduct
+                       </span>`
+                    : '';
+
+                const noAdjustBadge = (!item.bonus && !item.deduction)
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant border border-outline-variant/50">
+                         Standard (No Adjustments)
+                       </span>`
+                    : '';
+
+                const formattedDate = item.date ? item.date : 'Recorded';
+                const dayLabel = item.day ? `• ${item.day}` : '';
+
+                return `
+                    <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant shadow-sm hover:border-primary/40 transition-all">
+                        <div class="flex items-start justify-between gap-3 mb-2.5">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                    <span class="material-symbols-outlined text-[20px]">check_circle</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-headline-sm font-bold text-on-surface text-sm sm:text-base leading-snug">${escapeHtml(item.center)}</h3>
+                                    <div class="flex items-center gap-1.5 text-xs text-on-surface-variant mt-0.5">
+                                        <span class="material-symbols-outlined text-[14px] text-outline">calendar_today</span>
+                                        <span>${escapeHtml(formattedDate)}</span>
+                                        ${dayLabel ? `<span class="font-medium text-primary">${escapeHtml(dayLabel)}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold bg-secondary/10 text-secondary border border-secondary/20 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[13px]">verified</span>
+                                <span>Attended</span>
+                            </span>
+                        </div>
+
+                        <!-- Adjustments & Details Row -->
+                        <div class="pt-3 border-t border-outline-variant/40 flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${bonusBadge}
+                                ${deductBadge}
+                                ${noAdjustBadge}
+                            </div>
+                            <div class="text-[11px] text-outline flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[13px]">schedule</span>
+                                <span>Verified by Admin</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         function setScope(scope) {
             scheduleScope = scope;
@@ -913,9 +1290,11 @@
 
         // --- Init ---
         document.addEventListener('DOMContentLoaded', async () => {
-            await checkAssistantAuth();
+            const authed = await checkAssistantAuth();
             fetchSchedule();
-            // countdowns removed
+            if (authed) {
+                fetchAttendedLectures();
+            }
         });
 
     </script>
