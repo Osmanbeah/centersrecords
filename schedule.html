@@ -411,6 +411,30 @@
                 </div>
             </div>
 
+            <!-- Week Navigation Bar (Option B: Weekly Picking) -->
+            <div class="bg-surface-container-low rounded-2xl p-2.5 border border-outline-variant/60 flex items-center justify-between gap-2 shadow-sm">
+                <button type="button" onclick="changeWeekOffset(-1)" title="Previous Week" class="w-8 h-8 rounded-xl bg-surface hover:bg-surface-container flex items-center justify-center text-on-surface border border-outline-variant/40 transition-all active:scale-95 shrink-0">
+                    <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                </button>
+                <div class="flex flex-col items-center text-center min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <span id="week-badge-indicator" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary">
+                            <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                            <span id="week-badge-text">Upcoming Week</span>
+                        </span>
+                        <button type="button" id="btn-jump-current-week" onclick="resetToCurrentWeek()" class="hidden text-[11px] text-secondary font-bold hover:underline">
+                            (Current)
+                        </button>
+                    </div>
+                    <span id="week-date-range-text" class="text-xs sm:text-sm font-bold text-on-surface mt-0.5 truncate">
+                        Loading week...
+                    </span>
+                </div>
+                <button type="button" onclick="changeWeekOffset(1)" title="Next Week" class="w-8 h-8 rounded-xl bg-surface hover:bg-surface-container flex items-center justify-center text-on-surface border border-outline-variant/40 transition-all active:scale-95 shrink-0">
+                    <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                </button>
+            </div>
+
             <!-- Date Selector Pills -->
             <div id="date_selector_container" class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             </div>
@@ -440,11 +464,18 @@
                             <p class="text-[11px] text-on-surface-variant">Verified completed sessions and adjustments</p>
                         </div>
                     </div>
-                    <button type="button" onclick="fetchAttendedLectures(true)" title="Refresh attendance"
-                        class="px-2.5 py-1.5 rounded-xl text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors text-xs font-semibold flex items-center gap-1 border border-outline-variant/60">
-                        <span class="material-symbols-outlined text-[16px]">refresh</span>
-                        <span class="hidden sm:inline">Refresh</span>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <select id="attended_month_filter" onchange="renderAttendedLecturesList()" 
+                            class="bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs font-bold text-primary px-2.5 py-1.5 outline-none hover:border-primary transition-colors">
+                            <option value="CURRENT">This Month</option>
+                            <option value="ALL">All Time</option>
+                        </select>
+                        <button type="button" onclick="fetchAttendedLectures(true)" title="Refresh attendance"
+                            class="px-2.5 py-1.5 rounded-xl text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors text-xs font-semibold flex items-center gap-1 border border-outline-variant/60">
+                            <span class="material-symbols-outlined text-[16px]">refresh</span>
+                            <span class="hidden sm:inline">Refresh</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Friendly 3-Column Stats -->
@@ -549,6 +580,10 @@
                     <div class="flex items-center justify-between">
                         <span class="text-on-surface-variant font-medium">Days</span>
                         <span id="modal-lecture-days" class="font-semibold text-primary"></span>
+                    </div>
+                    <div class="flex items-center justify-between pt-1 border-t border-outline-variant/30">
+                        <span class="text-on-surface-variant font-medium">Target Week</span>
+                        <span id="modal-lecture-week" class="font-bold text-primary"></span>
                     </div>
                 </div>
 
@@ -955,8 +990,19 @@
             const listEl = document.getElementById('attended_list');
             if (!listEl) return;
 
+            const monthFilter = document.getElementById('attended_month_filter')?.value || 'CURRENT';
+            const currentYearMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-10"
+
+            let monthRecords = allAttendedLectures;
+            if (monthFilter === 'CURRENT') {
+                monthRecords = allAttendedLectures.filter(item => {
+                    const dateStr = item.date || (item.rawDate ? item.rawDate.split('T')[0] : '');
+                    return dateStr.startsWith(currentYearMonth);
+                });
+            }
+
             const searchVal = (document.getElementById('attended_search')?.value || '').trim().toLowerCase();
-            const filtered = allAttendedLectures.filter(item => {
+            const filtered = monthRecords.filter(item => {
                 if (!searchVal) return true;
                 return (item.center || '').toLowerCase().includes(searchVal) ||
                        (item.lecture || '').toLowerCase().includes(searchVal) ||
@@ -964,16 +1010,16 @@
                        (item.day || '').toLowerCase().includes(searchVal);
             });
 
-            // Calculate Totals
+            // Calculate Totals for this period
             let totalBonus = 0;
             let totalDeduct = 0;
-            allAttendedLectures.forEach(item => {
+            monthRecords.forEach(item => {
                 totalBonus += item.bonus || 0;
                 totalDeduct += item.deduction || 0;
             });
             const netAdj = totalBonus - totalDeduct;
 
-            document.getElementById('stat_attended_count').textContent = allAttendedLectures.length;
+            document.getElementById('stat_attended_count').textContent = monthRecords.length;
             document.getElementById('stat_total_bonus').textContent = `+${totalBonus}`;
             const netEl = document.getElementById('stat_net_adjustment');
             netEl.textContent = (netAdj > 0 ? `+${netAdj}` : `${netAdj}`);
@@ -1076,6 +1122,8 @@
             }).join('');
         }
 
+        window.renderAttendedLecturesList = renderAttendedList;
+
         function escapeHtml(str) {
             if (!str) return '';
             return String(str)
@@ -1156,7 +1204,106 @@
 
         const WEEK_DAYS = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
         let selectedDayFilter = 'all';
-        let myPendingRequestIds = new Set();
+
+        // ================= WEEK DATING LOGIC (OPTION B) =================
+        let selectedWeekOffset = 0; // 0 = current/upcoming week, 1 = next week, -1 = last week
+        let myRequestsMap = new Map(); // Key: `${schedule_id}_${weekKey}` -> 'pending' | 'approved' | 'rejected'
+
+        function getWeekInfo(dateObj = new Date(), offset = 0) {
+            const d = new Date(dateObj);
+            d.setHours(12, 0, 0, 0);
+            const day = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+            
+            // In our Saturday-Friday week cycle:
+            // Friday (5) is prep/picking day for the upcoming week!
+            let diffToSaturday = 0;
+            if (day === 5) {
+                diffToSaturday = 1; // Upcoming week starts tomorrow (Saturday)
+            } else if (day === 6) {
+                diffToSaturday = 0; // Current week started today (Saturday)
+            } else {
+                diffToSaturday = -(day + 1); // Sunday (0) to Thursday (4)
+            }
+
+            const sat = new Date(d);
+            sat.setDate(d.getDate() + diffToSaturday + (offset * 7));
+            const fri = new Date(sat);
+            fri.setDate(sat.getDate() + 6);
+
+            const formatShort = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const formatISO = (dt) => dt.toISOString().split('T')[0];
+
+            return {
+                weekKey: formatISO(sat),
+                startDate: formatISO(sat),
+                endDate: formatISO(fri),
+                label: `${formatShort(sat)} – ${formatShort(fri)}`,
+                isUpcomingOrCurrent: offset === 0
+            };
+        }
+
+        function getSelectedWeekInfo() {
+            return getWeekInfo(new Date(), selectedWeekOffset);
+        }
+
+        function changeWeekOffset(delta) {
+            selectedWeekOffset += delta;
+            updateWeekUI();
+            renderScheduleList();
+            renderDayPills();
+        }
+
+        function resetToCurrentWeek() {
+            selectedWeekOffset = 0;
+            updateWeekUI();
+            renderScheduleList();
+            renderDayPills();
+        }
+
+        function updateWeekUI() {
+            const weekInfo = getSelectedWeekInfo();
+            const badgeIndicator = document.getElementById('week-badge-indicator');
+            const badgeText = document.getElementById('week-badge-text');
+            const rangeText = document.getElementById('week-date-range-text');
+            const jumpBtn = document.getElementById('btn-jump-current-week');
+
+            if (rangeText) rangeText.textContent = weekInfo.label;
+            
+            const isFriday = new Date().getDay() === 5;
+
+            if (selectedWeekOffset === 0) {
+                if (badgeIndicator) badgeIndicator.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700";
+                if (badgeText) badgeText.textContent = isFriday ? "🟢 Picks Open for New Week" : "🟢 Active Week";
+                if (jumpBtn) jumpBtn.classList.add('hidden');
+            } else if (selectedWeekOffset > 0) {
+                if (badgeIndicator) badgeIndicator.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700";
+                if (badgeText) badgeText.textContent = `Future Week (+${selectedWeekOffset})`;
+                if (jumpBtn) jumpBtn.classList.remove('hidden');
+            } else {
+                if (badgeIndicator) badgeIndicator.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-500/15 text-slate-700";
+                if (badgeText) badgeText.textContent = `Past Week (${selectedWeekOffset})`;
+                if (jumpBtn) jumpBtn.classList.remove('hidden');
+            }
+        }
+
+        function parseRequestStatus(req) {
+            let status = req.status || 'pending';
+            let targetWeek = null;
+            if (status.includes('#')) {
+                const parts = status.split('#');
+                status = parts[0];
+                targetWeek = parts[1];
+            }
+            if (!targetWeek && req.created_at) {
+                // Fallback: derive week from created_at timestamp
+                const d = new Date(req.created_at);
+                const day = d.getDay();
+                let daysToSaturday = (day === 5) ? 1 : (day === 6 ? 0 : -(day + 1));
+                d.setDate(d.getDate() + daysToSaturday);
+                targetWeek = d.toISOString().split('T')[0];
+            }
+            return { status, targetWeek };
+        }
 
         async function fetchMyRequests() {
             if (!supabaseClient) return;
@@ -1164,19 +1311,43 @@
             if (!assistantIdent) return;
 
             try {
-                let query = supabaseClient.from('shift_requests').select('schedule_id').eq('status', 'pending');
+                let query = supabaseClient.from('shift_requests').select('*');
                 if (currentAssistant.email) {
-                    query = query.eq('assistant_email', currentAssistant.email);
+                    query = query.or(`assistant_email.eq.${currentAssistant.email},assistant_name.eq.${currentAssistant.name}`);
                 } else {
                     query = query.eq('assistant_name', currentAssistant.name);
                 }
                 const { data, error } = await query;
                 if (!error && data) {
-                    myPendingRequestIds = new Set(data.map(r => r.schedule_id));
+                    myRequestsMap.clear();
+                    data.forEach(r => {
+                        const parsed = parseRequestStatus(r);
+                        if (parsed.targetWeek) {
+                            const key = `${r.schedule_id}_${parsed.targetWeek}`;
+                            myRequestsMap.set(key, parsed.status);
+                        }
+                    });
+                    try {
+                        localStorage.setItem('cached_my_requests', JSON.stringify(data));
+                    } catch(e) {}
                 }
             } catch(e) {
-                console.warn("Could not fetch assistant requests:", e);
+                console.warn("Could not fetch assistant requests, loading cache:", e);
+                const cached = localStorage.getItem('cached_my_requests');
+                if (cached) {
+                    try {
+                        const data = JSON.parse(cached);
+                        myRequestsMap.clear();
+                        data.forEach(r => {
+                            const parsed = parseRequestStatus(r);
+                            if (parsed.targetWeek) {
+                                myRequestsMap.set(`${r.schedule_id}_${parsed.targetWeek}`, parsed.status);
+                            }
+                        });
+                    } catch(err) {}
+                }
             }
+            updateWeekUI();
         }
 
         function renderDayPills() {
@@ -1444,11 +1615,25 @@
             let baseList = [...allSchedules];
 
             // Calculate assistant's assigned lectures for Hero banner & Next Session highlight
+            const currentWeek = getSelectedWeekInfo();
             const myName = (currentAssistant.name || '').toLowerCase();
-            const myAssignedLectures = allSchedules.filter(s => (s.assistants || []).some(a => {
-                const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                return myName && (aName.includes(myName) || myName.includes(aName));
-            }));
+
+            // Check if this assistant has approved weekly requests for this week
+            const hasWeeklyApprovals = allSchedules.some(s => myRequestsMap.get(`${s.id}_${currentWeek.weekKey}`) === 'approved');
+
+            const myAssignedLectures = allSchedules.filter(s => {
+                const weekStatus = myRequestsMap.get(`${s.id}_${currentWeek.weekKey}`);
+                if (weekStatus === 'approved') return true;
+                if (weekStatus === 'pending' || weekStatus === 'rejected') return false;
+                // If on current week and no weekly picks exist yet, fallback to static schedule roster
+                if (selectedWeekOffset === 0 && !hasWeeklyApprovals && myName) {
+                    return (s.assistants || []).some(a => {
+                        const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
+                        return aName.includes(myName) || myName.includes(aName);
+                    });
+                }
+                return false;
+            });
 
             // Update Hero Banner & Live Target Countdown if in 'my' mode
             if (scheduleScope === 'my') {
@@ -1458,8 +1643,8 @@
                 const summaryEl = document.getElementById('welcome_schedule_summary');
                 if (summaryEl) {
                     summaryEl.textContent = myAssignedLectures.length > 0
-                        ? `You have ${myAssignedLectures.length} lecture session${myAssignedLectures.length > 1 ? 's' : ''} assigned this week.`
-                        : `You have no lectures assigned yet. Tap "All Centers" above to explore open slots!`;
+                        ? `You have ${myAssignedLectures.length} lecture session${myAssignedLectures.length > 1 ? 's' : ''} assigned for ${currentWeek.label}.`
+                        : `You have no lectures picked yet for ${currentWeek.label}. Tap "All Centers" above to pick your slots!`;
                 }
 
                 // Target center upcoming session & countdown
@@ -1494,11 +1679,21 @@
                 dayLectures.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
                 const cardsHtml = dayLectures.map(item => {
-                    const amAssigned = myName && (item.assistants || []).some(a => {
-                        const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                        return aName.includes(myName) || myName.includes(aName);
-                    });
-                    const isPending = myPendingRequestIds.has(item.id);
+                    const weekStatus = myRequestsMap.get(`${item.id}_${currentWeek.weekKey}`);
+                    let amAssigned = false;
+                    let isPending = false;
+
+                    if (weekStatus === 'approved') {
+                        amAssigned = true;
+                    } else if (weekStatus === 'pending') {
+                        isPending = true;
+                    } else if (!weekStatus && selectedWeekOffset === 0 && !hasWeeklyApprovals && myName) {
+                        amAssigned = (item.assistants || []).some(a => {
+                            const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
+                            return aName.includes(myName) || myName.includes(aName);
+                        });
+                    }
+
                     const daysStr = (item.days || []).join(', ');
 
                     let locationButton = '';
@@ -1521,13 +1716,13 @@
                     if (amAssigned) {
                         actionButton = `
                             <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-300/80 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm shrink-0">
-                                <span class="material-symbols-outlined text-[16px]">verified</span> You're Assigned
+                                <span class="material-symbols-outlined text-[16px]">verified</span> Assigned
                             </span>
                         `;
                     } else if (isPending) {
                         actionButton = `
                             <span class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-300/80 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm shrink-0">
-                                <span class="material-symbols-outlined text-[16px]">hourglass_top</span> Request Pending
+                                <span class="material-symbols-outlined text-[16px]">hourglass_top</span> Pending
                             </span>
                         `;
                     } else {
@@ -1711,9 +1906,12 @@
             if (!sched) return;
 
             pendingPickScheduleId = scheduleId;
+            const weekInfo = getSelectedWeekInfo();
             document.getElementById('modal-lecture-center').textContent = sched.center || 'Lecture';
             document.getElementById('modal-lecture-time').textContent = formatTime(sched.time);
             document.getElementById('modal-lecture-days').textContent = (sched.days || []).join(', ') || 'Regular';
+            const weekEl = document.getElementById('modal-lecture-week');
+            if (weekEl) weekEl.textContent = weekInfo.label;
 
             const modal = document.getElementById('pick-lecture-modal');
             modal.classList.remove('hidden');
@@ -1735,19 +1933,21 @@
             }
 
             try {
+                const weekInfo = getSelectedWeekInfo();
+                const targetWeekKey = weekInfo.weekKey;
                 const payload = {
                     assistant_name: currentAssistant.name,
                     assistant_email: currentAssistant.email,
                     schedule_id: pendingPickScheduleId,
-                    status: 'pending'
+                    status: `pending#${targetWeekKey}`
                 };
                 const { error } = await supabaseClient.from('shift_requests').insert([payload]);
                 if (error) throw error;
 
-                myPendingRequestIds.add(pendingPickScheduleId);
+                myRequestsMap.set(`${pendingPickScheduleId}_${targetWeekKey}`, 'pending');
                 closePickModal();
                 renderScheduleList();
-                showToast("Request sent successfully! Awaiting admin approval.", "success");
+                showToast(`Request sent for ${weekInfo.label}! Awaiting admin approval.`, "success");
             } catch (err) {
                 console.error("Error requesting lecture:", err);
                 showToast(err.message || "Failed to send request", "error");
