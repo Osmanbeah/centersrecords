@@ -3,6 +3,11 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="theme-color" content="#006d44"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <meta name="apple-mobile-web-app-title" content="Assistant Schedule"/>
+    <link rel="manifest" href="manifest.json"/>
     <title>Assistant Schedule</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23006d44'><path d='M4 22v-2h16v2H4Zm2-4v-7H4v-2l8-5 8 5v2h-2v7h-3v-7h-2v7h-3v-7H9v7H6Zm3-7h2v-5H9v5Zm5 0h2v-5h-2v5Z'/></svg>">
     <!-- Material Symbols Outlined -->
@@ -127,8 +132,14 @@
         }
     </style>
     
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Local Offline Libraries (Supabase + Local QRCode Generator) -->
+    <script src="supabase.min.js"></script>
+    <script>
+        if (typeof supabase === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>');
+        }
+    </script>
+    <script src="qrcode.min.js"></script>
 </head>
 <body class="text-on-background min-h-screen flex flex-col antialiased">
 
@@ -485,18 +496,28 @@
         </div>
 
         <!-- Request Shift Modal -->
-        <!-- QR Code Modal -->
-        <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/40 backdrop-blur-sm">
-            <div class="bg-surface rounded-2xl shadow-elevation-3 max-w-sm w-full overflow-hidden flex flex-col items-center p-6 text-center">
-                <h2 class="font-headline-md text-on-surface mb-2">Your ID Badge</h2>
-                <p class="font-body-sm text-on-surface-variant mb-6">Show this QR code to the Admin to check in.</p>
+        <!-- QR Code Modal (100% Offline Ready) -->
+        <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/50 backdrop-blur-sm animate-fade-in">
+            <div class="bg-surface rounded-3xl shadow-2xl border border-outline-variant/60 max-w-sm w-full overflow-hidden flex flex-col items-center p-6 text-center animate-scale-up">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs font-semibold mb-3">
+                    <span class="material-symbols-outlined text-[15px]">offline_pin</span>
+                    <span>100% Offline Ready Badge</span>
+                </div>
+                <h2 class="text-xl font-bold text-on-surface">Your Assistant ID</h2>
+                <p id="qr_modal_name" class="text-sm font-semibold text-primary mt-0.5">Assistant</p>
+                <p class="text-xs text-on-surface-variant mt-1 mb-4">Show this QR code to Admin upon arrival. Scans instantly with zero internet required.</p>
                 
-                <div class="bg-white p-4 rounded-xl border border-outline-variant shadow-sm mb-6">
-                    <img id="qr-image" src="" alt="QR Code" class="w-48 h-48 mx-auto">
+                <div class="bg-white p-4 rounded-2xl border-2 border-emerald-500/30 shadow-sm mb-4 flex flex-col items-center justify-center">
+                    <div id="qr-canvas-container" class="flex items-center justify-center min-w-[200px] min-h-[200px]"></div>
+                </div>
+
+                <div class="text-[11px] text-on-surface-variant/80 flex items-center gap-1 mb-5">
+                    <span class="material-symbols-outlined text-[15px] text-emerald-600">bolt</span>
+                    <span>Generates locally &bull; Works in airplane mode</span>
                 </div>
                 
-                <button type="button" onclick="document.getElementById('qr-modal').classList.add('hidden')" class="w-full h-12 bg-primary text-on-primary rounded-xl font-label-lg shadow-sm hover:bg-primary/90 transition-colors">
-                    Close
+                <button type="button" onclick="document.getElementById('qr-modal').classList.add('hidden')" class="w-full h-11 bg-primary text-on-primary rounded-xl font-semibold shadow-sm hover:bg-primary/90 transition-colors">
+                    Close Badge
                 </button>
             </div>
         </div>
@@ -629,9 +650,29 @@
             }
         }
 
+        function applyAssistantUser(user) {
+            currentAssistant = user;
+            const nameEl = document.getElementById('current_assistant_name');
+            if (nameEl) nameEl.textContent = user.name;
+            const welcomeNameEl = document.getElementById('welcome_assistant_name');
+            if (welcomeNameEl) welcomeNameEl.textContent = (user.name || 'Assistant').split(' ')[0];
+        }
+
         async function checkAssistantAuth() {
             const overlay = document.getElementById('assistant-auth-view');
+            // If offline, check localStorage first so assistant is never locked out without internet
+            const cachedUserStr = localStorage.getItem('cached_current_assistant');
+            let cachedUser = null;
+            if (cachedUserStr) {
+                try { cachedUser = JSON.parse(cachedUserStr); } catch(e) {}
+            }
+
             if (!supabaseClient) {
+                if (cachedUser) {
+                    applyAssistantUser(cachedUser);
+                    if (overlay) overlay.classList.add('hidden');
+                    return true;
+                }
                 if (overlay) overlay.classList.remove('hidden');
                 return false;
             }
@@ -641,12 +682,13 @@
                     const email = session.user.email || '';
                     const name = session.user.user_metadata?.name || email.split('@')[0];
                     currentAssistant = { name, email };
-                    
-                    const nameEl = document.getElementById('current_assistant_name');
-                    if (nameEl) nameEl.textContent = name;
-                    const welcomeNameEl = document.getElementById('welcome_assistant_name');
-                    if (welcomeNameEl) welcomeNameEl.textContent = name.split(' ')[0] || 'Assistant';
-
+                    try { localStorage.setItem('cached_current_assistant', JSON.stringify(currentAssistant)); } catch(e) {}
+                    applyAssistantUser(currentAssistant);
+                    if (overlay) overlay.classList.add('hidden');
+                    return true;
+                } else if (cachedUser && !navigator.onLine) {
+                    // Offline fallback when session check is unreachable
+                    applyAssistantUser(cachedUser);
                     if (overlay) overlay.classList.add('hidden');
                     return true;
                 } else {
@@ -654,7 +696,12 @@
                     return false;
                 }
             } catch(e) {
-                console.error("Assistant auth check failed:", e);
+                console.warn("Assistant auth check offline fallback:", e);
+                if (cachedUser) {
+                    applyAssistantUser(cachedUser);
+                    if (overlay) overlay.classList.add('hidden');
+                    return true;
+                }
                 if (overlay) overlay.classList.remove('hidden');
                 return false;
             }
@@ -666,6 +713,7 @@
 
         async function executeLogout() {
             document.getElementById('logout-modal').classList.add('hidden');
+            try { localStorage.removeItem('cached_current_assistant'); } catch(e) {}
             if (supabaseClient) {
                 await supabaseClient.auth.signOut();
             }
@@ -1051,6 +1099,10 @@
                 if (error) throw error;
                 
                 allSchedules = data || [];
+                try {
+                    localStorage.setItem('cached_schedules', JSON.stringify(allSchedules));
+                } catch(e) {}
+
                 await fetchMyRequests();
                 populateDropdown();
                 renderDayPills();
@@ -1058,8 +1110,18 @@
                 renderScheduleList();
                 updateStatus('connected');
             } catch (err) {
-                console.error("Error fetching schedule:", err);
-                updateStatus('error');
+                console.warn("Could not fetch fresh schedule, loading from offline cache:", err);
+                const cached = localStorage.getItem('cached_schedules');
+                if (cached) {
+                    try {
+                        allSchedules = JSON.parse(cached);
+                        populateDropdown();
+                        renderDayPills();
+                        document.getElementById('schedule_loading').classList.add('hidden');
+                        renderScheduleList();
+                    } catch(e) {}
+                }
+                updateStatus(navigator.onLine ? 'error' : 'offline');
             }
         }
 
@@ -1074,6 +1136,9 @@
             } else if(state === 'connected') {
                 dot.className = "w-2 h-2 rounded-full bg-secondary";
                 text.textContent = "Live Updates Active";
+            } else if (state === 'offline') {
+                dot.className = "w-2 h-2 rounded-full bg-amber-500";
+                text.textContent = "Offline Mode (Cached Schedule)";
             } else if (state === 'error') {
                 dot.className = "w-2 h-2 rounded-full bg-error";
                 text.textContent = "Connection Error. Retrying...";
@@ -1776,19 +1841,76 @@
 
         function showQRCode() {
             if (!currentAssistant) return;
-            const data = currentAssistant.name; // Use just the name to keep it simple and readable
-            const url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(data)}`;
-            document.getElementById('qr-image').src = url;
-            document.getElementById('qr-modal').classList.remove('hidden');
+            const modal = document.getElementById('qr-modal');
+            const container = document.getElementById('qr-canvas-container');
+            const nameEl = document.getElementById('qr_modal_name');
+            if (nameEl) nameEl.textContent = currentAssistant.name;
+
+            container.innerHTML = '';
+            
+            const qrText = currentAssistant.name;
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(container, {
+                        text: qrText,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#012d1d",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                    // Save rendered canvas DataURL to localStorage for instant offline recall
+                    setTimeout(() => {
+                        const canvas = container.querySelector('canvas');
+                        if (canvas) {
+                            try {
+                                localStorage.setItem('cached_qr_' + currentAssistant.name, canvas.toDataURL());
+                            } catch(e) {}
+                        }
+                    }, 50);
+                } else {
+                    throw new Error("QRCode library not ready");
+                }
+            } catch(err) {
+                console.warn("Using cached QR code fallback:", err);
+                const cachedImg = localStorage.getItem('cached_qr_' + currentAssistant.name);
+                if (cachedImg) {
+                    container.innerHTML = `<img src="${cachedImg}" alt="QR Code" class="w-48 h-48 mx-auto rounded-lg">`;
+                } else {
+                    container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrText)}" alt="QR Code" class="w-48 h-48 mx-auto rounded-lg">`;
+                }
+            }
+
+            modal.classList.remove('hidden');
         }
 
-        // --- Init ---
+        // --- Init & Service Worker Registration ---
         document.addEventListener('DOMContentLoaded', async () => {
             const authed = await checkAssistantAuth();
             fetchSchedule();
             if (authed) {
                 fetchAttendedLectures();
             }
+
+            // Register Service Worker for PWA & full offline capability
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+                    .catch(err => console.log('[PWA] Service Worker registration failed:', err));
+            }
+        });
+
+        // Network status listeners
+        window.addEventListener('online', () => {
+            updateStatus('fetching');
+            fetchSchedule();
+            if (currentAssistant) {
+                fetchAttendedLectures();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            updateStatus('offline');
         });
 
     </script>

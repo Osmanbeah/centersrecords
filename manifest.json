@@ -1,0 +1,19 @@
+{
+  "name": "Centers Record - Attendance & Schedule",
+  "short_name": "CentersRecord",
+  "description": "Offline-first center attendance tracking and assistant scheduling",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5fbf9",
+  "theme_color": "#006d44",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

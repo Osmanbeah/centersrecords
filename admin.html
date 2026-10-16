@@ -2,6 +2,11 @@
 <html class="light" lang="en">
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="theme-color" content="#006d44"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <meta name="apple-mobile-web-app-title" content="Centers Record Admin"/>
+    <link rel="manifest" href="manifest.json"/>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -161,9 +166,19 @@
         }
     </style>
     
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Local Offline Bundles (Supabase + HTML5 QR Code) -->
+    <script src="supabase.min.js"></script>
+    <script>
+        if (typeof supabase === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>');
+        }
+    </script>
+    <script src="html5-qrcode.min.js"></script>
+    <script>
+        if (typeof Html5Qrcode === 'undefined') {
+            document.write('<script src="https://unpkg.com/html5-qrcode"><\/script>');
+        }
+    </script>
 </head>
 <body class="text-on-background min-h-screen flex flex-col pt-12 md:pt-16 pb-20 md:pb-0 antialiased">
 
@@ -291,6 +306,12 @@
                     <span class="material-symbols-outlined text-[20px]">qr_code_scanner</span> Attendance
                 </button>
             </nav>
+
+            <!-- Offline Sync Status Badge -->
+            <div id="admin-offline-badge" onclick="syncOfflineAttendanceQueue()" class="hidden items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 cursor-pointer hover:bg-amber-500/25 transition-all shadow-sm" title="Click to sync offline records now">
+                <span class="material-symbols-outlined text-[15px] animate-pulse">cloud_off</span>
+                <span id="admin-offline-count">0 queued</span>
+            </div>
 
             <!-- Admin Badge & Logout -->
             <div class="flex items-center gap-1.5 pl-2 border-l border-outline-variant/60">
@@ -817,6 +838,23 @@
             </div>
 
             <div>
+                <!-- Offline Queue Sync Banner -->
+                <div id="offline-queue-banner" class="hidden mb-4 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 animate-fade-in shadow-sm">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">cloud_sync</span>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-on-surface truncate"><span id="offline-banner-count">0</span> offline scan(s) saved on this device</div>
+                            <div class="text-[11px] text-on-surface-variant truncate">Auto-syncs to cloud when internet is available</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="syncOfflineAttendanceQueue()" id="btn-manual-sync" class="shrink-0 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-colors">
+                        <span class="material-symbols-outlined text-[15px]">sync</span>
+                        <span>Sync Now</span>
+                    </button>
+                </div>
+
                 <h3 class="font-headline-md text-on-surface mb-4">Recent Scans</h3>
                 <div id="attendance_list_loading" class="flex justify-center py-4 hidden">
                     <div class="loading-spinner"></div>
@@ -880,9 +918,28 @@
             if (box) box.classList.toggle('hidden');
         }
 
+        function applyAdminUser(email) {
+            const displayEl = document.getElementById('admin-user-display');
+            if (displayEl) {
+                displayEl.textContent = email;
+                displayEl.title = `Logged in as ${email}`;
+            }
+        }
+
         async function checkAdminAuth() {
             const overlay = document.getElementById('admin-auth-view');
+            const cachedAdminStr = localStorage.getItem('cached_admin_session');
+            let cachedAdmin = null;
+            if (cachedAdminStr) {
+                try { cachedAdmin = JSON.parse(cachedAdminStr); } catch(e) {}
+            }
+
             if (!supabaseClient) {
+                if (cachedAdmin && cachedAdmin.role === 'admin') {
+                    applyAdminUser(cachedAdmin.email + ' (Offline)');
+                    if (overlay) overlay.classList.add('hidden');
+                    return true;
+                }
                 if (overlay) overlay.classList.remove('hidden');
                 return false;
             }
@@ -890,11 +947,12 @@
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session && session.user && session.user.user_metadata?.role === 'admin') {
                     const email = session.user.email || 'Admin';
-                    const displayEl = document.getElementById('admin-user-display');
-                    if (displayEl) {
-                        displayEl.textContent = email;
-                        displayEl.title = `Logged in as ${email}`;
-                    }
+                    try { localStorage.setItem('cached_admin_session', JSON.stringify({ email, role: 'admin' })); } catch(e) {}
+                    applyAdminUser(email);
+                    if (overlay) overlay.classList.add('hidden');
+                    return true;
+                } else if (cachedAdmin && cachedAdmin.role === 'admin' && !navigator.onLine) {
+                    applyAdminUser(cachedAdmin.email + ' (Offline)');
                     if (overlay) overlay.classList.add('hidden');
                     return true;
                 } else {
@@ -902,7 +960,12 @@
                     return false;
                 }
             } catch(e) {
-                console.error("Auth check failed:", e);
+                console.warn("Admin auth check offline fallback:", e);
+                if (cachedAdmin && cachedAdmin.role === 'admin') {
+                    applyAdminUser(cachedAdmin.email + ' (Offline)');
+                    if (overlay) overlay.classList.add('hidden');
+                    return true;
+                }
                 if (overlay) overlay.classList.remove('hidden');
                 return false;
             }
@@ -910,6 +973,7 @@
 
         async function logoutAdmin() {
             if (confirm("Are you sure you want to log out?")) {
+                try { localStorage.removeItem('cached_admin_session'); } catch(e) {}
                 if (supabaseClient) {
                     await supabaseClient.auth.signOut();
                 }
@@ -2292,6 +2356,9 @@
 
                 if (error) throw error;
                 State.schedules = data || [];
+                try {
+                    localStorage.setItem('cached_admin_schedules', JSON.stringify(State.schedules));
+                } catch(e) {}
                 fetchingSchedule = false;
                 renderScheduleList();
                 if (State.requests && State.requests.length > 0) {
@@ -2300,7 +2367,16 @@
                 updateAttendanceCenters();
                 renderAttendanceRecordsView();
             } catch (err) {
-                console.error("Error fetching schedule:", err);
+                console.warn("Could not fetch fresh schedule from Supabase, loading from offline cache:", err);
+                const cached = localStorage.getItem('cached_admin_schedules');
+                if (cached) {
+                    try {
+                        State.schedules = JSON.parse(cached);
+                        renderScheduleList();
+                        updateAttendanceCenters();
+                        renderAttendanceRecordsView();
+                    } catch(e) {}
+                }
             } finally {
                 if (loadingEl) loadingEl.classList.add('hidden');
                 fetchingSchedule = false;
@@ -3014,6 +3090,51 @@
             fetchAttendance();
         }
 
+        // --- Offline Attendance Queue & Persistence ---
+        const OFFLINE_ATTENDANCE_QUEUE_KEY = 'centers_attendance_offline_queue';
+        const CACHED_ATTENDANCE_KEY = 'cached_admin_attendance';
+
+        function getOfflineQueue() {
+            try {
+                return JSON.parse(localStorage.getItem(OFFLINE_ATTENDANCE_QUEUE_KEY) || '[]');
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function saveOfflineQueue(queue) {
+            try {
+                localStorage.setItem(OFFLINE_ATTENDANCE_QUEUE_KEY, JSON.stringify(queue));
+            } catch(e) {}
+            updateOfflineIndicatorUI();
+        }
+
+        function updateOfflineIndicatorUI() {
+            const queue = getOfflineQueue();
+            const count = queue.length;
+            
+            const badge = document.getElementById('admin-offline-badge');
+            const badgeCount = document.getElementById('admin-offline-count');
+            const banner = document.getElementById('offline-queue-banner');
+            const bannerCount = document.getElementById('offline-banner-count');
+
+            if (count > 0) {
+                if (badge) {
+                    badge.classList.remove('hidden');
+                    badge.classList.add('flex');
+                }
+                if (badgeCount) badgeCount.textContent = `${count} offline scan${count > 1 ? 's' : ''}`;
+                if (banner) banner.classList.remove('hidden');
+                if (bannerCount) bannerCount.textContent = count;
+            } else {
+                if (badge) {
+                    badge.classList.add('hidden');
+                    badge.classList.remove('flex');
+                }
+                if (banner) banner.classList.add('hidden');
+            }
+        }
+
         async function fetchAttendance() {
             const loadingEl = document.getElementById('attendance_list_loading');
             if (loadingEl) loadingEl.classList.remove('hidden');
@@ -3025,57 +3146,81 @@
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
-                State.attendances = data || [];
+                const cloudAttendances = data || [];
+                try {
+                    localStorage.setItem(CACHED_ATTENDANCE_KEY, JSON.stringify(cloudAttendances));
+                } catch(e) {}
+
+                // Merge pending offline scans with cloud scans
+                const queue = getOfflineQueue();
+                const cloudKeys = new Set(cloudAttendances.map(a => `${a.assistant_name}_${a.created_at}`));
+                const pendingScans = queue.filter(q => !cloudKeys.has(`${q.assistant_name}_${q.created_at}`));
                 
-                // Render Scanner tab's recent list
-                const today = new Date().toISOString().split('T')[0];
-                const todayScans = State.attendances.filter(a => a.created_at && a.created_at.startsWith(today));
-                renderAttendanceList(todayScans.length > 0 ? todayScans : State.attendances.slice(0, 20));
-
-                // Also update Attendance Records view if active
-                const recordsView = document.getElementById('view-new-entry');
-                if (recordsView && !recordsView.classList.contains('hidden')) {
-                    renderAttendanceRecordsView();
-                }
-
-                // Also update Manage Assistant Records view if active
-                const manageView = document.getElementById('view-manage');
-                if (manageView && !manageView.classList.contains('hidden')) {
-                    renderManageAssistantRecords();
-                }
+                State.attendances = [...pendingScans, ...cloudAttendances];
             } catch (err) {
-                console.error("Error fetching attendance:", err);
+                console.warn("Could not fetch attendance from Supabase, loading offline cache:", err);
+                const cached = localStorage.getItem(CACHED_ATTENDANCE_KEY);
+                const cloudFallback = cached ? JSON.parse(cached) : [];
+                const queue = getOfflineQueue();
+                State.attendances = [...queue, ...cloudFallback];
             } finally {
                 if (loadingEl) loadingEl.classList.add('hidden');
             }
+
+            // Render Scanner tab's recent list
+            const today = new Date().toISOString().split('T')[0];
+            const todayScans = (State.attendances || []).filter(a => a.created_at && a.created_at.startsWith(today));
+            renderAttendanceList(todayScans.length > 0 ? todayScans : (State.attendances || []).slice(0, 20));
+
+            // Also update Attendance Records view if active
+            const recordsView = document.getElementById('view-new-entry');
+            if (recordsView && !recordsView.classList.contains('hidden')) {
+                renderAttendanceRecordsView();
+            }
+
+            // Also update Manage Assistant Records view if active
+            const manageView = document.getElementById('view-manage');
+            if (manageView && !manageView.classList.contains('hidden')) {
+                renderManageAssistantRecords();
+            }
+
+            updateOfflineIndicatorUI();
         }
 
         function renderAttendanceList(scans) {
             const listContainer = document.getElementById('attendance_list');
-            if (scans.length === 0) {
+            if (!scans || scans.length === 0) {
                 listContainer.innerHTML = `<p class="text-on-surface-variant text-center text-sm py-4 italic">No scans recorded today.</p>`;
                 return;
             }
             
             listContainer.innerHTML = scans.map(scan => {
-                const timeStr = new Date(scan.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const timeStr = scan.time || (scan.created_at ? new Date(scan.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--');
                 const dayDisplay = scan.day ? ` &bull; ${scan.day}` : '';
+                const isOffline = scan.is_offline_pending;
+                const statusBadge = isOffline 
+                    ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full"><span class="material-symbols-outlined text-[12px]">cloud_off</span> Saved Offline</span>`
+                    : `<span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-500/10 px-1.5 py-0.5 rounded-full"><span class="material-symbols-outlined text-[12px]">cloud_done</span> Synced</span>`;
+
                 return `
-                <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-xl border border-outline-variant/50 shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+                <div class="flex items-center justify-between p-3 bg-surface-container-low rounded-xl border border-outline-variant/50 shadow-sm transition-all">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-full ${isOffline ? 'bg-amber-500/20 text-amber-700' : 'bg-primary/10 text-primary'} flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">${isOffline ? 'cloud_queue' : 'how_to_reg'}</span>
                         </div>
-                        <div>
-                            <div class="font-label-lg font-bold text-on-surface">${scan.assistant_name}</div>
-                            <div class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
-                                <span class="material-symbols-outlined text-[13px]">storefront</span>
-                                <span>${scan.center.includes('(') ? scan.center : `${scan.center}${dayDisplay}`}</span>
+                        <div class="min-w-0">
+                            <div class="font-label-lg font-bold text-on-surface truncate">${scan.assistant_name}</div>
+                            <div class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1 truncate">
+                                <span class="material-symbols-outlined text-[13px] shrink-0">storefront</span>
+                                <span class="truncate">${scan.center.includes('(') ? scan.center : `${scan.center}${dayDisplay}`}</span>
                             </div>
                         </div>
                     </div>
-                    <div class="text-xs font-semibold text-secondary flex items-center gap-1 bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant/40">
-                        <span class="material-symbols-outlined text-[15px]">schedule</span> ${timeStr}
+                    <div class="flex flex-col items-end gap-1 shrink-0 ml-2">
+                        <div class="text-xs font-semibold text-secondary flex items-center gap-1 bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant/40">
+                            <span class="material-symbols-outlined text-[15px]">schedule</span> ${timeStr}
+                        </div>
+                        ${statusBadge}
                     </div>
                 </div>`;
             }).join('');
@@ -3130,63 +3275,142 @@
             const day = document.getElementById('attendance_day').value;
             const now = new Date();
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
-            try {
-                // Try inserting with day column first
-                let { error } = await supabaseClient
-                    .from('attendance')
-                    .insert([{
-                        assistant_name: assistantName,
-                        center: `${center} (${day})`,
-                        day: day
-                    }]);
-                    
-                // Fallback: if day column does not exist in DB schema, insert into center column as "CenterName (Day)"
-                if (error && error.code === 'PGRST204') {
-                    const fallback = await supabaseClient
-                        .from('attendance')
-                        .insert([{
+            const scanTimestamp = now.toISOString();
+
+            // 1. Create offline-safe attendance record preserving the exact physical scan timestamp
+            const record = {
+                id: 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                assistant_name: assistantName,
+                center: `${center} (${day})`,
+                day: day,
+                created_at: scanTimestamp,
+                time: timeStr,
+                is_offline_pending: true
+            };
+
+            // 2. Immediately save to device offline queue
+            const queue = getOfflineQueue();
+            queue.push(record);
+            saveOfflineQueue(queue);
+
+            // 3. Immediately render on Admin screen (zero lag)
+            if (!State.attendances) State.attendances = [];
+            State.attendances.unshift(record);
+            const today = scanTimestamp.split('T')[0];
+            const todayScans = State.attendances.filter(a => a.created_at && a.created_at.startsWith(today));
+            renderAttendanceList(todayScans.length > 0 ? todayScans : State.attendances.slice(0, 20));
+
+            // 4. Trigger celebration animation & chime immediately!
+            triggerArrivalAlert({
+                assistant_name: assistantName,
+                center: `${center} (${day})`,
+                time: timeStr
+            });
+
+            // 5. Broadcast to assistant's phone if connection is available
+            if (window.adminArrivalsChannel) {
+                try {
+                    window.adminArrivalsChannel.send({
+                        type: 'broadcast',
+                        event: 'arrival',
+                        payload: {
                             assistant_name: assistantName,
-                            center: `${center} (${day})`
-                        }]);
-                    error = fallback.error;
+                            center: center,
+                            day: day,
+                            time: timeStr,
+                            timestamp: scanTimestamp
+                        }
+                    });
+                } catch(bcErr) {
+                    console.warn("Realtime broadcast skipped (offline):", bcErr);
                 }
+            }
 
-                if (error) throw error;
-                
-                triggerArrivalAlert({
-                    assistant_name: assistantName,
-                    center: `${center} (${day})`,
-                    time: timeStr
-                });
-
-                // Broadcast instantly to the assistant's phone to stop their countdown
-                if (window.adminArrivalsChannel) {
-                    try {
-                        window.adminArrivalsChannel.send({
-                            type: 'broadcast',
-                            event: 'arrival',
-                            payload: {
-                                assistant_name: assistantName,
-                                center: center,
-                                day: day,
-                                time: timeStr,
-                                timestamp: now.toISOString()
-                            }
-                        });
-                    } catch(bcErr) {
-                        console.warn("Broadcast error from admin:", bcErr);
-                    }
-                }
-
-                fetchAttendance();
-            } catch(e) {
-                console.error(e);
-                alert("Error recording attendance. Make sure the attendance table exists in Supabase.");
+            // 6. Attempt background cloud sync immediately if online
+            if (navigator.onLine) {
+                syncOfflineAttendanceQueue();
             }
         }
 
-        // --- Init ---
+        let isSyncingQueue = false;
+        async function syncOfflineAttendanceQueue() {
+            if (isSyncingQueue) return;
+            if (!navigator.onLine) {
+                updateOfflineIndicatorUI();
+                return;
+            }
+
+            const queue = getOfflineQueue();
+            if (queue.length === 0) {
+                updateOfflineIndicatorUI();
+                return;
+            }
+
+            isSyncingQueue = true;
+            const syncBtn = document.getElementById('btn-manual-sync');
+            if (syncBtn) {
+                syncBtn.innerHTML = `<div class="loading-spinner w-3 h-3 border-2"></div> <span>Syncing...</span>`;
+            }
+
+            try {
+                const remaining = [];
+                for (const item of queue) {
+                    try {
+                        let { error } = await supabaseClient
+                            .from('attendance')
+                            .insert([{
+                                assistant_name: item.assistant_name,
+                                center: item.center,
+                                day: item.day,
+                                created_at: item.created_at
+                            }]);
+
+                        if (error && error.code === 'PGRST204') {
+                            const fallback = await supabaseClient
+                                .from('attendance')
+                                .insert([{
+                                    assistant_name: item.assistant_name,
+                                    center: item.center,
+                                    created_at: item.created_at
+                                }]);
+                            error = fallback.error;
+                        }
+
+                        if (error) {
+                            console.warn("Could not sync item to Supabase, keeping offline:", item, error);
+                            remaining.push(item);
+                        } else {
+                            // Update item state to synced
+                            const match = (State.attendances || []).find(a => a.id === item.id || (a.assistant_name === item.assistant_name && a.created_at === item.created_at));
+                            if (match) match.is_offline_pending = false;
+                        }
+                    } catch(itemErr) {
+                        console.warn("Sync failed for item:", itemErr);
+                        remaining.push(item);
+                    }
+                }
+
+                saveOfflineQueue(remaining);
+
+                const today = new Date().toISOString().split('T')[0];
+                const todayScans = (State.attendances || []).filter(a => a.created_at && a.created_at.startsWith(today));
+                renderAttendanceList(todayScans.length > 0 ? todayScans : (State.attendances || []).slice(0, 20));
+
+                if (remaining.length === 0) {
+                    showToast("All offline attendance scans successfully synced!", "success");
+                }
+            } catch(err) {
+                console.error("Error syncing offline attendance:", err);
+            } finally {
+                isSyncingQueue = false;
+                if (syncBtn) {
+                    syncBtn.innerHTML = `<span class="material-symbols-outlined text-[15px]">sync</span> <span>Sync Now</span>`;
+                }
+                updateOfflineIndicatorUI();
+            }
+        }
+
+        // --- Init & Service Worker ---
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAdminAuth();
             await fetchAttendance();
@@ -3198,7 +3422,29 @@
             } else {
                 switchTab('new-entry');
             }
+
+            // Register Service Worker for Offline PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('[PWA Admin] Service Worker registered:', reg.scope))
+                    .catch(err => console.log('[PWA Admin] Service Worker registration failed:', err));
+            }
         });
+
+        // Network status & auto-sync listeners
+        window.addEventListener('online', () => {
+            console.log("Online status detected. Syncing offline attendance queue...");
+            syncOfflineAttendanceQueue();
+            fetchAttendance();
+            fetchSchedule();
+        });
+
+        // Background periodic sync check
+        setInterval(() => {
+            if (navigator.onLine && getOfflineQueue().length > 0) {
+                syncOfflineAttendanceQueue();
+            }
+        }, 20000);
 
     </script>
 </body>
