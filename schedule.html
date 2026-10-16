@@ -297,16 +297,75 @@
                     </button>
                 </div>
 
-                <!-- Next Up Session Highlight (if assigned) -->
-                <div id="next_session_box" class="hidden mt-3.5 pt-3 border-t border-primary/15 flex items-center justify-between gap-2 text-xs">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-secondary"></span>
-                        <span class="text-on-surface-variant">Next:</span>
-                        <span id="next_session_text" class="font-bold text-on-surface truncate">Saturday • Future Dreams (12:00 PM)</span>
+                <!-- Live Target Center Countdown & Arrival Card -->
+                <div id="target_countdown_card" class="hidden mt-4 pt-4 border-t border-primary/20 animate-fade-in">
+                    <div class="flex flex-col gap-3">
+                        <!-- Destination Header & Status -->
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-secondary/15 text-secondary">
+                                        <span class="material-symbols-outlined text-[13px]">pin_drop</span> Target Center
+                                    </span>
+                                    <span id="countdown_status_badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span id="countdown_status_text">Upcoming</span>
+                                    </span>
+                                </div>
+                                <h3 id="target_center_title" class="font-bold text-on-surface text-base sm:text-lg mt-1 truncate">
+                                    Center Name
+                                </h3>
+                                <p id="target_session_timing" class="text-xs text-on-surface-variant flex items-center gap-1 mt-0.5">
+                                    <span class="material-symbols-outlined text-[14px]">calendar_today</span>
+                                    <span id="target_session_day_time">Saturday at 3:30 PM</span>
+                                </p>
+                            </div>
+                            
+                            <a id="target_center_map_link" href="#" target="_blank" class="hidden shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-secondary text-xs font-semibold border border-outline-variant/60 transition-colors">
+                                <span class="material-symbols-outlined text-[16px]">directions</span>
+                                <span>Directions</span>
+                            </a>
+                        </div>
+
+                        <!-- Live Digital Countdown Digits -->
+                        <div class="bg-surface-container-low/90 rounded-2xl p-3 border border-outline-variant/70 shadow-inner">
+                            <div class="text-[11px] font-semibold text-on-surface-variant text-center mb-2 flex items-center justify-center gap-1">
+                                <span class="material-symbols-outlined text-[15px] text-primary">timer</span>
+                                <span id="countdown_label">Time remaining until lecture start:</span>
+                            </div>
+                            <div class="grid grid-cols-4 gap-1.5 sm:gap-2.5 text-center">
+                                <div class="bg-surface-container-lowest rounded-xl py-2 px-1 border border-outline-variant/60 shadow-sm">
+                                    <span id="cd_days" class="block text-xl sm:text-2xl font-black text-on-surface font-mono tracking-tight">00</span>
+                                    <span class="block text-[9px] uppercase font-bold text-outline">Days</span>
+                                </div>
+                                <div class="bg-surface-container-lowest rounded-xl py-2 px-1 border border-outline-variant/60 shadow-sm">
+                                    <span id="cd_hours" class="block text-xl sm:text-2xl font-black text-on-surface font-mono tracking-tight">00</span>
+                                    <span class="block text-[9px] uppercase font-bold text-outline">Hours</span>
+                                </div>
+                                <div class="bg-surface-container-lowest rounded-xl py-2 px-1 border border-outline-variant/60 shadow-sm">
+                                    <span id="cd_mins" class="block text-xl sm:text-2xl font-black text-on-surface font-mono tracking-tight">00</span>
+                                    <span class="block text-[9px] uppercase font-bold text-outline">Mins</span>
+                                </div>
+                                <div class="bg-surface-container-lowest rounded-xl py-2 px-1 border border-outline-variant/60 shadow-sm">
+                                    <span id="cd_secs" class="block text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight animate-pulse">00</span>
+                                    <span class="block text-[9px] uppercase font-bold text-outline">Secs</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Check-In / Arrival Action Button -->
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+                            <div class="text-[11px] text-on-surface-variant flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[15px] text-secondary">location_on</span>
+                                <span id="arrival_status_hint">At the center? Tap to record arrival:</span>
+                            </div>
+                            <button type="button" id="btn_mark_arrived" onclick="handleAssistantCheckIn()" 
+                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all shrink-0">
+                                <span class="material-symbols-outlined text-[17px]">how_to_reg</span>
+                                <span id="btn_mark_arrived_text">I'm Here! Mark Arrived</span>
+                            </button>
+                        </div>
                     </div>
-                    <a id="next_session_map_btn" href="#" target="_blank" class="hidden text-secondary hover:underline font-semibold shrink-0 flex items-center gap-0.5">
-                        <span class="material-symbols-outlined text-[14px]">near_me</span> Map
-                    </a>
                 </div>
             </div>
 
@@ -519,6 +578,16 @@
         let scheduleScope = 'my'; // default to 'my' (friendly personal schedule) or 'all'
         let currentAssistantTab = 'my'; // 'my', 'attended', or 'all'
         let allAttendedLectures = [];
+        let arrivalsChannel = null;
+        if (supabaseClient) {
+            try {
+                arrivalsChannel = supabaseClient.channel('assistant_arrivals');
+                arrivalsChannel.subscribe();
+                window._arrivalsRealtimeChannel = arrivalsChannel;
+            } catch(e) {
+                console.warn("Could not subscribe to arrivals channel:", e);
+            }
+        }
 
         function toggleAssistantPassVisibility() {
             const input = document.getElementById('login_assistant_password');
@@ -1066,6 +1135,277 @@
             renderScheduleList();
         };
 
+        const DAY_TO_JS = {
+            'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6
+        };
+
+        function findNextAssignedSession(sessions) {
+            if (!sessions || sessions.length === 0) return null;
+            const now = new Date();
+            let candidates = [];
+
+            sessions.forEach(session => {
+                const [hStr, mStr] = (session.time || '12:00:00').split(':');
+                const hours = parseInt(hStr, 10) || 12;
+                const minutes = parseInt(mStr, 10) || 0;
+
+                (session.days || []).forEach(dayName => {
+                    const targetDayNum = DAY_TO_JS[dayName.toLowerCase()];
+                    if (targetDayNum === undefined) return;
+
+                    let diffDays = (targetDayNum - now.getDay() + 7) % 7;
+                    let targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffDays, hours, minutes, 0, 0);
+
+                    // If session was today but finished more than 2.5 hours ago, advance by 7 days
+                    const diffMs = targetDate.getTime() - now.getTime();
+                    if (diffDays === 0 && diffMs < -2.5 * 60 * 60 * 1000) {
+                        targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, hours, minutes, 0, 0);
+                    }
+
+                    candidates.push({
+                        session,
+                        dayName,
+                        targetDate
+                    });
+                });
+            });
+
+            if (candidates.length === 0) return null;
+            candidates.sort((a, b) => a.targetDate - b.targetDate);
+            return candidates[0];
+        }
+
+        let _countdownInterval = null;
+        function updateTargetCountdown(targetInfo) {
+            const countdownCard = document.getElementById('target_countdown_card');
+            if (!countdownCard) return;
+
+            if (!targetInfo) {
+                countdownCard.classList.add('hidden');
+                clearInterval(_countdownInterval);
+                window._activeUpcomingSession = null;
+                return;
+            }
+
+            window._activeUpcomingSession = targetInfo;
+            countdownCard.classList.remove('hidden');
+
+            const { session, dayName, targetDate } = targetInfo;
+            const titleEl = document.getElementById('target_center_title');
+            if (titleEl) titleEl.textContent = session.center || 'Center';
+            
+            const timingEl = document.getElementById('target_session_day_time');
+            if (timingEl) timingEl.textContent = `${dayName} at ${formatTime(session.time)}`;
+
+            const mapLink = document.getElementById('target_center_map_link');
+            if (mapLink) {
+                if (session.address && session.address.trim()) {
+                    const addr = session.address.trim();
+                    mapLink.href = addr.startsWith('http') ? addr : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+                    mapLink.classList.remove('hidden');
+                } else {
+                    mapLink.classList.add('hidden');
+                }
+            }
+
+            // Check if already checked in today for this center
+            const todayStr = new Date().toISOString().split('T')[0];
+            const alreadyCheckedIn = allAttendedLectures.some(rec => {
+                const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
+                const rCenter = (rec.center || '').toLowerCase();
+                const sCenter = (session.center || '').toLowerCase();
+                return rDate === todayStr && (rCenter.includes(sCenter) || sCenter.includes(rCenter));
+            });
+
+            const btn = document.getElementById('btn_mark_arrived');
+            const btnText = document.getElementById('btn_mark_arrived_text');
+            const hintEl = document.getElementById('arrival_status_hint');
+
+            if (alreadyCheckedIn) {
+                if (btn) {
+                    btn.className = "px-3.5 py-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0";
+                    btn.disabled = true;
+                }
+                if (btnText) btnText.textContent = "Checked In Today ✅";
+                if (hintEl) hintEl.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">verified</span> You've already checked in today!</span>`;
+            } else {
+                if (btn) {
+                    btn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all shrink-0";
+                    btn.disabled = false;
+                }
+                if (btnText) btnText.textContent = "I'm Here! Mark Arrived";
+                if (hintEl) hintEl.textContent = "At the center? Tap to record arrival:";
+            }
+
+            // Ticker function
+            function tick() {
+                const now = new Date();
+                const diffMs = targetDate.getTime() - now.getTime();
+                const statusBadge = document.getElementById('countdown_status_badge');
+                const statusText = document.getElementById('countdown_status_text');
+                const labelEl = document.getElementById('countdown_label');
+
+                if (diffMs <= 0) {
+                    // Session is in progress
+                    const cdDays = document.getElementById('cd_days');
+                    const cdHours = document.getElementById('cd_hours');
+                    const cdMins = document.getElementById('cd_mins');
+                    const cdSecs = document.getElementById('cd_secs');
+                    if (cdDays) cdDays.textContent = '00';
+                    if (cdHours) cdHours.textContent = '00';
+                    if (cdMins) cdMins.textContent = '00';
+                    if (cdSecs) cdSecs.textContent = '00';
+                    if (labelEl) labelEl.textContent = "🟢 Session is happening now!";
+                    if (statusText) statusText.textContent = "In Progress";
+                    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30";
+                    return;
+                }
+
+                const totalSecs = Math.floor(diffMs / 1000);
+                const days = Math.floor(totalSecs / 86400);
+                const hours = Math.floor((totalSecs % 86400) / 3600);
+                const mins = Math.floor((totalSecs % 3600) / 60);
+                const secs = totalSecs % 60;
+
+                const cdDays = document.getElementById('cd_days');
+                const cdHours = document.getElementById('cd_hours');
+                const cdMins = document.getElementById('cd_mins');
+                const cdSecs = document.getElementById('cd_secs');
+
+                if (cdDays) cdDays.textContent = String(days).padStart(2, '0');
+                if (cdHours) cdHours.textContent = String(hours).padStart(2, '0');
+                if (cdMins) cdMins.textContent = String(mins).padStart(2, '0');
+                if (cdSecs) cdSecs.textContent = String(secs).padStart(2, '0');
+
+                if (labelEl) labelEl.textContent = "Time remaining until lecture start:";
+
+                if (days === 0 && hours === 0 && mins < 30) {
+                    if (statusText) statusText.textContent = `Starting in ${mins}m`;
+                    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30";
+                } else if (days === 0 && hours < 3) {
+                    if (statusText) statusText.textContent = `Starts today in ${hours}h ${mins}m`;
+                    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/15 text-primary border border-primary/20";
+                } else if (days === 0) {
+                    if (statusText) statusText.textContent = "Today";
+                    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20";
+                } else {
+                    if (statusText) statusText.textContent = `Starts in ${days}d ${hours}h`;
+                    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-surface-container-high text-on-surface-variant";
+                }
+            }
+
+            tick();
+            clearInterval(_countdownInterval);
+            _countdownInterval = setInterval(tick, 1000);
+        }
+
+        window.handleAssistantCheckIn = async function() {
+            if (!currentAssistant || !currentAssistant.name) {
+                showToast("Please sign in first", "error");
+                return;
+            }
+            if (!window._activeUpcomingSession) {
+                showToast("No upcoming assigned session found", "error");
+                return;
+            }
+
+            const { session, dayName } = window._activeUpcomingSession;
+            const btn = document.getElementById('btn_mark_arrived');
+            const btnText = document.getElementById('btn_mark_arrived_text');
+
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.innerHTML = `<span class="loading-spinner w-3.5 h-3.5 border-2 inline-block"></span> <span>Checking in...</span>`;
+
+            const now = new Date();
+            const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateFormatted = now.toISOString().split('T')[0];
+            const centerPayload = `${session.center} (${dayName})`;
+
+            try {
+                let insertedId = null;
+                if (supabaseClient) {
+                    const { data, error } = await supabaseClient
+                        .from('attendance')
+                        .insert([{
+                            assistant_name: currentAssistant.name,
+                            center: centerPayload
+                        }])
+                        .select();
+
+                    if (error) {
+                        console.warn("Attendance insert error:", error);
+                    } else if (data && data.length > 0) {
+                        insertedId = data[0].id;
+                    }
+                }
+
+                // Broadcast live event to Admin Board via Realtime channel
+                if (window._arrivalsRealtimeChannel) {
+                    try {
+                        window._arrivalsRealtimeChannel.send({
+                            type: 'broadcast',
+                            event: 'arrival',
+                            payload: {
+                                assistant_name: currentAssistant.name,
+                                center: session.center,
+                                day: dayName,
+                                time: timeFormatted,
+                                timestamp: now.toISOString(),
+                                id: insertedId || Date.now()
+                            }
+                        });
+                    } catch(bcErr) {
+                        console.warn("Broadcast error:", bcErr);
+                    }
+                }
+
+                // Update button UI
+                if (btn) {
+                    btn.className = "px-3.5 py-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0";
+                    btn.disabled = true;
+                }
+                if (btnText) {
+                    btnText.textContent = `Arrived at ${timeFormatted}`;
+                }
+                const hintEl = document.getElementById('arrival_status_hint');
+                if (hintEl) {
+                    hintEl.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">check_circle</span> Arrival confirmed!</span>`;
+                }
+
+                // Save locally to allAttendedLectures
+                allAttendedLectures.unshift({
+                    id: insertedId || Date.now(),
+                    center: session.center,
+                    lecture: session.subject || 'Lecture',
+                    date: dateFormatted,
+                    day: dayName,
+                    bonus: 0,
+                    deduction: 0,
+                    source: 'local',
+                    rawDate: now.toISOString()
+                });
+
+                // Toast
+                showToast(`🎉 Arrival at ${session.center} recorded (${timeFormatted})! Admin notified.`, "success");
+
+                // Badge count
+                const badgeEl = document.getElementById('badge_attended_count');
+                if (badgeEl) {
+                    badgeEl.textContent = allAttendedLectures.length;
+                    badgeEl.classList.remove('hidden');
+                }
+
+                if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]);
+                }
+            } catch(err) {
+                console.error("Check in error:", err);
+                showToast("Could not record arrival. Please try again.", "error");
+                if (btn) btn.disabled = false;
+                if (btnText) btnText.textContent = "I'm Here! Mark Arrived";
+            }
+        };
+
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
             if (!listContainer) return;
@@ -1089,7 +1429,7 @@
                 return myName && (aName.includes(myName) || myName.includes(aName));
             }));
 
-            // Update Hero Banner if in 'my' mode
+            // Update Hero Banner & Live Target Countdown if in 'my' mode
             if (scheduleScope === 'my') {
                 const welcomeNameEl = document.getElementById('welcome_assistant_name');
                 if (welcomeNameEl) welcomeNameEl.textContent = (currentAssistant.name || '').split(' ')[0] || 'Assistant';
@@ -1101,33 +1441,13 @@
                         : `You have no lectures assigned yet. Tap "All Centers" above to explore open slots!`;
                 }
 
-                // Next session highlight
-                const nextSessionBox = document.getElementById('next_session_box');
-                const nextSessionText = document.getElementById('next_session_text');
-                const nextSessionMap = document.getElementById('next_session_map_btn');
-                if (nextSessionBox) {
-                    if (myAssignedLectures.length > 0) {
-                        nextSessionBox.classList.remove('hidden');
-                        const firstSession = myAssignedLectures[0];
-                        const dayName = (firstSession.days && firstSession.days[0]) || 'Upcoming';
-                        if (nextSessionText) {
-                            nextSessionText.textContent = `${dayName} • ${firstSession.center} (${formatTime(firstSession.time)})`;
-                        }
-                        if (nextSessionMap) {
-                            if (firstSession.address && firstSession.address.trim()) {
-                                const addr = firstSession.address.trim();
-                                nextSessionMap.href = addr.startsWith('http') ? addr : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
-                                nextSessionMap.classList.remove('hidden');
-                            } else {
-                                nextSessionMap.classList.add('hidden');
-                            }
-                        }
-                    } else {
-                        nextSessionBox.classList.add('hidden');
-                    }
-                }
+                // Target center upcoming session & countdown
+                const targetUpcomingSession = findNextAssignedSession(myAssignedLectures);
+                updateTargetCountdown(targetUpcomingSession);
 
                 baseList = myAssignedLectures;
+            } else {
+                updateTargetCountdown(null);
             }
 
             if (searchVal) {
