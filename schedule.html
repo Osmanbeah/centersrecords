@@ -206,157 +206,195 @@
     </div>
 
     <!-- Top Header -->
-    <header class="w-full bg-surface-container-lowest border-b border-outline-variant py-3 px-margin-mobile flex flex-col gap-3 sticky top-0 z-10 shadow-sm">
-        <div class="flex items-center justify-between max-w-2xl mx-auto w-full">
-            <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-primary text-[24px]">event_available</span>
-                <h1 class="font-headline-md text-primary text-base sm:text-lg">Assistant Schedule</h1>
-            </div>
-            
-            <div class="flex items-center gap-1.5 ml-2">
-
-                <button onclick="showQRCode()" class="bg-primary text-on-primary px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 transition-colors flex items-center gap-1 shrink-0">
-                    <span class="material-symbols-outlined text-[16px]">qr_code_2</span>
-                    <span class="hidden sm:inline">Show ID</span>
-                    <span class="sm:hidden">ID</span>
-                </button>
-            </div>
-            
-            <!-- User Status & Logout -->
-            <div class="flex items-center gap-2">
-                <div class="flex items-center gap-1.5 bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/60">
-                    <span class="material-symbols-outlined text-[16px] text-secondary">account_circle</span>
-                    <span id="current_assistant_name" class="text-xs font-semibold text-on-surface max-w-[120px] sm:max-w-[160px] truncate">Assistant</span>
+    <header class="w-full bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/80 py-2.5 px-margin-mobile sticky top-0 z-20 shadow-sm">
+        <div class="max-w-2xl mx-auto w-full flex flex-col gap-2.5">
+            <!-- Row 1: Brand + Live Status + User Profile -->
+            <div class="flex items-center justify-between">
+                <!-- Brand & Live status -->
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined text-[20px]">calendar_month</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-bold text-on-surface text-sm sm:text-base leading-none">Assistant Hub</span>
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Live
+                            </span>
+                        </div>
+                    </div>
                 </div>
-                <button onclick="logoutAssistant()" title="Log Out" class="text-error hover:bg-error-container/30 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold">
-                    <span class="material-symbols-outlined text-[16px]">logout</span>
-                    <span class="hidden sm:inline">Logout</span>
-                </button>
-            </div>
-        </div>
 
-        <!-- Main Navigation Tabs: Upcoming Schedule vs Attended Lectures -->
-        <div class="flex items-center justify-center p-1 bg-surface-container-high rounded-2xl max-w-md mx-auto w-full border border-outline-variant/60 shadow-sm">
-            <button type="button" id="tab_btn_schedule" onclick="switchAssistantTab('schedule')" 
-                class="flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">calendar_month</span>
-                <span>Upcoming Schedule</span>
-            </button>
-            <button type="button" id="tab_btn_attended" onclick="switchAssistantTab('attended')" 
-                class="flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
-                <span class="material-symbols-outlined text-[18px]">verified</span>
-                <span>Attended Lectures</span>
-                <span id="badge_attended_count" class="hidden ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary/10 text-primary"></span>
-            </button>
-        </div>
-
-        <!-- Scope Switcher: My Sessions vs All Sessions (Schedule tab only) -->
-        <div id="schedule_scope_wrapper" class="flex items-center justify-center p-1 bg-surface-container rounded-xl max-w-md mx-auto w-full">
-            <button type="button" id="btn_scope_my" onclick="setScope('my')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
-                <span class="material-symbols-outlined text-[16px]">person</span>
-                <span>My Assigned Sessions</span>
-            </button>
-            <button type="button" id="btn_scope_all" onclick="setScope('all')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm">
-                <span class="material-symbols-outlined text-[16px]">groups</span>
-                <span>All Center Sessions</span>
-            </button>
-        </div>
-        
-        <!-- Filter/Search (Schedule tab only) -->
-        <div id="schedule_search_wrapper" class="relative max-w-md mx-auto w-full flex flex-col gap-2">
-            <div class="relative w-full">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span class="material-symbols-outlined text-on-surface-variant text-[18px]">search</span>
+                <!-- User Controls: Show ID button + Name & Logout -->
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="showQRCode()" 
+                        class="bg-primary/10 text-primary hover:bg-primary hover:text-on-primary transition-all px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 border border-primary/20 shrink-0">
+                        <span class="material-symbols-outlined text-[16px]">qr_code_2</span>
+                        <span class="hidden sm:inline">Show QR ID</span>
+                        <span class="sm:hidden">ID</span>
+                    </button>
+                    
+                    <div class="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-xl border border-outline-variant/60">
+                        <span class="material-symbols-outlined text-[16px] text-secondary">account_circle</span>
+                        <span id="current_assistant_name" class="text-xs font-semibold text-on-surface max-w-[90px] sm:max-w-[130px] truncate">Assistant</span>
+                        <button type="button" onclick="logoutAssistant()" title="Log Out" class="text-on-surface-variant hover:text-error ml-1 p-0.5 rounded transition-colors flex items-center">
+                            <span class="material-symbols-outlined text-[16px]">logout</span>
+                        </button>
+                    </div>
                 </div>
-                <input type="text" id="assistant_search" placeholder="Search by name, subject, or center..." class="block w-full bg-surface-container-low border border-outline-variant rounded-full py-1.5 pl-9 pr-4 text-xs text-on-surface focus:outline-none focus:border-primary-fixed-dim focus:ring-1 focus:ring-primary-fixed-dim transition-colors">
             </div>
-            <div class="relative w-full hidden" id="dropdown_wrapper">
-                <select id="assistant_dropdown" class="block w-full bg-surface-container-low border border-outline-variant rounded-full py-1.5 pl-4 pr-10 text-xs text-on-surface focus:outline-none focus:border-primary-fixed-dim appearance-none">
-                    <option value="">Or select an assistant name...</option>
-                </select>
-            </div>
+
+            <!-- Row 2: 3-Segment Friendly Primary Navigation -->
+            <nav class="flex items-center justify-center p-1 bg-surface-container rounded-2xl max-w-md mx-auto w-full border border-outline-variant/60">
+                <button type="button" id="tab_nav_my" onclick="selectAssistantTab('my')" 
+                    class="flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm">
+                    <span class="material-symbols-outlined text-[17px]">person</span>
+                    <span>My Schedule</span>
+                </button>
+                <button type="button" id="tab_nav_attended" onclick="selectAssistantTab('attended')" 
+                    class="flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
+                    <span class="material-symbols-outlined text-[17px]">verified</span>
+                    <span>Attended</span>
+                    <span id="badge_attended_count" class="hidden ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary/10 text-primary"></span>
+                </button>
+                <button type="button" id="tab_nav_all" onclick="selectAssistantTab('all')" 
+                    class="flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
+                    <span class="material-symbols-outlined text-[17px]">explore</span>
+                    <span>All Centers</span>
+                </button>
+            </nav>
         </div>
     </header>
 
     <!-- Main Content Canvas -->
     <main class="flex-grow px-margin-mobile pt-stack-md pb-stack-lg max-w-2xl mx-auto w-full">
         
-        <!-- Status Indicator -->
-        <div id="connection_status" class="flex items-center justify-center gap-2 mb-4 text-xs font-label-md text-on-surface-variant">
+        <!-- Subtle Status Indicator (Only shown if reconnecting/error) -->
+        <div id="connection_status" class="hidden items-center justify-center gap-2 mb-3 text-xs font-medium text-on-surface-variant">
             <div class="w-2 h-2 rounded-full bg-outline-variant" id="status_dot"></div>
-            <span id="status_text">Connecting to schedule...</span>
+            <span id="status_text">Syncing schedule...</span>
         </div>
 
-        <!-- =================== VIEW: SCHEDULE =================== -->
-        <div id="view_schedule" class="flex flex-col gap-4">
-            <!-- Date Selector Pills -->
-            <div id="date_selector_container" class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        <!-- =================== VIEW: SCHEDULE (My Schedule or All Centers) =================== -->
+        <div id="view_schedule" class="flex flex-col gap-3.5">
+            
+            <!-- Friendly Hero Welcome Card (Only in 'My Schedule' tab) -->
+            <div id="hero_welcome_section" class="bg-gradient-to-br from-primary/10 via-surface-container-lowest to-secondary/10 border border-primary/20 rounded-2xl p-4 sm:p-5 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="space-y-1">
+                        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/15 text-primary">
+                            <span class="material-symbols-outlined text-[13px]">waving_hand</span>
+                            <span>Welcome</span>
+                        </div>
+                        <h2 class="text-base sm:text-lg font-bold text-on-surface">Hello, <span id="welcome_assistant_name">Assistant</span>! 👋</h2>
+                        <p id="welcome_schedule_summary" class="text-xs text-on-surface-variant">Here are your assigned lectures for this week.</p>
+                    </div>
+                    <button type="button" onclick="showQRCode()" class="shrink-0 bg-primary text-on-primary hover:bg-primary/90 active:scale-95 transition-all px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+                        <span class="material-symbols-outlined text-[17px]">qr_code_2</span>
+                        <span class="hidden sm:inline">Check-in QR</span>
+                        <span class="sm:hidden">QR</span>
+                    </button>
+                </div>
+
+                <!-- Next Up Session Highlight (if assigned) -->
+                <div id="next_session_box" class="hidden mt-3.5 pt-3 border-t border-primary/15 flex items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-secondary"></span>
+                        <span class="text-on-surface-variant">Next:</span>
+                        <span id="next_session_text" class="font-bold text-on-surface truncate">Saturday • Future Dreams (12:00 PM)</span>
+                    </div>
+                    <a id="next_session_map_btn" href="#" target="_blank" class="hidden text-secondary hover:underline font-semibold shrink-0 flex items-center gap-0.5">
+                        <span class="material-symbols-outlined text-[14px]">near_me</span> Map
+                    </a>
+                </div>
             </div>
 
+            <!-- Search Bar (Only shown in 'All Centers' tab) -->
+            <div id="all_centers_search_section" class="hidden relative w-full">
+                <div class="relative w-full">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+                        <span class="material-symbols-outlined text-[18px]">search</span>
+                    </div>
+                    <input type="text" id="assistant_search" placeholder="Search centers, subjects, or assistants..." 
+                        class="block w-full bg-surface-container-lowest border border-outline-variant/80 rounded-2xl py-2.5 pl-10 pr-9 text-xs text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm transition-all">
+                    <button type="button" id="clear_search_btn" onclick="clearSearch()" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface">
+                        <span class="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Date Selector Pills -->
+            <div id="date_selector_container" class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            </div>
+
+            <!-- Loading Spinner -->
             <div id="schedule_loading" class="flex justify-center py-12">
                 <div class="loading-spinner"></div>
             </div>
 
             <!-- Schedule List -->
-            <div id="schedule_list" class="flex flex-col gap-stack-md">
-                <!-- Populated from Supabase -->
+            <div id="schedule_list" class="flex flex-col gap-3">
+                <!-- Populated dynamically -->
             </div>
         </div>
 
         <!-- =================== VIEW: ATTENDED LECTURES =================== -->
-        <div id="view_attended_lectures" class="hidden flex flex-col gap-4">
-            <!-- Summary Stats Card -->
-            <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant shadow-sm">
+        <div id="view_attended_lectures" class="hidden flex flex-col gap-3.5">
+            <!-- Summary Rewards Card -->
+            <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant/80 shadow-sm">
                 <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                        <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                            <span class="material-symbols-outlined text-[20px]">workspace_premium</span>
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[22px]">workspace_premium</span>
                         </div>
                         <div>
-                            <h2 class="text-sm font-bold text-on-surface">Attended Lectures Record</h2>
-                            <p class="text-[11px] text-on-surface-variant">Summary of your completed sessions and adjustments</p>
+                            <h2 class="text-sm sm:text-base font-bold text-on-surface">Your Attendance & Rewards</h2>
+                            <p class="text-[11px] text-on-surface-variant">Verified completed sessions and adjustments</p>
                         </div>
                     </div>
                     <button type="button" onclick="fetchAttendedLectures(true)" title="Refresh attendance"
-                        class="p-2 rounded-xl text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors">
-                        <span class="material-symbols-outlined text-[18px]">refresh</span>
+                        class="px-2.5 py-1.5 rounded-xl text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors text-xs font-semibold flex items-center gap-1 border border-outline-variant/60">
+                        <span class="material-symbols-outlined text-[16px]">refresh</span>
+                        <span class="hidden sm:inline">Refresh</span>
                     </button>
                 </div>
 
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <!-- Friendly 3-Column Stats -->
+                <div class="grid grid-cols-3 gap-2.5">
                     <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
-                        <span class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-0.5">Attended</span>
+                        <span class="text-[11px] font-semibold text-on-surface-variant mb-0.5">Attended</span>
                         <span id="stat_attended_count" class="text-xl font-bold text-primary font-mono">0</span>
-                        <span class="text-[10px] text-on-surface-variant">Lectures</span>
+                        <span class="text-[10px] text-on-surface-variant">Sessions</span>
                     </div>
 
-                    <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
-                        <span class="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider mb-0.5">Total Bonus</span>
-                        <span id="stat_total_bonus" class="text-xl font-bold text-emerald-600 font-mono">+0</span>
+                    <div class="bg-emerald-50/60 dark:bg-emerald-950/20 rounded-xl p-3 border border-emerald-200/70 dark:border-emerald-800/40 flex flex-col items-center text-center">
+                        <span class="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">Total Bonus</span>
+                        <span id="stat_total_bonus" class="text-xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">+0</span>
                         <span class="text-[10px] text-emerald-600/80">EGP</span>
                     </div>
 
                     <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
-                        <span class="text-[10px] font-semibold text-rose-700 uppercase tracking-wider mb-0.5">Deductions</span>
-                        <span id="stat_total_deduction" class="text-xl font-bold text-rose-600 font-mono">-0</span>
-                        <span class="text-[10px] text-rose-600/80">EGP</span>
-                    </div>
-
-                    <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 flex flex-col items-center text-center">
-                        <span class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-0.5">Net Adjustment</span>
+                        <span class="text-[11px] font-semibold text-on-surface-variant mb-0.5">Net Rewards</span>
                         <span id="stat_net_adjustment" class="text-xl font-bold text-on-surface font-mono">0</span>
                         <span class="text-[10px] text-on-surface-variant">EGP</span>
                     </div>
                 </div>
+
+                <!-- Subtle Deduction Notice (Only appears if deductions exist) -->
+                <div id="deduction_notice_wrapper" class="hidden mt-3 pt-2.5 border-t border-outline-variant/40 flex items-center justify-between text-xs text-rose-600">
+                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">info</span> Deductions:</span>
+                    <span id="stat_total_deduction" class="font-bold font-mono">-0 EGP</span>
+                </div>
             </div>
 
-            <!-- Search & Filter bar for attended lectures -->
+            <!-- Search bar for attended lectures -->
             <div class="relative w-full">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span class="material-symbols-outlined text-on-surface-variant text-[18px]">search</span>
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-on-surface-variant">
+                    <span class="material-symbols-outlined text-[18px]">search</span>
                 </div>
-                <input type="text" id="attended_search" oninput="renderAttendedList()" placeholder="Search attended lectures by center or date..."
-                    class="block w-full bg-surface-container-low border border-outline-variant rounded-xl py-2 pl-9 pr-4 text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors">
+                <input type="text" id="attended_search" oninput="renderAttendedList()" placeholder="Search attended sessions by center or date..."
+                    class="block w-full bg-surface-container-lowest border border-outline-variant/80 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm transition-all">
             </div>
 
             <!-- Attended Lectures List Loading Spinner -->
@@ -478,7 +516,9 @@
         }
 
         let currentAssistant = { name: '', email: '' };
-        let scheduleScope = 'all'; // 'my' (only assigned sessions) or 'all'
+        let scheduleScope = 'my'; // default to 'my' (friendly personal schedule) or 'all'
+        let currentAssistantTab = 'my'; // 'my', 'attended', or 'all'
+        let allAttendedLectures = [];
 
         function toggleAssistantPassVisibility() {
             const input = document.getElementById('login_assistant_password');
@@ -507,6 +547,9 @@
                     
                     const nameEl = document.getElementById('current_assistant_name');
                     if (nameEl) nameEl.textContent = name;
+                    const welcomeNameEl = document.getElementById('welcome_assistant_name');
+                    if (welcomeNameEl) welcomeNameEl.textContent = name.split(' ')[0] || 'Assistant';
+
                     if (overlay) overlay.classList.add('hidden');
                     return true;
                 } else {
@@ -560,6 +603,8 @@
                 currentAssistant = { name, email };
                 const nameEl = document.getElementById('current_assistant_name');
                 if (nameEl) nameEl.textContent = name;
+                const welcomeNameEl = document.getElementById('welcome_assistant_name');
+                if (welcomeNameEl) welcomeNameEl.textContent = name.split(' ')[0] || 'Assistant';
 
                 document.getElementById('assistant-auth-view').classList.add('hidden');
                 fetchSchedule();
@@ -573,37 +618,58 @@
             }
         });
 
-        // =================== TAB SWITCHING ===================
-        let currentAssistantTab = 'schedule'; // 'schedule' or 'attended'
-        let allAttendedLectures = [];
-
-        function switchAssistantTab(tab) {
+        // =================== FRIENDLY TAB SWITCHING ===================
+        function selectAssistantTab(tab) {
             currentAssistantTab = tab;
-            const btnSched = document.getElementById('tab_btn_schedule');
-            const btnAttended = document.getElementById('tab_btn_attended');
+            const btnMy = document.getElementById('tab_nav_my');
+            const btnAttended = document.getElementById('tab_nav_attended');
+            const btnAll = document.getElementById('tab_nav_all');
+            
             const viewSched = document.getElementById('view_schedule');
             const viewAttended = document.getElementById('view_attended_lectures');
-            const scopeWrapper = document.getElementById('schedule_scope_wrapper');
-            const searchWrapper = document.getElementById('schedule_search_wrapper');
+            const heroSection = document.getElementById('hero_welcome_section');
+            const searchSection = document.getElementById('all_centers_search_section');
 
-            if (tab === 'schedule') {
-                btnSched.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
-                btnAttended.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface";
+            // Reset tab button styles
+            [btnMy, btnAttended, btnAll].forEach(b => {
+                if (b) b.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface";
+            });
+
+            if (tab === 'my') {
+                if (btnMy) btnMy.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
+                scheduleScope = 'my';
                 viewSched.classList.remove('hidden');
                 viewAttended.classList.add('hidden');
-                if (scopeWrapper) scopeWrapper.classList.remove('hidden');
-                if (searchWrapper) searchWrapper.classList.remove('hidden');
-            } else {
-                btnAttended.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
-                btnSched.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface";
-                viewAttended.classList.remove('hidden');
+                if (heroSection) heroSection.classList.remove('hidden');
+                if (searchSection) searchSection.classList.add('hidden');
+                renderDayPills();
+                renderScheduleList();
+            } else if (tab === 'attended') {
+                if (btnAttended) btnAttended.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
                 viewSched.classList.add('hidden');
-                if (scopeWrapper) scopeWrapper.classList.add('hidden');
-                if (searchWrapper) searchWrapper.classList.add('hidden');
-
+                viewAttended.classList.remove('hidden');
                 fetchAttendedLectures();
+            } else if (tab === 'all') {
+                if (btnAll) btnAll.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
+                scheduleScope = 'all';
+                viewSched.classList.remove('hidden');
+                viewAttended.classList.add('hidden');
+                if (heroSection) heroSection.classList.add('hidden');
+                if (searchSection) searchSection.classList.remove('hidden');
+                renderDayPills();
+                renderScheduleList();
             }
         }
+
+        // Backward compatibility helpers
+        window.switchAssistantTab = function(tab) {
+            if (tab === 'schedule') selectAssistantTab('my');
+            else if (tab === 'attended') selectAssistantTab('attended');
+            else selectAssistantTab(tab);
+        };
+        window.setScope = function(scope) {
+            selectAssistantTab(scope === 'all' ? 'all' : 'my');
+        };
 
         // =================== ATTENDED LECTURES LOGIC ===================
         async function fetchAttendedLectures(forceRefresh = false) {
@@ -764,27 +830,37 @@
 
             document.getElementById('stat_attended_count').textContent = allAttendedLectures.length;
             document.getElementById('stat_total_bonus').textContent = `+${totalBonus}`;
-            document.getElementById('stat_total_deduction').textContent = `-${totalDeduct}`;
             const netEl = document.getElementById('stat_net_adjustment');
             netEl.textContent = (netAdj > 0 ? `+${netAdj}` : `${netAdj}`);
             if (netAdj > 0) {
-                netEl.className = "text-xl font-bold text-emerald-600 font-mono";
+                netEl.className = "text-xl font-bold text-emerald-600 dark:text-emerald-400 font-mono";
             } else if (netAdj < 0) {
                 netEl.className = "text-xl font-bold text-rose-600 font-mono";
             } else {
                 netEl.className = "text-xl font-bold text-on-surface font-mono";
             }
 
+            const deductNotice = document.getElementById('deduction_notice_wrapper');
+            const statDeductEl = document.getElementById('stat_total_deduction');
+            if (deductNotice && statDeductEl) {
+                if (totalDeduct > 0) {
+                    deductNotice.classList.remove('hidden');
+                    statDeductEl.textContent = `-${totalDeduct} EGP`;
+                } else {
+                    deductNotice.classList.add('hidden');
+                }
+            }
+
             if (filtered.length === 0) {
                 listEl.innerHTML = `
-                    <div class="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/60 text-center flex flex-col items-center justify-center gap-3">
+                    <div class="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/60 text-center flex flex-col items-center justify-center gap-3 animate-fade-in">
                         <div class="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center text-outline">
                             <span class="material-symbols-outlined text-[32px]">event_busy</span>
                         </div>
                         <div>
-                            <h3 class="font-headline-sm text-on-surface text-sm font-bold">No Attended Lectures Found</h3>
+                            <h3 class="font-headline-sm text-on-surface text-sm font-bold">No Attended Sessions Found</h3>
                             <p class="text-xs text-on-surface-variant max-w-xs mt-1">
-                                ${searchVal ? 'No records match your search criteria.' : 'Lectures you attend and complete with the Admin will appear here with bonuses and deductions.'}
+                                ${searchVal ? 'No records match your search criteria.' : 'Lectures you attend and complete with the Admin will appear here with your bonuses and attendance details.'}
                             </p>
                         </div>
                     </div>
@@ -794,22 +870,22 @@
 
             listEl.innerHTML = filtered.map(item => {
                 const bonusBadge = item.bonus > 0 
-                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200">
                          <span class="material-symbols-outlined text-[14px]">arrow_upward</span>
                          +${item.bonus} EGP Bonus
                        </span>` 
                     : '';
                 
                 const deductBadge = item.deduction > 0
-                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200">
                          <span class="material-symbols-outlined text-[14px]">arrow_downward</span>
                          -${item.deduction} EGP Deduct
                        </span>`
                     : '';
 
                 const noAdjustBadge = (!item.bonus && !item.deduction)
-                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant border border-outline-variant/50">
-                         Standard (No Adjustments)
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant border border-outline-variant/50">
+                         Standard Attendance
                        </span>`
                     : '';
 
@@ -817,7 +893,7 @@
                 const dayLabel = item.day ? `• ${item.day}` : '';
 
                 return `
-                    <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant shadow-sm hover:border-primary/40 transition-all">
+                    <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant/80 shadow-sm hover:shadow-md hover:border-primary/40 transition-all">
                         <div class="flex items-start justify-between gap-3 mb-2.5">
                             <div class="flex items-center gap-2.5">
                                 <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -846,7 +922,7 @@
                                 ${noAdjustBadge}
                             </div>
                             <div class="text-[11px] text-outline flex items-center gap-1">
-                                <span class="material-symbols-outlined text-[13px]">schedule</span>
+                                <span class="material-symbols-outlined text-[13px]">verified_user</span>
                                 <span>Verified by Admin</span>
                             </div>
                         </div>
@@ -863,20 +939,6 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
-        }
-
-        function setScope(scope) {
-            scheduleScope = scope;
-            const btnMy = document.getElementById('btn_scope_my');
-            const btnAll = document.getElementById('btn_scope_all');
-            if (scope === 'my') {
-                btnMy.className = "flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
-                btnAll.className = "flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface";
-            } else {
-                btnAll.className = "flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
-                btnMy.className = "flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface";
-            }
-            renderScheduleList();
         }
 
         let allSchedules = [];
@@ -959,26 +1021,40 @@
             const pillsContainer = document.getElementById('date_selector_container');
             if (!pillsContainer) return;
 
+            const myName = (currentAssistant.name || '').toLowerCase();
+            let sourceList = allSchedules;
+            if (scheduleScope === 'my' && myName) {
+                sourceList = allSchedules.filter(s => (s.assistants || []).some(a => {
+                    const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
+                    return aName.includes(myName) || myName.includes(aName);
+                }));
+            }
+
             const daysList = ['all', ...WEEK_DAYS];
             pillsContainer.innerHTML = daysList.map(d => {
                 const isSelected = selectedDayFilter === d;
                 let count = 0;
                 if (d === 'all') {
-                    count = allSchedules.length;
+                    count = sourceList.length;
                 } else {
-                    count = allSchedules.filter(s => (s.days || []).includes(d)).length;
+                    count = sourceList.filter(s => (s.days || []).includes(d)).length;
                 }
 
-                const label = d === 'all' ? 'All Days' : d;
+                const isZeroInMy = (scheduleScope === 'my' && count === 0 && d !== 'all');
+                const label = d === 'all' ? 'All Days' : d.substring(0, 3);
+                const fullLabel = d === 'all' ? 'All Days' : d;
+                
                 const activeClass = isSelected
                     ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "bg-surface-container-low text-on-surface hover:bg-surface-container border border-outline-variant/60";
+                    : (isZeroInMy 
+                        ? "bg-surface-container-low/40 text-outline border border-outline-variant/30 opacity-60"
+                        : "bg-surface-container-lowest text-on-surface hover:bg-surface-container border border-outline-variant/60");
 
                 return `
-                    <button type="button" onclick="selectDayFilter('${d}')"
+                    <button type="button" onclick="selectDayFilter('${d}')" title="${fullLabel}"
                         class="px-3.5 py-1.5 rounded-full text-xs shrink-0 flex items-center gap-1.5 transition-all ${activeClass}">
                         <span>${label}</span>
-                        <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-surface-variant text-on-surface-variant'}">${count}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-white/20 text-white' : 'bg-surface-container text-on-surface-variant'}">${count}</span>
                     </button>
                 `;
             }).join('');
@@ -992,29 +1068,75 @@
 
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
-            const searchVal = document.getElementById('assistant_search').value.toLowerCase().trim();
-            const dropdownVal = document.getElementById('assistant_dropdown').value.toLowerCase();
-            const activeFilter = searchVal || dropdownVal;
+            if (!listContainer) return;
+
+            const searchInput = document.getElementById('assistant_search');
+            const searchVal = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+            // Update Clear Search Button visibility
+            const clearBtn = document.getElementById('clear_search_btn');
+            if (clearBtn) {
+                if (searchVal.length > 0) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
 
             let baseList = [...allSchedules];
 
-            if (scheduleScope === 'my' && currentAssistant.name) {
-                const myName = currentAssistant.name.toLowerCase();
-                baseList = baseList.filter(s => {
-                    return (s.assistants || []).some(a => {
-                        const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                        return aName.includes(myName) || myName.includes(aName);
-                    });
-                });
+            // Calculate assistant's assigned lectures for Hero banner & Next Session highlight
+            const myName = (currentAssistant.name || '').toLowerCase();
+            const myAssignedLectures = allSchedules.filter(s => (s.assistants || []).some(a => {
+                const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
+                return myName && (aName.includes(myName) || myName.includes(aName));
+            }));
+
+            // Update Hero Banner if in 'my' mode
+            if (scheduleScope === 'my') {
+                const welcomeNameEl = document.getElementById('welcome_assistant_name');
+                if (welcomeNameEl) welcomeNameEl.textContent = (currentAssistant.name || '').split(' ')[0] || 'Assistant';
+
+                const summaryEl = document.getElementById('welcome_schedule_summary');
+                if (summaryEl) {
+                    summaryEl.textContent = myAssignedLectures.length > 0
+                        ? `You have ${myAssignedLectures.length} lecture session${myAssignedLectures.length > 1 ? 's' : ''} assigned this week.`
+                        : `You have no lectures assigned yet. Tap "All Centers" above to explore open slots!`;
+                }
+
+                // Next session highlight
+                const nextSessionBox = document.getElementById('next_session_box');
+                const nextSessionText = document.getElementById('next_session_text');
+                const nextSessionMap = document.getElementById('next_session_map_btn');
+                if (nextSessionBox) {
+                    if (myAssignedLectures.length > 0) {
+                        nextSessionBox.classList.remove('hidden');
+                        const firstSession = myAssignedLectures[0];
+                        const dayName = (firstSession.days && firstSession.days[0]) || 'Upcoming';
+                        if (nextSessionText) {
+                            nextSessionText.textContent = `${dayName} • ${firstSession.center} (${formatTime(firstSession.time)})`;
+                        }
+                        if (nextSessionMap) {
+                            if (firstSession.address && firstSession.address.trim()) {
+                                const addr = firstSession.address.trim();
+                                nextSessionMap.href = addr.startsWith('http') ? addr : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+                                nextSessionMap.classList.remove('hidden');
+                            } else {
+                                nextSessionMap.classList.add('hidden');
+                            }
+                        }
+                    } else {
+                        nextSessionBox.classList.add('hidden');
+                    }
+                }
+
+                baseList = myAssignedLectures;
             }
 
-            if (activeFilter) {
+            if (searchVal) {
                 baseList = baseList.filter(s => {
                     const matchAssistant = (s.assistants || []).some(a => {
                         const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                        return aName.includes(activeFilter);
+                        return aName.includes(searchVal);
                     });
-                    const matchCenter = (s.center || '').toLowerCase().includes(activeFilter);
+                    const matchCenter = (s.center || '').toLowerCase().includes(searchVal);
                     return matchAssistant || matchCenter;
                 });
             }
@@ -1028,12 +1150,13 @@
                 if (dayLectures.length === 0) return;
 
                 totalRendered += dayLectures.length;
-
-                // Sort by lecture time
                 dayLectures.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
                 const cardsHtml = dayLectures.map(item => {
-                    const amAssigned = item.assistants && item.assistants.includes(currentAssistant.name);
+                    const amAssigned = myName && (item.assistants || []).some(a => {
+                        const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
+                        return aName.includes(myName) || myName.includes(aName);
+                    });
                     const isPending = myPendingRequestIds.has(item.id);
                     const daysStr = (item.days || []).join(', ');
 
@@ -1046,9 +1169,9 @@
 
                         locationButton = `
                             <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" 
-                                class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-container text-on-primary hover:bg-secondary active:scale-95 transition-all text-xs font-semibold shadow-sm shrink-0">
-                                <span class="material-symbols-outlined text-[16px]">location_on</span>
-                                <span>Center Location</span>
+                                class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 shadow-sm transition-all shrink-0">
+                                <span class="material-symbols-outlined text-[15px] text-primary">near_me</span>
+                                <span>Directions</span>
                             </a>
                         `;
                     }
@@ -1056,56 +1179,90 @@
                     let actionButton = '';
                     if (amAssigned) {
                         actionButton = `
-                            <span class="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0">
-                                <span class="material-symbols-outlined text-[16px]">check_circle</span> Assigned
+                            <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-300/80 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm shrink-0">
+                                <span class="material-symbols-outlined text-[16px]">verified</span> You're Assigned
                             </span>
                         `;
                     } else if (isPending) {
                         actionButton = `
-                            <span class="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0">
-                                <span class="material-symbols-outlined text-[16px]">hourglass_top</span> Requested
+                            <span class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-300/80 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm shrink-0">
+                                <span class="material-symbols-outlined text-[16px]">hourglass_top</span> Request Pending
                             </span>
                         `;
                     } else {
                         actionButton = `
                             <button onclick="pickLecture('${item.id}')" 
-                                class="bg-primary text-on-primary px-3.5 py-1.5 rounded-xl text-xs font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all flex items-center gap-1 shrink-0">
+                                class="bg-primary text-on-primary px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm hover:bg-primary/90 active:scale-95 transition-all flex items-center gap-1.5 shrink-0">
                                 <span class="material-symbols-outlined text-[16px]">add_circle</span> Pick Lecture
                             </button>
                         `;
                     }
 
-                    const assistantsTags = (item.assistants || []).map(a => {
-                        const isMatch = searchVal && a.toLowerCase().includes(searchVal);
-                        const tagClass = isMatch 
-                            ? "inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container px-2.5 py-1 rounded-lg text-xs font-semibold border border-secondary"
-                            : "inline-flex items-center gap-1 bg-surface-variant text-on-surface px-2.5 py-1 rounded-lg text-xs border border-outline-variant/50";
-                        return `<span class="${tagClass}">${a}</span>`;
-                    }).join('');
+                    // Friendly Co-assistants summary
+                    let teamHtml = '';
+                    if (item.assistants && item.assistants.length > 0) {
+                        if (amAssigned) {
+                            const coAssistants = item.assistants
+                                .filter(a => {
+                                    const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
+                                    return !aName.includes(myName) && !myName.includes(aName);
+                                })
+                                .map(a => typeof a === 'object' ? a.name : a);
+
+                            if (coAssistants.length > 0) {
+                                teamHtml = `
+                                    <div class="text-xs text-on-surface-variant flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[15px] text-outline">group</span>
+                                        <span>With you: <strong class="text-on-surface font-medium">${coAssistants.join(', ')}</strong></span>
+                                    </div>
+                                `;
+                            } else {
+                                teamHtml = `
+                                    <div class="text-xs text-on-surface-variant flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[15px] text-outline">person</span>
+                                        <span>Assigned solo</span>
+                                    </div>
+                                `;
+                            }
+                        } else {
+                            const namesList = item.assistants.map(a => typeof a === 'object' ? a.name : a).join(', ');
+                            teamHtml = `
+                                <div class="text-xs text-on-surface-variant flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[15px] text-outline">group</span>
+                                    <span class="truncate max-w-sm">Assigned: <strong class="text-on-surface font-medium">${namesList}</strong></span>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        teamHtml = `
+                            <div class="text-xs text-on-surface-variant italic flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px] text-outline">person_outline</span>
+                                <span>No assistants assigned yet</span>
+                            </div>
+                        `;
+                    }
 
                     return `
-                    <article class="bg-surface-container-lowest rounded-xl border border-outline-variant/80 p-4 shadow-sm relative transition-all duration-200 hover:border-primary/40">
-                        <div class="flex flex-col sm:flex-row justify-between gap-3">
+                    <article class="bg-surface-container-lowest rounded-2xl border border-outline-variant/80 p-4 sm:p-5 shadow-sm relative transition-all duration-200 hover:shadow-md hover:border-primary/40">
+                        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3.5">
                             <div class="space-y-2 flex-grow">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <h3 class="font-body-lg font-bold text-on-surface text-base leading-tight">${item.center}</h3>
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary/10 text-secondary text-xs font-semibold">
+                                    <h3 class="font-bold text-on-surface text-base sm:text-lg leading-snug">${escapeHtml(item.center)}</h3>
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-secondary/10 text-secondary text-xs font-bold shrink-0">
                                         <span class="material-symbols-outlined text-[14px]">schedule</span>
                                         ${formatTime(item.time)}
                                     </span>
                                 </div>
                                 
                                 <div class="text-xs text-on-surface-variant flex items-center gap-1.5">
-                                    <span class="material-symbols-outlined text-[16px] text-outline">repeat</span>
-                                    <span>Recurring: ${daysStr}</span>
+                                    <span class="material-symbols-outlined text-[15px] text-outline">calendar_today</span>
+                                    <span>Recurring: <strong class="text-on-surface font-semibold">${daysStr}</strong></span>
                                 </div>
 
-                                <div class="flex flex-wrap gap-1.5 pt-1">
-                                    ${assistantsTags || '<span class="text-xs text-on-surface-variant italic">No assistants assigned yet</span>'}
-                                </div>
+                                ${teamHtml}
                             </div>
                             
-                            <div class="flex sm:flex-col justify-end sm:justify-center items-center gap-2 border-t sm:border-t-0 sm:border-l border-outline-variant/30 pt-3 sm:pt-0 sm:pl-3 mt-1 sm:mt-0">
+                            <div class="flex sm:flex-col justify-end sm:justify-center items-center gap-2 border-t sm:border-t-0 sm:border-l border-outline-variant/30 pt-3 sm:pt-0 sm:pl-3">
                                 ${actionButton}
                                 ${locationButton}
                             </div>
@@ -1115,15 +1272,15 @@
                 }).join('');
 
                 sectionsHtml.push(`
-                    <section class="mb-6">
-                        <div class="flex items-center justify-between pb-2 mb-3 border-b border-outline-variant/60">
+                    <section class="mb-4">
+                        <div class="flex items-center justify-between pb-2 mb-2.5 border-b border-outline-variant/60">
                             <div class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
-                                <h2 class="font-headline-sm font-bold text-on-surface text-sm sm:text-base">${day}</h2>
+                                <span class="material-symbols-outlined text-primary text-[18px]">calendar_month</span>
+                                <h2 class="font-bold text-on-surface text-sm sm:text-base">${day}</h2>
                             </div>
-                            <span class="bg-primary/10 text-primary text-[11px] font-semibold px-2 py-0.5 rounded-full">${dayLectures.length} lecture${dayLectures.length > 1 ? 's' : ''}</span>
+                            <span class="bg-primary/10 text-primary text-[11px] font-bold px-2.5 py-0.5 rounded-full">${dayLectures.length} session${dayLectures.length > 1 ? 's' : ''}</span>
                         </div>
-                        <div class="space-y-3">
+                        <div class="space-y-2.5">
                             ${cardsHtml}
                         </div>
                     </section>
@@ -1131,26 +1288,56 @@
             });
 
             if (totalRendered === 0) {
-                const emptyMsg = selectedDayFilter === 'all' 
-                    ? (scheduleScope === 'my' ? `No assigned sessions found for ${currentAssistant.name || 'you'}.` : 'No assignments found.')
-                    : `No lectures scheduled on ${selectedDayFilter}.`;
-
-                listContainer.innerHTML = `
-                <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center mt-4 shadow-sm">
-                    <span class="material-symbols-outlined text-[48px] text-outline-variant mb-2">event_busy</span>
-                    <p class="text-on-surface font-body-lg font-medium">${emptyMsg}</p>
-                    ${scheduleScope === 'my' ? `
-                        <button type="button" onclick="setScope('all')" class="mt-4 px-4 py-2 bg-secondary text-on-secondary rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-secondary/90 transition-colors shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">groups</span>
-                            <span>View All Center Schedules</span>
+                if (scheduleScope === 'my') {
+                    listContainer.innerHTML = `
+                    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/70 p-8 text-center my-4 shadow-sm flex flex-col items-center gap-3 animate-fade-in">
+                        <div class="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[32px]">event_available</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-on-surface text-base">No Lectures Scheduled Yet</h3>
+                            <p class="text-xs text-on-surface-variant max-w-sm mt-1">
+                                You don't have any lectures assigned for ${selectedDayFilter === 'all' ? 'this week' : selectedDayFilter}. Tap below to browse all center schedules and request open sessions.
+                            </p>
+                        </div>
+                        <button type="button" onclick="selectAssistantTab('all')" class="mt-2 px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold inline-flex items-center gap-1.5 hover:bg-primary/90 active:scale-95 transition-all shadow-sm">
+                            <span class="material-symbols-outlined text-[16px]">explore</span>
+                            <span>Explore All Centers</span>
                         </button>
-                    ` : ''}
-                </div>`;
+                    </div>`;
+                } else {
+                    listContainer.innerHTML = `
+                    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/70 p-8 text-center my-4 shadow-sm flex flex-col items-center gap-3 animate-fade-in">
+                        <div class="w-14 h-14 rounded-2xl bg-surface-container text-outline flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[32px]">search_off</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-on-surface text-base">No Sessions Found</h3>
+                            <p class="text-xs text-on-surface-variant max-w-sm mt-1">
+                                No sessions match "${escapeHtml(searchVal || selectedDayFilter)}". Try resetting your filters.
+                            </p>
+                        </div>
+                        <button type="button" onclick="clearSearch()" class="mt-2 px-4 py-2 bg-surface-container text-on-surface rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-surface-container-high transition-colors border border-outline-variant/60">
+                            <span class="material-symbols-outlined text-[16px]">refresh</span>
+                            <span>Clear Filters</span>
+                        </button>
+                    </div>`;
+                }
                 return;
             }
 
             listContainer.innerHTML = sectionsHtml.join('');
         }
+
+        window.clearSearch = function() {
+            const searchInput = document.getElementById('assistant_search');
+            if (searchInput) searchInput.value = '';
+            const clearBtn = document.getElementById('clear_search_btn');
+            if (clearBtn) clearBtn.classList.add('hidden');
+            selectedDayFilter = 'all';
+            renderDayPills();
+            renderScheduleList();
+        };
 
         let pendingPickScheduleId = null;
 
@@ -1249,14 +1436,28 @@
             dropdown.value = currentVal;
         }
 
-        document.getElementById('assistant_search').addEventListener('input', () => {
-            renderScheduleList();
-        });
+        const searchInputEl = document.getElementById('assistant_search');
+        if (searchInputEl) {
+            searchInputEl.addEventListener('input', () => {
+                const clearBtn = document.getElementById('clear_search_btn');
+                if (clearBtn) {
+                    if (searchInputEl.value.trim().length > 0) {
+                        clearBtn.classList.remove('hidden');
+                    } else {
+                        clearBtn.classList.add('hidden');
+                    }
+                }
+                renderScheduleList();
+            });
+        }
         
-        document.getElementById('assistant_dropdown').addEventListener('change', () => {
-            document.getElementById('assistant_search').value = '';
-            renderScheduleList();
-        });
+        const dropdownEl = document.getElementById('assistant_dropdown');
+        if (dropdownEl) {
+            dropdownEl.addEventListener('change', () => {
+                if (searchInputEl) searchInputEl.value = '';
+                renderScheduleList();
+            });
+        }
 
         if (supabaseClient) {
             supabaseClient
