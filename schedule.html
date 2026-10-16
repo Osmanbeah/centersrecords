@@ -266,8 +266,9 @@
                 <button type="button" id="tab_nav_attended" onclick="selectAssistantTab('attended')" 
                     class="flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
                     <span class="material-symbols-outlined text-[17px]">verified</span>
-                    <span>Attended</span>
-                    <span id="badge_attended_count" class="hidden ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-primary/10 text-primary"></span>
+                    <span class="hidden sm:inline">Attended Lectures</span>
+                    <span class="sm:hidden">Attended</span>
+                    <span id="badge_attended_count" class="hidden ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary"></span>
                 </button>
                 <button type="button" id="tab_nav_all" onclick="selectAssistantTab('all')" 
                     class="flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-on-surface-variant hover:text-on-surface">
@@ -300,6 +301,13 @@
                         </div>
                         <h2 class="text-base sm:text-lg font-bold text-on-surface">Hello, <span id="welcome_assistant_name">Assistant</span>! 👋</h2>
                         <p id="welcome_schedule_summary" class="text-xs text-on-surface-variant">Here are your assigned lectures for this week.</p>
+                        <div class="pt-1 flex items-center gap-2 flex-wrap">
+                            <button type="button" onclick="selectAssistantTab('attended')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 text-xs font-semibold text-on-surface transition-all active:scale-95 shadow-sm">
+                                <span class="material-symbols-outlined text-[15px] text-emerald-600">verified</span>
+                                <span id="hero_attended_badge_text">Attended Lectures</span>
+                                <span class="material-symbols-outlined text-[14px] text-outline">arrow_forward</span>
+                            </button>
+                        </div>
                     </div>
                     <button type="button" onclick="showQRCode()" class="shrink-0 bg-primary text-on-primary hover:bg-primary/90 active:scale-95 transition-all px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm">
                         <span class="material-symbols-outlined text-[17px]">qr_code_2</span>
@@ -451,6 +459,45 @@
             <div id="schedule_list" class="flex flex-col gap-3">
                 <!-- Populated dynamically -->
             </div>
+
+            <!-- Attended Lectures Dashboard Section (In 'My Schedule' Dashboard) -->
+            <div id="home_attended_section" class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant/80 shadow-sm mt-2 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">history_edu</span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm sm:text-base font-bold text-on-surface">Attended Lectures</h3>
+                                <span id="home_attended_count_badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">0</span>
+                            </div>
+                            <p class="text-[11px] text-on-surface-variant">Your completed sessions, verified arrivals & rewards</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="selectAssistantTab('attended')" class="text-xs font-bold text-primary hover:underline flex items-center gap-1 shrink-0 px-2.5 py-1 rounded-lg hover:bg-primary/5 transition-colors">
+                        <span>View All History</span>
+                        <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+                    </button>
+                </div>
+
+                <!-- 2-Stat Summary Bar -->
+                <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                    <div class="bg-surface-container-low rounded-xl p-2.5 border border-outline-variant/40 flex flex-col items-center">
+                        <span class="text-[10px] text-on-surface-variant">This Month Attended</span>
+                        <span id="home_stat_month_attended" class="font-bold text-primary text-base font-mono">0</span>
+                    </div>
+                    <div class="bg-surface-container-low rounded-xl p-2.5 border border-outline-variant/40 flex flex-col items-center">
+                        <span class="text-[10px] text-on-surface-variant">Net Rewards Earned</span>
+                        <span id="home_stat_month_rewards" class="font-bold text-emerald-600 dark:text-emerald-400 text-base font-mono">0 EGP</span>
+                    </div>
+                </div>
+
+                <!-- Recent Attended Cards Container -->
+                <div id="home_recent_attended_list" class="flex flex-col gap-2 mt-0.5">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
         </div>
 
         <!-- =================== VIEW: ATTENDED LECTURES =================== -->
@@ -463,8 +510,8 @@
                             <span class="material-symbols-outlined text-[22px]">workspace_premium</span>
                         </div>
                         <div>
-                            <h2 class="text-sm sm:text-base font-bold text-on-surface">Your Attendance & Rewards</h2>
-                            <p class="text-[11px] text-on-surface-variant">Verified completed sessions and adjustments</p>
+                            <h2 class="text-sm sm:text-base font-bold text-on-surface">Your Attended Lectures & Rewards</h2>
+                            <p class="text-[11px] text-on-surface-variant">All lectures you attended with verified arrivals, bonuses & deductions</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -812,6 +859,7 @@
             const viewAttended = document.getElementById('view_attended_lectures');
             const heroSection = document.getElementById('hero_welcome_section');
             const searchSection = document.getElementById('all_centers_search_section');
+            const homeAttended = document.getElementById('home_attended_section');
 
             // Reset tab button styles
             [btnMy, btnAttended, btnAll].forEach(b => {
@@ -825,8 +873,10 @@
                 viewAttended.classList.add('hidden');
                 if (heroSection) heroSection.classList.remove('hidden');
                 if (searchSection) searchSection.classList.add('hidden');
+                if (homeAttended) homeAttended.classList.remove('hidden');
                 renderDayPills();
                 renderScheduleList();
+                if (typeof renderHomeAttendedPreview === 'function') renderHomeAttendedPreview();
             } else if (tab === 'attended') {
                 if (btnAttended) btnAttended.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
                 viewSched.classList.add('hidden');
@@ -839,6 +889,7 @@
                 viewAttended.classList.add('hidden');
                 if (heroSection) heroSection.classList.add('hidden');
                 if (searchSection) searchSection.classList.remove('hidden');
+                if (homeAttended) homeAttended.classList.add('hidden');
                 renderDayPills();
                 renderScheduleList();
             }
@@ -855,13 +906,43 @@
         };
 
         // =================== ATTENDED LECTURES LOGIC ===================
+        function matchesAssistant(rowName, rowEmail, myName, myEmail) {
+            const rName = (rowName || '').trim().toLowerCase();
+            const rEmail = (rowEmail || '').trim().toLowerCase();
+            const cName = (myName || '').trim().toLowerCase();
+            const cEmail = (myEmail || '').trim().toLowerCase();
+
+            if (!cName && !cEmail) return true; // If no user specified, fallback
+            if (cEmail && rEmail && cEmail === rEmail) return true;
+            if (cName && rName) {
+                if (cName === rName) return true;
+                if (rName.includes(cName) || cName.includes(rName)) return true;
+                const cParts = cName.split(/\s+/).filter(p => p.length > 2);
+                const rParts = rName.split(/\s+/).filter(p => p.length > 2);
+                if (cParts.some(cp => rParts.includes(cp))) return true;
+            }
+            if (cEmail && rName) {
+                const prefix = cEmail.split('@')[0].toLowerCase();
+                if (prefix.length > 2 && (rName.includes(prefix) || prefix.includes(rName))) return true;
+            }
+            return false;
+        }
+
         async function fetchAttendedLectures(forceRefresh = false) {
             const loading = document.getElementById('attended_loading');
-            if (loading) loading.classList.remove('hidden');
+            if (loading && currentAssistantTab === 'attended') loading.classList.remove('hidden');
 
             try {
-                const astName = (currentAssistant.name || '').trim().toLowerCase();
-                const astEmail = (currentAssistant.email || '').trim().toLowerCase();
+                // Ensure currentAssistant is loaded
+                if ((!currentAssistant || !currentAssistant.name) && localStorage.getItem('cached_current_assistant')) {
+                    try {
+                        const parsed = JSON.parse(localStorage.getItem('cached_current_assistant'));
+                        if (parsed && (parsed.name || parsed.email)) currentAssistant = parsed;
+                    } catch(e) {}
+                }
+
+                const astName = (currentAssistant.name || '').trim();
+                const astEmail = (currentAssistant.email || '').trim();
 
                 let combinedRecords = [];
                 const seenKeys = new Set();
@@ -876,40 +957,59 @@
 
                         if (!error && Array.isArray(supaLogs)) {
                             supaLogs.forEach(row => {
-                                const rName = (row.assistant_name || '').trim().toLowerCase();
-                                // Check if this log belongs to current assistant
-                                if (!astName || rName === astName || (astEmail && rName.includes(astName)) || astName.includes(rName)) {
+                                if (matchesAssistant(row.assistant_name, row.assistant_email, astName, astEmail)) {
                                     let centerName = row.center || 'Center';
                                     let lectureName = 'Regular Lecture';
                                     let dateStr = row.created_at ? row.created_at.split('T')[0] : '';
-                                    let dayStr = '';
-                                    let bonus = 0;
-                                    let deduction = 0;
+                                    let dayStr = row.day || '';
+                                    let bonus = parseFloat(row.bonus) || 0;
+                                    let deduction = parseFloat(row.deduction) || 0;
+                                    let arrivalTime = '';
 
-                                    // Parse enriched JSON center metadata if present
-                                    if (typeof row.center === 'string' && row.center.trim().startsWith('{')) {
+                                    if (row.created_at) {
                                         try {
-                                            const meta = JSON.parse(row.center);
-                                            centerName = meta.c || centerName;
-                                            dayStr = meta.d || '';
-                                            dateStr = meta.dt || dateStr;
-                                            bonus = parseFloat(meta.b) || 0;
-                                            deduction = parseFloat(meta.ded) || 0;
-                                            lectureName = meta.l || lectureName;
+                                            const d = new Date(row.created_at);
+                                            if (!isNaN(d.getTime())) {
+                                                arrivalTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                            }
                                         } catch(e) {}
                                     }
+                                    if (row.arrival_time) arrivalTime = row.arrival_time;
 
-                                    const uniqueKey = `${dateStr}_${centerName}_${row.id || Math.random()}`;
+                                    // Parse enriched JSON center metadata if present
+                                    if (typeof row.center === 'string') {
+                                        const trimmed = row.center.trim();
+                                        if (trimmed.startsWith('{')) {
+                                            try {
+                                                const meta = JSON.parse(trimmed);
+                                                centerName = meta.c || centerName;
+                                                dayStr = meta.d || dayStr;
+                                                dateStr = meta.dt || dateStr;
+                                                bonus = parseFloat(meta.b) || bonus;
+                                                deduction = parseFloat(meta.ded) || deduction;
+                                                lectureName = meta.l || lectureName;
+                                            } catch(e) {}
+                                        } else {
+                                            const parenMatch = trimmed.match(/^(.*?)\s*\(([^)]+)\)$/);
+                                            if (parenMatch) {
+                                                centerName = parenMatch[1].trim();
+                                                if (!dayStr) dayStr = parenMatch[2].trim();
+                                            }
+                                        }
+                                    }
+
+                                    const uniqueKey = `${dateStr}_${centerName}_${dayStr}`;
                                     if (!seenKeys.has(uniqueKey)) {
                                         seenKeys.add(uniqueKey);
                                         combinedRecords.push({
-                                            id: row.id,
+                                            id: row.id || uniqueKey,
                                             center: centerName,
                                             lecture: lectureName,
                                             date: dateStr,
                                             day: dayStr,
                                             bonus: bonus,
                                             deduction: deduction,
+                                            arrivalTime: arrivalTime,
                                             source: 'cloud',
                                             rawDate: row.created_at || dateStr
                                         });
@@ -922,41 +1022,48 @@
                     }
                 }
 
-                // 2. Fetch from Local Storage Admin session records (ct_entries) if on same browser/device
+                // 2. Fetch from Local Storage Admin session records (ct_entries)
                 try {
                     const localEntries = JSON.parse(localStorage.getItem('ct_entries')) || [];
                     localEntries.forEach(entry => {
                         const isPresent = (entry.present || []).some(n => 
-                            n && astName && (n.toLowerCase() === astName || n.toLowerCase().includes(astName) || astName.includes(n.toLowerCase()))
+                            matchesAssistant(n, '', astName, astEmail)
                         );
 
                         if (isPresent) {
-                            // Find matching adjustment
                             let matchedName = (entry.present || []).find(n => 
-                                n && astName && (n.toLowerCase() === astName || n.toLowerCase().includes(astName) || astName.includes(n.toLowerCase()))
+                                matchesAssistant(n, '', astName, astEmail)
                             );
                             const adj = (entry.adjustments && matchedName && entry.adjustments[matchedName]) || {};
                             const bonus = parseFloat(adj.bonus) || 0;
                             const deduction = parseFloat(adj.deduction) || 0;
                             const dateStr = entry.date || (entry.createdAt ? entry.createdAt.split('T')[0] : '');
+                            let cName = entry.center || 'Center';
+                            let dStr = entry.day || '';
 
-                            const uniqueKey = `${dateStr}_${entry.center}_${entry.day}`;
-                            // If not already in list, or update bonuses/deductions for matching date & center
-                            const existingIdx = combinedRecords.findIndex(r => r.date === dateStr && r.center.toLowerCase() === (entry.center || '').toLowerCase());
+                            const parenMatch = cName.match(/^(.*?)\s*\(([^)]+)\)$/);
+                            if (parenMatch) {
+                                cName = parenMatch[1].trim();
+                                if (!dStr) dStr = parenMatch[2].trim();
+                            }
+
+                            const uniqueKey = `${dateStr}_${cName}_${dStr}`;
+                            const existingIdx = combinedRecords.findIndex(r => r.date === dateStr && r.center.toLowerCase() === cName.toLowerCase());
                             if (existingIdx >= 0) {
                                 if (bonus > 0) combinedRecords[existingIdx].bonus = bonus;
                                 if (deduction > 0) combinedRecords[existingIdx].deduction = deduction;
-                                if (entry.day && !combinedRecords[existingIdx].day) combinedRecords[existingIdx].day = entry.day;
+                                if (dStr && !combinedRecords[existingIdx].day) combinedRecords[existingIdx].day = dStr;
                             } else if (!seenKeys.has(uniqueKey)) {
                                 seenKeys.add(uniqueKey);
                                 combinedRecords.push({
                                     id: entry.id || uniqueKey,
-                                    center: entry.center || 'Center',
+                                    center: cName,
                                     lecture: 'Session Lecture',
                                     date: dateStr,
-                                    day: entry.day || '',
+                                    day: dStr,
                                     bonus: bonus,
                                     deduction: deduction,
+                                    arrivalTime: '',
                                     source: 'local',
                                     rawDate: entry.createdAt || dateStr
                                 });
@@ -967,12 +1074,49 @@
                     console.warn("Could not read ct_entries:", e);
                 }
 
+                // 3. Fetch from offline attendance queue if any local scans pending
+                try {
+                    const offlineQueue = JSON.parse(localStorage.getItem('offline_attendance_queue')) || [];
+                    offlineQueue.forEach(item => {
+                        if (matchesAssistant(item.assistant_name, '', astName, astEmail)) {
+                            const scanDate = item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
+                            let cName = item.center || 'Center';
+                            let dStr = item.day || '';
+                            const parenMatch = cName.match(/^(.*?)\s*\(([^)]+)\)$/);
+                            if (parenMatch) {
+                                cName = parenMatch[1].trim();
+                                if (!dStr) dStr = parenMatch[2].trim();
+                            }
+                            const uniqueKey = `${scanDate}_${cName}_${dStr}`;
+                            if (!seenKeys.has(uniqueKey)) {
+                                seenKeys.add(uniqueKey);
+                                let arrTime = '';
+                                if (item.created_at) {
+                                    try { arrTime = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch(e){}
+                                }
+                                combinedRecords.push({
+                                    id: uniqueKey,
+                                    center: cName,
+                                    lecture: 'Scanned Session',
+                                    date: scanDate,
+                                    day: dStr,
+                                    bonus: 0,
+                                    deduction: 0,
+                                    arrivalTime: arrTime,
+                                    source: 'offline',
+                                    rawDate: item.created_at || scanDate
+                                });
+                            }
+                        }
+                    });
+                } catch(e) {}
+
                 // Sort by date descending
                 combinedRecords.sort((a, b) => (b.date || b.rawDate || '').localeCompare(a.date || a.rawDate || ''));
 
                 allAttendedLectures = combinedRecords;
 
-                // Update badge
+                // Update badge in top navigation
                 const badge = document.getElementById('badge_attended_count');
                 if (badge) {
                     if (allAttendedLectures.length > 0) {
@@ -983,10 +1127,118 @@
                     }
                 }
 
+                updateAttendedMonthOptions();
                 renderAttendedList();
+                renderHomeAttendedPreview();
             } finally {
                 if (loading) loading.classList.add('hidden');
             }
+        }
+
+        function updateAttendedMonthOptions() {
+            const sel = document.getElementById('attended_month_filter');
+            if (!sel) return;
+            const currentVal = sel.value;
+            const months = new Set();
+            allAttendedLectures.forEach(r => {
+                const d = r.date || (r.rawDate ? r.rawDate.split('T')[0] : '');
+                if (d && d.length >= 7) months.add(d.slice(0, 7));
+            });
+            const sorted = Array.from(months).sort().reverse();
+            let html = `<option value="CURRENT">This Month</option>`;
+            sorted.forEach(m => {
+                const [y, mo] = m.split('-');
+                const d = new Date(parseInt(y, 10), parseInt(mo, 10) - 1, 1);
+                const name = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                html += `<option value="${m}">${name}</option>`;
+            });
+            html += `<option value="ALL">All Time</option>`;
+            sel.innerHTML = html;
+            if (Array.from(sel.options).some(o => o.value === currentVal)) {
+                sel.value = currentVal;
+            }
+        }
+
+        function renderHomeAttendedPreview() {
+            const previewContainer = document.getElementById('home_recent_attended_list');
+            if (!previewContainer) return;
+
+            const currentYearMonth = new Date().toISOString().slice(0, 7);
+            const monthRecords = allAttendedLectures.filter(item => {
+                const dateStr = item.date || (item.rawDate ? item.rawDate.split('T')[0] : '');
+                return dateStr.startsWith(currentYearMonth);
+            });
+
+            // Update badges and counts
+            const countBadge = document.getElementById('home_attended_count_badge');
+            if (countBadge) countBadge.textContent = monthRecords.length;
+
+            const heroBadgeText = document.getElementById('hero_attended_badge_text');
+            if (heroBadgeText) {
+                heroBadgeText.textContent = `${monthRecords.length} Attended This Month`;
+            }
+
+            const monthAttendedEl = document.getElementById('home_stat_month_attended');
+            if (monthAttendedEl) monthAttendedEl.textContent = monthRecords.length;
+
+            let totalBonus = 0;
+            let totalDeduct = 0;
+            monthRecords.forEach(r => {
+                totalBonus += r.bonus || 0;
+                totalDeduct += r.deduction || 0;
+            });
+            const netReward = totalBonus - totalDeduct;
+            const rewardsEl = document.getElementById('home_stat_month_rewards');
+            if (rewardsEl) {
+                rewardsEl.textContent = (netReward >= 0 ? `+${netReward}` : `${netReward}`) + " EGP";
+                rewardsEl.className = netReward > 0 
+                    ? "font-bold text-emerald-600 dark:text-emerald-400 text-base font-mono"
+                    : (netReward < 0 ? "font-bold text-rose-600 text-base font-mono" : "font-bold text-on-surface text-base font-mono");
+            }
+
+            if (allAttendedLectures.length === 0) {
+                previewContainer.innerHTML = `
+                    <div class="bg-surface-container-low/60 rounded-xl p-4 text-center border border-outline-variant/40 flex flex-col items-center gap-2">
+                        <span class="material-symbols-outlined text-[24px] text-outline">event_available</span>
+                        <p class="text-xs text-on-surface font-semibold">No attended lectures yet.</p>
+                        <p class="text-[11px] text-on-surface-variant max-w-xs">When you attend a lecture and check in with your QR badge, your verified attendance, bonuses, and arrival times will be recorded here.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Show top 3 recent attended lectures
+            const recent = allAttendedLectures.slice(0, 3);
+            previewContainer.innerHTML = recent.map(item => {
+                const bonusText = item.bonus > 0 ? `<span class="text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 px-2 py-0.5 rounded-md text-[10px]">+${item.bonus} EGP</span>` : '';
+                const deductText = item.deduction > 0 ? `<span class="text-rose-700 dark:text-rose-400 font-bold bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 px-2 py-0.5 rounded-md text-[10px]">-${item.deduction} EGP</span>` : '';
+                const standardText = (!item.bonus && !item.deduction) ? `<span class="text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-md text-[10px] font-medium">Standard</span>` : '';
+                const timeText = item.arrivalTime ? `• ⏰ ${escapeHtml(item.arrivalTime)}` : '';
+                const dayText = item.day ? `• ${escapeHtml(item.day)}` : '';
+
+                return `
+                    <div class="flex items-center justify-between gap-2.5 p-3 rounded-xl bg-surface-container-low border border-outline-variant/40 hover:border-primary/40 transition-all">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                                <span class="material-symbols-outlined text-[18px]">verified</span>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-on-surface truncate">${escapeHtml(item.center)}</p>
+                                <p class="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5 truncate">
+                                    <span>${escapeHtml(item.date || 'Recorded')}</span>
+                                    <span>${dayText}</span>
+                                    <span>${timeText}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${bonusText}
+                            ${deductText}
+                            ${standardText}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function renderAttendedList() {
@@ -1001,6 +1253,11 @@
                 monthRecords = allAttendedLectures.filter(item => {
                     const dateStr = item.date || (item.rawDate ? item.rawDate.split('T')[0] : '');
                     return dateStr.startsWith(currentYearMonth);
+                });
+            } else if (monthFilter !== 'ALL') {
+                monthRecords = allAttendedLectures.filter(item => {
+                    const dateStr = item.date || (item.rawDate ? item.rawDate.split('T')[0] : '');
+                    return dateStr.startsWith(monthFilter);
                 });
             }
 
@@ -1064,14 +1321,14 @@
 
             listEl.innerHTML = filtered.map(item => {
                 const bonusBadge = item.bonus > 0 
-                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200">
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
                          <span class="material-symbols-outlined text-[14px]">arrow_upward</span>
                          +${item.bonus} EGP Bonus
                        </span>` 
                     : '';
                 
                 const deductBadge = item.deduction > 0
-                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200">
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50">
                          <span class="material-symbols-outlined text-[14px]">arrow_downward</span>
                          -${item.deduction} EGP Deduct
                        </span>`
@@ -1085,6 +1342,10 @@
 
                 const formattedDate = item.date ? item.date : 'Recorded';
                 const dayLabel = item.day ? `• ${item.day}` : '';
+                const timeLabel = item.arrivalTime ? `• ⏰ ${item.arrivalTime}` : '';
+                const sourceBadge = item.source === 'offline'
+                    ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">cloud_sync</span> Offline Sync</span>`
+                    : `<span class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">verified</span> Attended</span>`;
 
                 return `
                     <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant/80 shadow-sm hover:shadow-md hover:border-primary/40 transition-all">
@@ -1095,17 +1356,15 @@
                                 </div>
                                 <div>
                                     <h3 class="font-headline-sm font-bold text-on-surface text-sm sm:text-base leading-snug">${escapeHtml(item.center)}</h3>
-                                    <div class="flex items-center gap-1.5 text-xs text-on-surface-variant mt-0.5">
+                                    <div class="flex items-center gap-1.5 text-xs text-on-surface-variant mt-0.5 flex-wrap">
                                         <span class="material-symbols-outlined text-[14px] text-outline">calendar_today</span>
                                         <span>${escapeHtml(formattedDate)}</span>
                                         ${dayLabel ? `<span class="font-medium text-primary">${escapeHtml(dayLabel)}</span>` : ''}
+                                        ${timeLabel ? `<span class="text-on-surface-variant font-medium">${escapeHtml(timeLabel)}</span>` : ''}
                                     </div>
                                 </div>
                             </div>
-                            <span class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold bg-secondary/10 text-secondary border border-secondary/20 flex items-center gap-1">
-                                <span class="material-symbols-outlined text-[13px]">verified</span>
-                                <span>Attended</span>
-                            </span>
+                            ${sourceBadge}
                         </div>
 
                         <!-- Adjustments & Details Row -->
@@ -1117,7 +1376,7 @@
                             </div>
                             <div class="text-[11px] text-outline flex items-center gap-1">
                                 <span class="material-symbols-outlined text-[13px]">verified_user</span>
-                                <span>Verified by Admin</span>
+                                <span>Recorded & Verified</span>
                             </div>
                         </div>
                     </div>
