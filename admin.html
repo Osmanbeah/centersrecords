@@ -2944,8 +2944,8 @@
                 .subscribe();
 
             // Instant broadcast channel for assistant check-in arrivals (<50ms response)
-            supabaseClient
-                .channel('assistant_arrivals')
+            window.adminArrivalsChannel = supabaseClient.channel('assistant_arrivals');
+            window.adminArrivalsChannel
                 .on('broadcast', { event: 'arrival' }, ({ payload }) => {
                     if (payload) {
                         triggerArrivalAlert(payload);
@@ -3159,6 +3159,26 @@
                     center: `${center} (${day})`,
                     time: timeStr
                 });
+
+                // Broadcast instantly to the assistant's phone to stop their countdown
+                if (window.adminArrivalsChannel) {
+                    try {
+                        window.adminArrivalsChannel.send({
+                            type: 'broadcast',
+                            event: 'arrival',
+                            payload: {
+                                assistant_name: assistantName,
+                                center: center,
+                                day: day,
+                                time: timeStr,
+                                timestamp: now.toISOString()
+                            }
+                        });
+                    } catch(bcErr) {
+                        console.warn("Broadcast error from admin:", bcErr);
+                    }
+                }
+
                 fetchAttendance();
             } catch(e) {
                 console.error(e);

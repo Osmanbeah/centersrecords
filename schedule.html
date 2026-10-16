@@ -327,8 +327,8 @@
                             </a>
                         </div>
 
-                        <!-- Live Digital Countdown Digits -->
-                        <div class="bg-surface-container-low/90 rounded-2xl p-3 border border-outline-variant/70 shadow-inner">
+                        <!-- Live Digital Countdown Digits (Active until scanned) -->
+                        <div id="target_countdown_digits_box" class="bg-surface-container-low/90 rounded-2xl p-3 border border-outline-variant/70 shadow-inner">
                             <div class="text-[11px] font-semibold text-on-surface-variant text-center mb-2 flex items-center justify-center gap-1">
                                 <span class="material-symbols-outlined text-[15px] text-primary">timer</span>
                                 <span id="countdown_label">Time remaining until lecture start:</span>
@@ -353,17 +353,34 @@
                             </div>
                         </div>
 
-                        <!-- Check-In / Arrival Action Button -->
-                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
-                            <div class="text-[11px] text-on-surface-variant flex items-center gap-1">
-                                <span class="material-symbols-outlined text-[15px] text-secondary">location_on</span>
-                                <span id="arrival_status_hint">At the center? Tap to record arrival:</span>
+                        <!-- Scan Prompt Bar (Shown until scanned) -->
+                        <div id="scanner_checkin_hint_box" class="flex items-center justify-between gap-2 pt-1 border-t border-outline-variant/40">
+                            <div class="text-[11px] text-on-surface-variant flex items-center gap-1.5 min-w-0">
+                                <span class="material-symbols-outlined text-[16px] text-secondary shrink-0">qr_code_scanner</span>
+                                <span class="truncate">Counter stops when Admin scans your QR ID</span>
                             </div>
-                            <button type="button" id="btn_mark_arrived" onclick="handleAssistantCheckIn()" 
-                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all shrink-0">
-                                <span class="material-symbols-outlined text-[17px]">how_to_reg</span>
-                                <span id="btn_mark_arrived_text">I'm Here! Mark Arrived</span>
+                            <button type="button" onclick="showQRCode()" class="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition-colors shrink-0">
+                                <span class="material-symbols-outlined text-[15px]">qr_code_2</span>
+                                <span>Show QR ID</span>
                             </button>
+                        </div>
+
+                        <!-- Verified Arrival Card (Appears immediately when scanned by admin, replacing countdown) -->
+                        <div id="arrived_success_box" class="hidden bg-emerald-500/10 border-2 border-emerald-500/30 rounded-2xl p-4 text-center animate-fade-in space-y-2.5">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto ring-4 ring-emerald-500/20">
+                                <span class="material-symbols-outlined text-[28px]">verified</span>
+                            </div>
+                            <div>
+                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                                    <span class="material-symbols-outlined text-[12px]">how_to_reg</span> Attendance Verified
+                                </span>
+                                <h4 class="font-bold text-on-surface text-base sm:text-lg mt-1">Arrival Recorded!</h4>
+                                <p class="text-xs text-on-surface-variant">The admin scanned your QR badge and your arrival was saved.</p>
+                            </div>
+                            <div class="inline-flex items-center gap-1.5 bg-surface-container-lowest px-3 py-1.5 rounded-xl border border-emerald-500/30 text-xs font-bold text-emerald-700 dark:text-emerald-300 shadow-sm">
+                                <span class="material-symbols-outlined text-[16px] text-emerald-600">schedule</span>
+                                <span>Arrived at: <span id="arrived_exact_time">10:45 AM</span></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -582,6 +599,17 @@
         if (supabaseClient) {
             try {
                 arrivalsChannel = supabaseClient.channel('assistant_arrivals');
+                arrivalsChannel.on('broadcast', { event: 'arrival' }, ({ payload }) => {
+                    if (payload && currentAssistant && currentAssistant.name) {
+                        const myName = currentAssistant.name.trim().toLowerCase();
+                        const pName = (payload.assistant_name || '').trim().toLowerCase();
+                        if (pName && (pName === myName || pName.includes(myName) || myName.includes(pName))) {
+                            if (typeof markArrivedOnPhone === 'function') {
+                                markArrivedOnPhone(payload.time, payload.center);
+                            }
+                        }
+                    }
+                });
                 arrivalsChannel.subscribe();
                 window._arrivalsRealtimeChannel = arrivalsChannel;
             } catch(e) {
@@ -1210,39 +1238,43 @@
 
             // Check if already checked in today for this center
             const todayStr = new Date().toISOString().split('T')[0];
-            const alreadyCheckedIn = allAttendedLectures.some(rec => {
+            const alreadyCheckedIn = allAttendedLectures.find(rec => {
                 const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
                 const rCenter = (rec.center || '').toLowerCase();
                 const sCenter = (session.center || '').toLowerCase();
                 return rDate === todayStr && (rCenter.includes(sCenter) || sCenter.includes(rCenter));
             });
 
-            const btn = document.getElementById('btn_mark_arrived');
-            const btnText = document.getElementById('btn_mark_arrived_text');
-            const hintEl = document.getElementById('arrival_status_hint');
+            const digitsBox = document.getElementById('target_countdown_digits_box');
+            const hintBox = document.getElementById('scanner_checkin_hint_box');
+            const successBox = document.getElementById('arrived_success_box');
+            const statusBadge = document.getElementById('countdown_status_badge');
+            const statusText = document.getElementById('countdown_status_text');
 
             if (alreadyCheckedIn) {
-                if (btn) {
-                    btn.className = "px-3.5 py-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0";
-                    btn.disabled = true;
-                }
-                if (btnText) btnText.textContent = "Checked In Today ✅";
-                if (hintEl) hintEl.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">verified</span> You've already checked in today!</span>`;
-            } else {
-                if (btn) {
-                    btn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all shrink-0";
-                    btn.disabled = false;
-                }
-                if (btnText) btnText.textContent = "I'm Here! Mark Arrived";
-                if (hintEl) hintEl.textContent = "At the center? Tap to record arrival:";
+                clearInterval(_countdownInterval);
+                if (digitsBox) digitsBox.classList.add('hidden');
+                if (hintBox) hintBox.classList.add('hidden');
+                if (successBox) successBox.classList.remove('hidden');
+
+                const recTime = alreadyCheckedIn.arrival_time || (alreadyCheckedIn.rawDate ? new Date(alreadyCheckedIn.rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today');
+                const timeEl = document.getElementById('arrived_exact_time');
+                if (timeEl) timeEl.textContent = recTime;
+
+                if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30";
+                if (statusText) statusText.textContent = "Arrived ✅";
+                return;
             }
+
+            // Not yet scanned today: show ticking countdown & scanner note
+            if (digitsBox) digitsBox.classList.remove('hidden');
+            if (hintBox) hintBox.classList.remove('hidden');
+            if (successBox) successBox.classList.add('hidden');
 
             // Ticker function
             function tick() {
                 const now = new Date();
                 const diffMs = targetDate.getTime() - now.getTime();
-                const statusBadge = document.getElementById('countdown_status_badge');
-                const statusText = document.getElementById('countdown_status_text');
                 const labelEl = document.getElementById('countdown_label');
 
                 if (diffMs <= 0) {
@@ -1299,112 +1331,36 @@
             _countdownInterval = setInterval(tick, 1000);
         }
 
-        window.handleAssistantCheckIn = async function() {
-            if (!currentAssistant || !currentAssistant.name) {
-                showToast("Please sign in first", "error");
-                return;
+        function markArrivedOnPhone(timeStr, centerName) {
+            clearInterval(_countdownInterval);
+
+            const digitsBox = document.getElementById('target_countdown_digits_box');
+            if (digitsBox) digitsBox.classList.add('hidden');
+
+            const hintBox = document.getElementById('scanner_checkin_hint_box');
+            if (hintBox) hintBox.classList.add('hidden');
+
+            const successBox = document.getElementById('arrived_success_box');
+            if (successBox) successBox.classList.remove('hidden');
+
+            const timeEl = document.getElementById('arrived_exact_time');
+            if (timeEl) timeEl.textContent = timeStr || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const statusBadge = document.getElementById('countdown_status_badge');
+            if (statusBadge) {
+                statusBadge.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30";
             }
-            if (!window._activeUpcomingSession) {
-                showToast("No upcoming assigned session found", "error");
-                return;
+            const statusText = document.getElementById('countdown_status_text');
+            if (statusText) statusText.textContent = "Arrived ✅";
+
+            showToast(`🎉 Verified! Your arrival at ${centerName || 'the center'} was recorded at ${timeStr}.`, "success");
+
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100]);
             }
 
-            const { session, dayName } = window._activeUpcomingSession;
-            const btn = document.getElementById('btn_mark_arrived');
-            const btnText = document.getElementById('btn_mark_arrived_text');
-
-            if (btn) btn.disabled = true;
-            if (btnText) btnText.innerHTML = `<span class="loading-spinner w-3.5 h-3.5 border-2 inline-block"></span> <span>Checking in...</span>`;
-
-            const now = new Date();
-            const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const dateFormatted = now.toISOString().split('T')[0];
-            const centerPayload = `${session.center} (${dayName})`;
-
-            try {
-                let insertedId = null;
-                if (supabaseClient) {
-                    const { data, error } = await supabaseClient
-                        .from('attendance')
-                        .insert([{
-                            assistant_name: currentAssistant.name,
-                            center: centerPayload
-                        }])
-                        .select();
-
-                    if (error) {
-                        console.warn("Attendance insert error:", error);
-                    } else if (data && data.length > 0) {
-                        insertedId = data[0].id;
-                    }
-                }
-
-                // Broadcast live event to Admin Board via Realtime channel
-                if (window._arrivalsRealtimeChannel) {
-                    try {
-                        window._arrivalsRealtimeChannel.send({
-                            type: 'broadcast',
-                            event: 'arrival',
-                            payload: {
-                                assistant_name: currentAssistant.name,
-                                center: session.center,
-                                day: dayName,
-                                time: timeFormatted,
-                                timestamp: now.toISOString(),
-                                id: insertedId || Date.now()
-                            }
-                        });
-                    } catch(bcErr) {
-                        console.warn("Broadcast error:", bcErr);
-                    }
-                }
-
-                // Update button UI
-                if (btn) {
-                    btn.className = "px-3.5 py-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0";
-                    btn.disabled = true;
-                }
-                if (btnText) {
-                    btnText.textContent = `Arrived at ${timeFormatted}`;
-                }
-                const hintEl = document.getElementById('arrival_status_hint');
-                if (hintEl) {
-                    hintEl.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">check_circle</span> Arrival confirmed!</span>`;
-                }
-
-                // Save locally to allAttendedLectures
-                allAttendedLectures.unshift({
-                    id: insertedId || Date.now(),
-                    center: session.center,
-                    lecture: session.subject || 'Lecture',
-                    date: dateFormatted,
-                    day: dayName,
-                    bonus: 0,
-                    deduction: 0,
-                    source: 'local',
-                    rawDate: now.toISOString()
-                });
-
-                // Toast
-                showToast(`🎉 Arrival at ${session.center} recorded (${timeFormatted})! Admin notified.`, "success");
-
-                // Badge count
-                const badgeEl = document.getElementById('badge_attended_count');
-                if (badgeEl) {
-                    badgeEl.textContent = allAttendedLectures.length;
-                    badgeEl.classList.remove('hidden');
-                }
-
-                if (navigator.vibrate) {
-                    navigator.vibrate([100, 50, 100]);
-                }
-            } catch(err) {
-                console.error("Check in error:", err);
-                showToast("Could not record arrival. Please try again.", "error");
-                if (btn) btn.disabled = false;
-                if (btnText) btnText.textContent = "I'm Here! Mark Arrived";
-            }
-        };
+            fetchAttendedLectures();
+        }
 
         function renderScheduleList() {
             const listContainer = document.getElementById('schedule_list');
@@ -1799,6 +1755,23 @@
                         updateStatus('connected');
                     }
                 });
+
+            supabaseClient
+                .channel('public:attendance')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, payload => {
+                    if (payload && payload.new && currentAssistant && currentAssistant.name) {
+                        const myName = currentAssistant.name.trim().toLowerCase();
+                        const pName = (payload.new.assistant_name || '').trim().toLowerCase();
+                        if (pName && (pName === myName || pName.includes(myName) || myName.includes(pName))) {
+                            let centerName = payload.new.center || 'Center';
+                            let timeStr = new Date(payload.new.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            if (typeof markArrivedOnPhone === 'function') {
+                                markArrivedOnPhone(timeStr, centerName);
+                            }
+                        }
+                    }
+                })
+                .subscribe();
         }
 
         function showQRCode() {
