@@ -328,7 +328,7 @@
     <canvas id="arrival-confetti-canvas" class="fixed inset-0 pointer-events-none z-[120] w-full h-full hidden"></canvas>
 
     <!-- Real-time Assistant Arrival Celebration Banner (Animated in on arrival) -->
-    <div id="admin-arrival-banner" class="fixed top-14 md:top-20 right-3 sm:right-6 z-[110] max-w-sm sm:max-w-md w-[calc(100%-1.5rem)] pointer-events-auto transform -translate-y-28 opacity-0 transition-all duration-500 ease-out shadow-2xl rounded-2xl bg-surface-container-highest/95 backdrop-blur-xl border-2 border-emerald-500/60 p-4">
+    <div id="admin-arrival-banner" class="hidden fixed top-14 md:top-20 right-3 sm:right-6 z-[110] max-w-sm sm:max-w-md w-[calc(100%-1.5rem)] pointer-events-none transform -translate-y-28 opacity-0 transition-all duration-500 ease-out shadow-2xl rounded-2xl bg-surface-container-highest/95 backdrop-blur-xl border-2 border-emerald-500/60 p-4">
         <div class="flex items-start gap-3">
             <div class="relative shrink-0">
                 <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl ring-4 ring-emerald-500/30">
@@ -1349,15 +1349,24 @@
 
         // --- Navigation ---
         function switchTab(tabId) {
+            try {
+                history.replaceState(null, '', '#' + tabId);
+            } catch(e) {}
+
             document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const targetView = document.getElementById(`view-${tabId}`);
+            if (targetView) {
+                targetView.classList.remove('hidden');
+            }
 
             const titleEl = document.getElementById('header-title');
-            if (tabId === 'new-entry') titleEl.textContent = 'Attendance Records';
-            if (tabId === 'records') titleEl.textContent = 'Records';
-            if (tabId === 'manage') titleEl.textContent = 'Manage';
-            if (tabId === 'schedule') titleEl.textContent = 'Schedule';
-            if (tabId === 'attendance') titleEl.textContent = 'Attendance';
+            if (titleEl) {
+                if (tabId === 'new-entry') titleEl.textContent = 'Attendance Records';
+                if (tabId === 'records') titleEl.textContent = 'Records';
+                if (tabId === 'manage') titleEl.textContent = 'Manage';
+                if (tabId === 'schedule') titleEl.textContent = 'Schedule';
+                if (tabId === 'attendance') titleEl.textContent = 'Attendance';
+            }
 
             // Desktop Nav
             const desktopClassesActive = ['bg-primary-container', 'text-on-primary-container'];
@@ -1367,14 +1376,15 @@
                 el.classList.remove(...desktopClassesActive);
                 el.classList.add(...desktopClassesInactive);
                 const icon = el.querySelector('.material-symbols-outlined');
-                icon.classList.remove('icon-fill');
+                if (icon) icon.classList.remove('icon-fill');
             });
 
             const activeDesktop = document.getElementById(`nav-desktop-${tabId}`);
             if(activeDesktop) {
                 activeDesktop.classList.remove(...desktopClassesInactive);
                 activeDesktop.classList.add(...desktopClassesActive);
-                activeDesktop.querySelector('.material-symbols-outlined').classList.add('icon-fill');
+                const icon = activeDesktop.querySelector('.material-symbols-outlined');
+                if (icon) icon.classList.add('icon-fill');
             }
 
             // Mobile Nav
@@ -1385,8 +1395,10 @@
                 el.classList.remove(...mobileClassesActive);
                 el.classList.add(...mobileClassesInactive);
                 const icon = el.querySelector('.nav-icon');
-                icon.classList.remove('icon-fill');
-                icon.classList.remove('text-[20px]'); // optional bump size
+                if (icon) {
+                    icon.classList.remove('icon-fill');
+                    icon.classList.remove('text-[20px]');
+                }
             });
 
             const activeMobile = document.getElementById(`nav-mobile-${tabId}`);
@@ -1394,16 +1406,21 @@
                 activeMobile.classList.remove(...mobileClassesInactive);
                 activeMobile.classList.add(...mobileClassesActive);
                 const icon = activeMobile.querySelector('.nav-icon');
-                icon.classList.add('icon-fill');
-                icon.classList.add('text-[20px]');
+                if (icon) {
+                    icon.classList.add('icon-fill');
+                    icon.classList.add('text-[20px]');
+                }
             }
 
             // View init
-            if (tabId === 'new-entry') initNewEntryView();
-
-            if (tabId === 'manage') initManageView();
-            if (tabId === 'schedule') initScheduleView();
-            if (tabId === 'attendance') initAttendanceView();
+            try {
+                if (tabId === 'new-entry') initNewEntryView();
+                if (tabId === 'manage') initManageView();
+                if (tabId === 'schedule') initScheduleView();
+                if (tabId === 'attendance') initAttendanceView();
+            } catch(viewErr) {
+                console.error(`Error initializing view for tab "${tabId}":`, viewErr);
+            }
         }
 
         // --- Manage View ---
@@ -3840,8 +3857,13 @@
             clearTimeout(_arrivalBannerTimeout);
             const banner = document.getElementById('admin-arrival-banner');
             if (banner) {
-                banner.classList.add('-translate-y-28', 'opacity-0');
-                banner.classList.remove('translate-y-0', 'opacity-100');
+                banner.classList.add('-translate-y-28', 'opacity-0', 'pointer-events-none');
+                banner.classList.remove('translate-y-0', 'opacity-100', 'pointer-events-auto');
+                setTimeout(() => {
+                    if (banner && banner.classList.contains('opacity-0')) {
+                        banner.classList.add('hidden');
+                    }
+                }, 500);
             }
         }
 
@@ -3863,8 +3885,8 @@
                 }, 50);
             }
 
-            banner.classList.remove('-translate-y-28', 'opacity-0');
-            banner.classList.add('translate-y-0', 'opacity-100');
+            banner.classList.remove('hidden', '-translate-y-28', 'opacity-0', 'pointer-events-none');
+            banner.classList.add('pointer-events-auto', 'translate-y-0', 'opacity-100');
 
             clearTimeout(_arrivalBannerTimeout);
             _arrivalBannerTimeout = setTimeout(() => {
@@ -3959,12 +3981,14 @@
             const seen = new Set();
 
             (State.schedules || []).forEach(s => {
-                if ((s.days || []).includes(selectedDay)) {
+                if (!s || !s.center) return;
+                const days = Array.isArray(s.days) ? s.days : (typeof s.days === 'string' ? [s.days] : []);
+                if (days.includes(selectedDay)) {
                     const key = `${s.center}___${s.time || ''}`;
                     if (!seen.has(key)) {
                         seen.add(key);
                         scheduledCentersOnDay.push({
-                            center: s.center,
+                            center: String(s.center),
                             time: s.time
                         });
                     }
@@ -3973,20 +3997,30 @@
 
             // Sort: Newstar first if present, then by time
             scheduledCentersOnDay.sort((a, b) => {
-                if (a.center.includes('Newstar')) return -1;
-                if (b.center.includes('Newstar')) return 1;
+                const aName = a.center || '';
+                const bName = b.center || '';
+                if (aName.includes('Newstar') && !bName.includes('Newstar')) return -1;
+                if (!aName.includes('Newstar') && bName.includes('Newstar')) return 1;
                 return (a.time || '').localeCompare(b.time || '');
             });
 
-            if (scheduledCentersOnDay.length === 0) {
-                centerSelect.innerHTML = `<option value="">No centers scheduled on ${selectedDay}</option>`;
-                return;
+            if (scheduledCentersOnDay.length > 0) {
+                centerSelect.innerHTML = scheduledCentersOnDay.map(s => {
+                    const timeFmt = s.time ? ` (${formatTime(s.time)})` : '';
+                    return `<option value="${escapeHtml(s.center)}">${escapeHtml(s.center)}${timeFmt}</option>`;
+                }).join('');
+            } else {
+                // Fallback to all saved centers so admin can still scan even if schedule is not set
+                const allCenters = (State.centers || []).map(c => typeof c === 'string' ? c : (c ? c.name : '')).filter(Boolean);
+                if (allCenters.length > 0) {
+                    centerSelect.innerHTML = `
+                        <option value="">-- No schedule for ${escapeHtml(selectedDay)} (Select below) --</option>
+                        ${allCenters.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+                    `;
+                } else {
+                    centerSelect.innerHTML = `<option value="">No centers scheduled on ${escapeHtml(selectedDay)}</option>`;
+                }
             }
-
-            centerSelect.innerHTML = scheduledCentersOnDay.map(s => {
-                const timeFmt = s.time ? ` (${formatTime(s.time)})` : '';
-                return `<option value="${s.center}">${s.center}${timeFmt}</option>`;
-            }).join('');
         }
 
         let _attendanceDayInitialized = false;
@@ -4418,7 +4452,7 @@
             }
 
             const hash = window.location.hash.replace('#', '');
-            if (['new-entry', 'records', 'manage', 'schedule'].includes(hash)) {
+            if (['new-entry', 'records', 'manage', 'schedule', 'attendance'].includes(hash)) {
                 switchTab(hash);
             } else {
                 switchTab('new-entry');
