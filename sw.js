@@ -1,5 +1,5 @@
 // Service Worker for Centers Record (Offline PWA)
-const CACHE_NAME = 'centers-record-v2';
+const CACHE_NAME = 'centers-record-v3';
 
 const STATIC_ASSETS = [
     './',
@@ -68,7 +68,35 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // For static assets, HTML pages, Google fonts, and scripts: Stale-While-Revalidate
+    // For HTML navigation and page loads: Network First with offline fallback
+    const isHtml = request.mode === 'navigate' || 
+                   url.pathname.endsWith('.html') || 
+                   url.pathname === '/' || 
+                   (request.headers.get('accept') && request.headers.get('accept').includes('text/html'));
+
+    if (isHtml) {
+        event.respondWith(
+            fetch(request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(request, responseClone);
+                    });
+                }
+                return networkResponse;
+            }).catch(() => {
+                return caches.match(request).then((cached) => {
+                    if (cached) return cached;
+                    if (url.pathname.includes('schedule')) return caches.match('./schedule.html');
+                    if (url.pathname.includes('admin')) return caches.match('./admin.html');
+                    return caches.match('./index.html');
+                });
+            })
+        );
+        return;
+    }
+
+    // For static assets, Google fonts, and scripts: Stale-While-Revalidate
     event.respondWith(
         caches.match(request).then((cachedResponse) => {
             const fetchPromise = fetch(request).then((networkResponse) => {
@@ -79,21 +107,8 @@ self.addEventListener('fetch', (event) => {
                     });
                 }
                 return networkResponse;
-            }).catch((err) => {
-                // If offline and request is an HTML page navigation, fallback to cached page
-                if (request.mode === 'navigate') {
-                    if (url.pathname.includes('schedule')) {
-                        return caches.match('./schedule.html');
-                    }
-                    if (url.pathname.includes('admin')) {
-                        return caches.match('./admin.html');
-                    }
-                    return caches.match('./index.html');
-                }
-                return null;
-            });
+            }).catch(() => null);
 
-            // Return cached response immediately if present, otherwise wait for network
             return cachedResponse || fetchPromise;
         })
     );

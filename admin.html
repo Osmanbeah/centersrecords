@@ -1729,7 +1729,12 @@
                             </span>
                         ` : ''}
                     </div>
-                ` : '';
+                ` : `
+                    <div class="mt-2 pt-2 border-t border-outline-variant/30 flex items-center gap-1.5 text-[11px] text-outline italic">
+                        <span class="material-symbols-outlined text-[13px]">rate_review</span>
+                        <span>No lecture notes submitted yet</span>
+                    </div>
+                `;
 
                 return `
                     <div class="p-3 sm:p-4 rounded-xl bg-surface-container-low border border-outline-variant/60 flex flex-col gap-2 hover:bg-surface-container transition-colors">
@@ -2490,6 +2495,48 @@
                                 arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">schedule</span> Arrived at ${arrTime}</span>`;
                             }
 
+                            let astMrPayment = '';
+                            let astDeductNote = '';
+                            if (scanRecord && typeof scanRecord.center === 'string' && scanRecord.center.trim().startsWith('{')) {
+                                try {
+                                    const meta = JSON.parse(scanRecord.center.trim());
+                                    astMrPayment = meta.mr_payment || '';
+                                    astDeductNote = meta.deduct_note || '';
+                                } catch(e) {}
+                            }
+
+                            let localNotesMap = {};
+                            try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e) {}
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            const altKey = `${todayStr}_${sched.center}_${day}`;
+                            const lNote = (scanRecord && localNotesMap[scanRecord.id]) || localNotesMap[altKey];
+                            if (lNote) {
+                                if (lNote.mr_payment && !astMrPayment) astMrPayment = lNote.mr_payment;
+                                if (lNote.deduct_note && !astDeductNote) astDeductNote = lNote.deduct_note;
+                            }
+
+                            const notesBadge = (astMrPayment || astDeductNote) ? `
+                                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                    ${astMrPayment ? `
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary/15 text-secondary text-[11px] font-semibold border border-secondary/30">
+                                            <span class="material-symbols-outlined text-[13px]">payments</span>
+                                            <span>Paid for Mr: <strong>${escapeHtml(astMrPayment)}</strong></span>
+                                        </span>
+                                    ` : ''}
+                                    ${astDeductNote ? `
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-error/15 text-error text-[11px] font-semibold border border-error/30">
+                                            <span class="material-symbols-outlined text-[13px]">remove_circle</span>
+                                            <span>Deduct: <strong>${escapeHtml(astDeductNote)}</strong></span>
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            ` : `
+                                <div class="text-[10px] text-outline italic mt-1 flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[12px]">rate_review</span>
+                                    <span>No notes reported yet</span>
+                                </div>
+                            `;
+
                             return `
                                 <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-outline-variant/60 bg-surface-container-low/70 gap-3 hover:bg-surface-container transition-colors">
                                     <label class="flex items-center cursor-pointer flex-grow select-none">
@@ -2501,6 +2548,7 @@
                                                 ${name}
                                             </span>
                                             ${arrivalBadge}
+                                            ${notesBadge}
                                         </div>
                                     </label>
 
