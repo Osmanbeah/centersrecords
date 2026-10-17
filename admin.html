@@ -1608,7 +1608,7 @@
             State.attendances.forEach(att => {
                 let cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
                 let attDay = att.day || (att.center && att.center.match(/\(([^)]+)\)/) ? att.center.match(/\(([^)]+)\)/)[1] : '');
-                let scanDate = att.created_at ? att.created_at.split('T')[0] : 'Today';
+                let scanDate = att.created_at ? att.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
                 let bonus = 0;
                 let deduction = 0;
                 let mrPayment = '';
@@ -2013,7 +2013,7 @@
 
             // 2. From raw scans not yet in entries
             State.attendances.forEach(att => {
-                const scanDate = att.created_at ? att.created_at.split('T')[0] : '';
+                const scanDate = att.created_at ? att.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
                 if (!matchesMonth(scanDate)) return;
 
                 const name = att.assistant_name;
@@ -2184,10 +2184,21 @@
             let mrVal = '';
             let dedVal = '';
 
-            const scanRecord = (State.attendances || []).find(a => 
-                (recordId && a.id === recordId) ||
-                ((a.assistant_name || '').trim().toLowerCase() === (assistantName || '').trim().toLowerCase())
-            );
+            const scanRecord = (State.attendances || []).find(a => {
+                if (recordId && a.id === recordId) return true;
+                const nameMatch = (a.assistant_name || '').trim().toLowerCase() === (assistantName || '').trim().toLowerCase();
+                if (!nameMatch) return false;
+                const meta = parseAttendanceCenterMeta(a.center);
+                const attCenter = (meta.cleanCenter || a.center || '').trim().toLowerCase();
+                const targetCenter = (center || '').trim().toLowerCase();
+                const centerMatch = attCenter === targetCenter || attCenter.includes(targetCenter) || targetCenter.includes(attCenter);
+                if (!centerMatch) return false;
+                if (day) {
+                    const attDay = (a.day || meta.day || '').trim().toLowerCase();
+                    if (attDay && attDay !== day.trim().toLowerCase()) return false;
+                }
+                return true;
+            });
 
             if (scanRecord) {
                 const meta = parseAttendanceCenterMeta(scanRecord.center);
@@ -2240,10 +2251,21 @@
             }
 
             try {
-                let match = (State.attendances || []).find(a => 
-                    (recordId && a.id === recordId) ||
-                    ((a.assistant_name || '').trim().toLowerCase() === assistantName.trim().toLowerCase())
-                );
+                let match = (State.attendances || []).find(a => {
+                    if (recordId && a.id === recordId) return true;
+                    const nameMatch = (a.assistant_name || '').trim().toLowerCase() === assistantName.trim().toLowerCase();
+                    if (!nameMatch) return false;
+                    const meta = parseAttendanceCenterMeta(a.center);
+                    const attCenter = (meta.cleanCenter || a.center || '').trim().toLowerCase();
+                    const targetCenter = (center || '').trim().toLowerCase();
+                    const centerMatch = attCenter === targetCenter || attCenter.includes(targetCenter) || targetCenter.includes(attCenter);
+                    if (!centerMatch) return false;
+                    if (day) {
+                        const attDay = (a.day || meta.day || '').trim().toLowerCase();
+                        if (attDay && attDay !== day.trim().toLowerCase()) return false;
+                    }
+                    return true;
+                });
 
                 if (!match && recordId) {
                     match = (State.attendances || []).find(a => a.id === recordId);
@@ -2663,7 +2685,7 @@
 
                 const centersHtml = daySchedules.map(sched => {
                     const timeFmt = sched.time ? formatTime(sched.time) : '';
-                    const assignedAssistants = Array.isArray(sched.assistants) ? sched.assistants : [];
+                    const assignedAssistants = (Array.isArray(sched.assistants) ? sched.assistants : []).map(getAssistantName).filter(Boolean);
                     const centerSafeId = `${day}_${sched.id}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 
                     // Filter only assistants who scanned their ID for this center AND this specific day
@@ -2702,8 +2724,9 @@
                         e.day && e.day.toLowerCase() === day.toLowerCase()
                     );
 
-                    // List of unique assistant names that scanned OR were previously saved in this session
+                    // Combine assigned assistants, live scanned assistants, and any previously saved attendees
                     const displayAssistants = Array.from(new Set([
+                        ...assignedAssistants,
                         ...scannedAssistantNames,
                         ...(existingEntry?.present || []),
                         ...(existingEntry?.absent || []),
@@ -2714,22 +2737,44 @@
                     if (displayAssistants.length === 0) {
                         assistantsListHtml = `
                             <div class="p-4 rounded-xl bg-surface-container-low border border-dashed border-outline-variant text-center space-y-1">
-                                <span class="material-symbols-outlined text-outline text-[24px]">qr_code_scanner</span>
-                                <p class="text-xs text-on-surface-variant italic">No assistants have scanned their ID badge for this lecture yet.</p>
-                                <p class="text-[11px] text-outline">Assistants must scan their QR ID on the Attendance tab to appear here.</p>
+                                <span class="material-symbols-outlined text-outline text-[24px]">group_off</span>
+                                <p class="text-xs text-on-surface-variant italic">No assistants assigned or scanned for this lecture yet.</p>
+                                <button type="button" onclick="switchTab('schedule')" class="text-xs text-primary font-semibold hover:underline inline-flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[13px]">add</span> Assign in Schedule
+                                </button>
                             </div>
                         `;
                     } else {
                         assistantsListHtml = displayAssistants.map(name => {
-                            const isChecked = existingEntry ? (existingEntry.present || []).includes(name) : true;
+                            const isScanned = scannedAssistantNames.some(s => s.trim().toLowerCase() === name.trim().toLowerCase());
+                            const isAssigned = assignedAssistants.some(a => a.trim().toLowerCase() === name.trim().toLowerCase());
+
+                            let isChecked = false;
+                            if (existingEntry) {
+                                isChecked = (existingEntry.present || []).includes(name);
+                            } else {
+                                // Default checked if they scanned ID
+                                isChecked = isScanned;
+                            }
+
                             const savedBonus = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.bonus) ? existingEntry.adjustments[name].bonus : '';
                             const savedDeduct = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.deduction) ? existingEntry.adjustments[name].deduction : '';
 
                             const scanRecord = scannedRecordsForCenter.find(att => (att.assistant_name || '').trim().toLowerCase() === name.trim().toLowerCase());
-                            let arrivalBadge = `<span class="text-[11px] text-secondary font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">verified</span> Scanned ID</span>`;
+                            let arrivalBadge = '';
                             if (scanRecord && scanRecord.created_at) {
                                 const arrTime = new Date(scanRecord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">schedule</span> Arrived at ${arrTime}</span>`;
+                                arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Arrived at ${arrTime}</span>`;
+                            } else if (isScanned) {
+                                arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Scanned ID</span>`;
+                            } else if (existingEntry) {
+                                if ((existingEntry.present || []).includes(name)) {
+                                    arrivalBadge = `<span class="text-[11px] text-primary font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">check_circle</span> Attended</span>`;
+                                } else {
+                                    arrivalBadge = `<span class="text-[11px] text-outline font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">cancel</span> Absent</span>`;
+                                }
+                            } else {
+                                arrivalBadge = `<span class="text-[11px] text-on-surface-variant font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[12px] text-outline">schedule</span> Assigned (Not scanned yet)</span>`;
                             }
 
                             const scanMeta = scanRecord ? parseAttendanceCenterMeta(scanRecord.center) : {};
@@ -2849,6 +2894,12 @@
                                         </span>
                                     ` : ''}
                                     ${savedBadgeHtml}
+                                    ${scannedAssistantNames.length > 0 ? `
+                                        <span class="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 font-bold flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-[13px]">qr_code_scanner</span>
+                                            ${scannedAssistantNames.length} scanned
+                                        </span>
+                                    ` : ''}
                                     <span class="text-xs text-on-surface-variant bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/40 font-medium">
                                         ${displayAssistants.length} assistant${displayAssistants.length !== 1 ? 's' : ''}
                                     </span>
@@ -3962,6 +4013,70 @@
             }
         }
 
+        function syncEntriesFromAttendances() {
+            if (!Array.isArray(State.attendances) || State.attendances.length === 0) return;
+            
+            const groups = {};
+            State.attendances.forEach(att => {
+                const meta = parseAttendanceCenterMeta(att.center);
+                const center = meta.cleanCenter || att.center || 'Center';
+                const day = att.day || meta.day || '';
+                const date = meta.dt || (att.created_at ? att.created_at.split('T')[0] : '');
+                if (!date) return;
+                const groupKey = `${date}_${center.toLowerCase()}_${day.toLowerCase()}`;
+                
+                if (!groups[groupKey]) {
+                    groups[groupKey] = {
+                        id: 'cloud_' + groupKey.replace(/[^a-zA-Z0-9_-]/g, '_'),
+                        center: center,
+                        day: day,
+                        date: date,
+                        present: new Set(),
+                        absent: [],
+                        adjustments: {},
+                        savedAt: att.created_at ? new Date(att.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+                        createdAt: att.created_at || date || new Date().toISOString()
+                    };
+                }
+                
+                if (att.assistant_name) {
+                    groups[groupKey].present.add(att.assistant_name);
+                    if (meta.bonus > 0 || meta.deduction > 0) {
+                        groups[groupKey].adjustments[att.assistant_name] = {
+                            bonus: meta.bonus || 0,
+                            deduction: meta.deduction || 0
+                        };
+                    }
+                }
+            });
+
+            let hasNewEntries = false;
+            Object.values(groups).forEach(g => {
+                const exists = State.entries.some(e => {
+                    const eDate = e.date || (e.createdAt ? e.createdAt.split('T')[0] : '');
+                    const eCenter = (e.center || '').trim().toLowerCase();
+                    const gCenter = g.center.trim().toLowerCase();
+                    const centerMatch = eCenter === gCenter || eCenter.includes(gCenter) || gCenter.includes(eCenter);
+                    const eDay = (e.day || '').trim().toLowerCase();
+                    const gDay = g.day.trim().toLowerCase();
+                    const dayMatch = !eDay || !gDay || eDay === gDay;
+                    return eDate === g.date && centerMatch && dayMatch;
+                });
+
+                if (!exists) {
+                    State.entries.push({
+                        ...g,
+                        present: Array.from(g.present)
+                    });
+                    hasNewEntries = true;
+                }
+            });
+
+            if (hasNewEntries) {
+                saveState();
+            }
+        }
+
         async function fetchAttendance() {
             const loadingEl = document.getElementById('attendance_list_loading');
             if (loadingEl) loadingEl.classList.remove('hidden');
@@ -3984,12 +4099,14 @@
                 const pendingScans = queue.filter(q => !cloudKeys.has(`${q.assistant_name}_${q.created_at}`));
                 
                 State.attendances = [...pendingScans, ...cloudAttendances];
+                syncEntriesFromAttendances();
             } catch (err) {
                 console.warn("Could not fetch attendance from Supabase, loading offline cache:", err);
                 const cached = localStorage.getItem(CACHED_ATTENDANCE_KEY);
                 const cloudFallback = cached ? JSON.parse(cached) : [];
                 const queue = getOfflineQueue();
                 State.attendances = [...queue, ...cloudFallback];
+                syncEntriesFromAttendances();
             } finally {
                 if (loadingEl) loadingEl.classList.add('hidden');
             }
