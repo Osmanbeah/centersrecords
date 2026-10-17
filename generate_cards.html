@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee ID Card Generator - Mr. Mohamed Kelany</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <!-- QRCode.js and html2canvas for instant client-side photo export -->
+  <script src="qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              navy: '#0F1E36',
+              deep: '#091322',
+              teal: '#0D9488',
+              tealLight: '#14B8A6',
+              accent: '#06B6D4',
+              surface: '#F8FAFC'
+            }
+          },
+          boxShadow: {
+            'card-elevated': '0 20px 40px -15px rgba(15, 30, 54, 0.22), 0 8px 16px -6px rgba(15, 30, 54, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+            'slot': 'inset 0 2px 4px rgba(0,0,0,0.4), 0 1px 1px rgba(255,255,255,0.8)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #f1f5f9;
+    }
+    .id-card {
+      width: 310px;
+      height: 495px;
+      position: relative;
+    }
+    @media print {
+      body {
+        background: white !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .cards-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 20px !important;
+        page-break-inside: avoid;
+      }
+      .id-card {
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen py-10 px-4 sm:px-6 antialiased text-slate-800">
+
+  <!-- Header & Control Panel -->
+  <div class="max-w-5xl mx-auto mb-10 no-print">
+    <div class="flex items-center justify-between pb-6 border-b border-slate-200">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-brand-navy text-white flex items-center justify-center shadow-md">
+          <span class="material-symbols-outlined text-[28px]">badge</span>
+        </div>
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-brand-navy tracking-tight">Employee ID Card Generator</h1>
+          <p class="text-xs sm:text-sm text-slate-500">Mr. Mohamed Kelany • Vertical Credential Badges with Verified QR Codes</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="admin.html" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 shadow-sm transition-all">
+          <span class="material-symbols-outlined text-[16px]">arrow_back</span> Admin Portal
+        </a>
+      </div>
+    </div>
+
+    <!-- Input Section -->
+    <div class="mt-6 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Assistant Names List</h2>
+          <p class="text-xs text-slate-500">Enter one assistant name per line (or comma-separated). Each will get their own custom badge and scannable QR.</p>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="loadFromSupabase()" class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors">
+            <span class="material-symbols-outlined text-[15px]">cloud_download</span> Load from System
+          </button>
+          <button type="button" onclick="loadDemoNames()" class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors">
+            <span class="material-symbols-outlined text-[15px]">group</span> Demo Samples
+          </button>
+        </div>
+      </div>
+
+      <textarea id="assistant_names_input" rows="4" class="w-full rounded-xl border border-slate-300 p-3 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="Ahmed Osman&#10;Sara Ali&#10;Omar Khaled"></textarea>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <label class="text-xs font-bold text-slate-700">Role Title:</label>
+          <input type="text" id="role_title_input" value="Assistant" class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 w-36" placeholder="Assistant">
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="renderAllCards()" class="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand-navy hover:bg-brand-deep text-white rounded-xl text-xs font-bold shadow transition-all">
+            <span class="material-symbols-outlined text-[16px]">draw</span>
+            <span>Generate Badges</span>
+          </button>
+          <button type="button" onclick="downloadAllAsZip()" id="btn_zip_all" class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow transition-all">
+            <span class="material-symbols-outlined text-[16px]">folder_zip</span>
+            <span>Download All Photos (ZIP)</span>
+          </button>
+          <button type="button" onclick="window.print()" class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow transition-all">
+            <span class="material-symbols-outlined text-[16px]">print</span>
+            <span>Print Sheet</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cards Display Grid -->
+  <div class="max-w-6xl mx-auto">
+    <div id="cards_container" class="cards-grid flex flex-wrap items-center justify-center gap-8">
+      <!-- Injected via JavaScript -->
+    </div>
+  </div>
+
+  <!-- Teacher Logo Cached -->
+  <img id="teacher_logo_source" src="kelany_logo.png" onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuDkqxElV86sCe0LBid5gJE7sguNEq5TTOJLLuhoOI9BWFwYq2kF-C7JALor7FaSq2NR-SOZn8crmXxJE9weKmtmpTerHvRTG27S21bXaMI-hcoM0teU6i1CyrQUSzxRfCGa9gJoSvsKgepH5TAaIV2WRMZN7rkiRd3bOILQMDai2-PR85NjqEjmVL250XwIJPMPCYDcShr73-sexPFbgr50fIRikg1E0tJZUkqpFhXQfhj4V0QdyGTqkaujF4j3wIgLQg'" class="hidden" alt="Logo">
+
+  <script>
+    const SUPABASE_URL = 'https://mwposurgahrcdexfvywa.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13cG9zdXJnYWhyY2RleGZ2eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE2NDAsImV4cCI6MjEwNzIxNzY0MH0.fxr7qxygr5Fl8urhcFWC1oYYqAxtYiObf5kNGnInPfk';
+
+    async function loadFromSupabase() {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/schedule?select=assistants`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+          }
+        });
+        const schedules = await res.json();
+        const names = new Set();
+        schedules.forEach(s => {
+          (s.assistants || []).forEach(a => {
+            const name = typeof a === 'string' ? a : (a && a.name);
+            if (name && name.trim()) names.add(name.trim());
+          });
+        });
+        const list = Array.from(names);
+        if (list.length > 0) {
+          document.getElementById('assistant_names_input').value = list.join('\n');
+          renderAllCards();
+        } else {
+          document.getElementById('assistant_names_input').value = "Ahmed Osman";
+          renderAllCards();
+        }
+      } catch(e) {
+        document.getElementById('assistant_names_input').value = "Ahmed Osman";
+        renderAllCards();
+      }
+    }
+
+    function loadDemoNames() {
+      document.getElementById('assistant_names_input').value = "Ahmed Osman\nSara Ali\nOmar Khaled\nNour El-Din";
+      renderAllCards();
+    }
+
+    function getNames() {
+      const raw = document.getElementById('assistant_names_input').value;
+      if (!raw.trim()) return ['Ahmed Osman'];
+      return raw.split(/[\n,]/).map(n => n.trim()).filter(Boolean);
+    }
+
+    function renderAllCards() {
+      const names = getNames();
+      const role = document.getElementById('role_title_input').value.trim() || 'Assistant';
+      const container = document.getElementById('cards_container');
+      container.innerHTML = '';
+
+      names.forEach((name, index) => {
+        const safeId = 'card_' + index;
+        const cardWrapper = document.createElement('div');
+        cardWrapper.className = 'flex flex-col items-center gap-3';
+        
+        cardWrapper.innerHTML = `
+          <!-- Card Canvas -->
+          <div id="${safeId}" class="id-card bg-white rounded-[24px] shadow-card-elevated border border-slate-200/80 overflow-hidden flex flex-col justify-between select-none">
+            
+            <!-- Top Lanyard Slot -->
+            <div class="relative w-full pt-3.5 pb-1 flex justify-center bg-brand-navy">
+              <div class="w-12 h-2.5 rounded-full bg-slate-900 border border-slate-700/80 shadow-slot relative flex items-center justify-center">
+                <span class="w-8 h-[1px] bg-slate-800/80"></span>
+              </div>
+            </div>
+
+            <!-- Header Section -->
+            <div class="bg-brand-navy px-5 pb-5 pt-1.5 text-center relative overflow-hidden flex flex-col items-center justify-center">
+              <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-teal-500/10 rounded-full blur-xl pointer-events-none"></div>
+              <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-navy to-slate-900 border-2 border-teal-500/30 p-2 shadow-md flex items-center justify-center mb-2 overflow-hidden">
+                <img src="kelany_logo.png" onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuDkqxElV86sCe0LBid5gJE7sguNEq5TTOJLLuhoOI9BWFwYq2kF-C7JALor7FaSq2NR-SOZn8crmXxJE9weKmtmpTerHvRTG27S21bXaMI-hcoM0teU6i1CyrQUSzxRfCGa9gJoSvsKgepH5TAaIV2WRMZN7rkiRd3bOILQMDai2-PR85NjqEjmVL250XwIJPMPCYDcShr73-sexPFbgr50fIRikg1E0tJZUkqpFhXQfhj4V0QdyGTqkaujF4j3wIgLQg'" alt="Logo" class="w-full h-full object-contain filter drop-shadow">
+              </div>
+              <span class="text-sm font-bold tracking-wider text-white uppercase font-sans">MR. MOHAMED KELANY</span>
+              <p class="text-[10px] uppercase font-semibold tracking-widest text-teal-300/80 mt-0.5">mathematics</p>
+            </div>
+
+            <!-- Body Section -->
+            <div class="flex-1 flex flex-col items-center justify-around px-4 py-3 bg-gradient-to-b from-slate-50/60 to-white">
+              <div class="text-center mt-1">
+                <h2 class="text-xl font-extrabold text-brand-navy text-center tracking-tight leading-tight mb-1">${escapeHtml(name)}</h2>
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-700 shadow-sm">
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                  <span class="text-[10px] font-bold uppercase tracking-wider">${escapeHtml(role)}</span>
+                </div>
+              </div>
+
+              <!-- Real QR Code Container -->
+              <div class="flex flex-col items-center py-1">
+                <div class="p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center">
+                  <div id="qr_${safeId}"></div>
+                </div>
+                <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-widest mt-1.5">Scan to verify</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Action Buttons for this Card -->
+          <div class="no-print flex items-center gap-2">
+            <button type="button" onclick="downloadSingleCard('${safeId}', '${escapeHtml(name)}')" class="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-sm transition-all">
+              <span class="material-symbols-outlined text-[15px]">download</span> Download Photo
+            </button>
+          </div>
+        `;
+
+        container.appendChild(cardWrapper);
+
+        // Render QR Code inside this card
+        setTimeout(() => {
+          const qrEl = document.getElementById(`qr_${safeId}`);
+          if (qrEl) {
+            new QRCode(qrEl, {
+              text: name,
+              width: 120,
+              height: 120,
+              colorDark: "#0F1E36",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.M
+            });
+          }
+        }, 50);
+      });
+    }
+
+    async function downloadSingleCard(cardId, name) {
+      const cardEl = document.getElementById(cardId);
+      if (!cardEl) return;
+      try {
+        const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
+        const link = document.createElement('a');
+        link.download = `${name.replace(/\s+/g, '_')}_id_card.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch(e) {
+        console.error(e);
+        alert("Could not export photo: " + e.message);
+      }
+    }
+
+    async function downloadAllAsZip() {
+      const names = getNames();
+      const zipBtn = document.getElementById('btn_zip_all');
+      zipBtn.disabled = true;
+      zipBtn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Generating ZIP...`;
+
+      try {
+        const zip = new JSZip();
+        for (let i = 0; i < names.length; i++) {
+          const name = names[i];
+          const cardId = 'card_' + i;
+          const cardEl = document.getElementById(cardId);
+          if (cardEl) {
+            const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
+            const dataUrl = canvas.toDataURL('image/png');
+            const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+            zip.file(`${name.replace(/\s+/g, '_')}_id_card.png`, base64Data, { base64: true });
+          }
+        }
+        const content = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = `Employee_ID_Cards_${new Date().toISOString().split('T')[0]}.zip`;
+        link.click();
+      } catch(e) {
+        console.error("ZIP generation error:", e);
+        alert("Failed to build ZIP: " + e.message);
+      } finally {
+        zipBtn.disabled = false;
+        zipBtn.innerHTML = `<span class="material-symbols-outlined text-[16px]">folder_zip</span> <span>Download All Photos (ZIP)</span>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Auto-render default on load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromSupabase();
+    });
+  </script>
+</body>
+</html>
