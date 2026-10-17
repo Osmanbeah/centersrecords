@@ -761,6 +761,78 @@
             </div>
         </div>
 
+        <!-- ================= MODAL: EDIT / VIEW ATTENDANCE NOTES ================= -->
+        <div id="admin-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm animate-fade-in">
+            <div class="bg-surface rounded-2xl sm:rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col border border-outline-variant/80 animate-scale-up">
+                <!-- Header -->
+                <div class="p-4 sm:p-5 bg-surface-container-low border-b border-outline-variant/60 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[22px]">rate_review</span>
+                        </div>
+                        <div>
+                            <h3 class="font-headline-sm font-bold text-on-surface text-base">Lecture Notes</h3>
+                            <p id="admin_modal_notes_subtitle" class="text-xs text-on-surface-variant">Assistant &amp; Lecture info</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeAdminNotesModal()" class="w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center text-outline hover:text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                    <input type="hidden" id="admin_notes_assistant_name" value=""/>
+                    <input type="hidden" id="admin_notes_center" value=""/>
+                    <input type="hidden" id="admin_notes_day" value=""/>
+                    <input type="hidden" id="admin_notes_record_id" value=""/>
+
+                    <!-- Question 1: Mr Payment -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-on-surface flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-secondary text-[16px]">payments</span>
+                            <span>Did you pay anything for the Mr?</span>
+                        </label>
+                        <div class="flex flex-wrap gap-1.5 mb-1.5">
+                            <button type="button" onclick="setAdminMrPreset('Taxi 50 EGP')" class="text-[11px] px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors">🚕 Taxi</button>
+                            <button type="button" onclick="setAdminMrPreset('Printing 30 EGP')" class="text-[11px] px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors">🖨️ Printing</button>
+                            <button type="button" onclick="setAdminMrPreset('Coffee / Drinks')" class="text-[11px] px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors">☕ Drinks</button>
+                            <button type="button" onclick="setAdminMrPreset('None')" class="text-[11px] px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors">✅ None</button>
+                        </div>
+                        <input type="text" id="admin_notes_mr_payment_input" placeholder="e.g. Taxi 40 EGP or None"
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-xs text-on-surface placeholder:text-outline focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+                    </div>
+
+                    <!-- Question 2: Deductions -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-on-surface flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-error text-[16px]">remove_circle</span>
+                            <span>Do you have any deducts?</span>
+                        </label>
+                        <div class="flex flex-wrap gap-1.5 mb-1.5">
+                            <button type="button" onclick="setAdminDeductPreset('None')" class="text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 transition-colors">✅ None</button>
+                            <button type="button" onclick="setAdminDeductPreset('Late 15 min')" class="text-[11px] px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors">⏰ Late 15m</button>
+                            <button type="button" onclick="setAdminDeductPreset('Late 30 min')" class="text-[11px] px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors">⏰ Late 30m</button>
+                            <button type="button" onclick="setAdminDeductPreset('Left early')" class="text-[11px] px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors">🏃 Left early</button>
+                        </div>
+                        <input type="text" id="admin_notes_deduct_input" placeholder="e.g. None or Late 15 min"
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-xs text-on-surface placeholder:text-outline focus:outline-none focus:border-error focus:ring-1 focus:ring-error"/>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="p-4 bg-surface-container-low border-t border-outline-variant/60 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeAdminNotesModal()" class="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-colors border border-outline-variant">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-save-admin-notes" onclick="saveAdminNotes()" class="px-5 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span>Save Notes</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- ================= VIEW: SCHEDULE ================= -->
         <div id="view-schedule" class="view-section max-w-2xl mx-auto hidden">
             <div class="mb-stack-lg">
@@ -1206,6 +1278,42 @@
 
         function generateId() {
             return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // Helper to parse center string or JSON metadata (center name, day, notes, bonuses)
+        function parseAttendanceCenterMeta(rawCenterVal) {
+            let cleanCenter = '';
+            let day = '';
+            let mrPayment = '';
+            let deductNote = '';
+            let bonus = 0;
+            let deduction = 0;
+            let lecture = '';
+
+            if (typeof rawCenterVal === 'string') {
+                const trimmed = rawCenterVal.trim();
+                if (trimmed.startsWith('{')) {
+                    try {
+                        const meta = JSON.parse(trimmed);
+                        cleanCenter = (meta.c || '').trim();
+                        day = (meta.d || '').trim();
+                        mrPayment = (meta.mr_payment || '').trim();
+                        deductNote = (meta.deduct_note || '').trim();
+                        bonus = parseFloat(meta.b) || 0;
+                        deduction = parseFloat(meta.ded) || 0;
+                        lecture = (meta.l || '').trim();
+                    } catch(e) {}
+                } else {
+                    const parenMatch = trimmed.match(/^(.*?)\s*\(([^)]+)\)$/);
+                    if (parenMatch) {
+                        cleanCenter = parenMatch[1].trim();
+                        day = parenMatch[2].trim();
+                    } else {
+                        cleanCenter = trimmed;
+                    }
+                }
+            }
+            return { cleanCenter, day, mrPayment, deductNote, bonus, deduction, lecture };
         }
 
         // --- Navigation ---
@@ -2063,6 +2171,140 @@
             });
         };
 
+        // --- Admin Attendance Notes Functions ---
+        window.openAdminNotesModal = function(assistantName, center, day, recordId) {
+            document.getElementById('admin_notes_assistant_name').value = assistantName || '';
+            document.getElementById('admin_notes_center').value = center || '';
+            document.getElementById('admin_notes_day').value = day || '';
+            document.getElementById('admin_notes_record_id').value = recordId || '';
+
+            const subEl = document.getElementById('admin_modal_notes_subtitle');
+            if (subEl) subEl.textContent = `${assistantName} • ${center} (${day})`;
+
+            let mrVal = '';
+            let dedVal = '';
+
+            const scanRecord = (State.attendances || []).find(a => 
+                (recordId && a.id === recordId) ||
+                ((a.assistant_name || '').trim().toLowerCase() === (assistantName || '').trim().toLowerCase())
+            );
+
+            if (scanRecord) {
+                const meta = parseAttendanceCenterMeta(scanRecord.center);
+                mrVal = meta.mrPayment || '';
+                dedVal = meta.deductNote || '';
+            }
+
+            let localNotesMap = {};
+            try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e){}
+            const lNote = (recordId && localNotesMap[recordId]) || localNotesMap[`${center}_${day}`];
+            if (lNote) {
+                if (lNote.mr_payment && !mrVal) mrVal = lNote.mr_payment;
+                if (lNote.deduct_note && !dedVal) dedVal = lNote.deduct_note;
+            }
+
+            document.getElementById('admin_notes_mr_payment_input').value = mrVal;
+            document.getElementById('admin_notes_deduct_input').value = dedVal;
+
+            const modal = document.getElementById('admin-notes-modal');
+            if (modal) modal.classList.remove('hidden');
+        };
+
+        window.closeAdminNotesModal = function() {
+            const modal = document.getElementById('admin-notes-modal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.setAdminMrPreset = function(text) {
+            const input = document.getElementById('admin_notes_mr_payment_input');
+            if (input) { input.value = text; input.focus(); }
+        };
+
+        window.setAdminDeductPreset = function(text) {
+            const input = document.getElementById('admin_notes_deduct_input');
+            if (input) { input.value = text; input.focus(); }
+        };
+
+        window.saveAdminNotes = async function() {
+            const assistantName = document.getElementById('admin_notes_assistant_name').value;
+            const center = document.getElementById('admin_notes_center').value;
+            const day = document.getElementById('admin_notes_day').value;
+            let recordId = document.getElementById('admin_notes_record_id').value;
+            const mrPayment = (document.getElementById('admin_notes_mr_payment_input')?.value || '').trim();
+            const deductNote = (document.getElementById('admin_notes_deduct_input')?.value || '').trim();
+
+            const btn = document.getElementById('btn-save-admin-notes');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<div class="loading-spinner w-3.5 h-3.5 border-2"></div> <span>Saving...</span>`;
+            }
+
+            try {
+                let match = (State.attendances || []).find(a => 
+                    (recordId && a.id === recordId) ||
+                    ((a.assistant_name || '').trim().toLowerCase() === assistantName.trim().toLowerCase())
+                );
+
+                if (!match && recordId) {
+                    match = (State.attendances || []).find(a => a.id === recordId);
+                }
+
+                if (match && !recordId) {
+                    recordId = match.id;
+                }
+
+                let localNotesMap = {};
+                try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e){}
+                const updatedVal = {
+                    mr_payment: mrPayment,
+                    deduct_note: deductNote,
+                    updated_at: new Date().toISOString()
+                };
+                if (recordId) localNotesMap[recordId] = updatedVal;
+                localNotesMap[`${center}_${day}`] = updatedVal;
+                const todayStr = new Date().toISOString().split('T')[0];
+                localNotesMap[`${todayStr}_${center}_${day}`] = updatedVal;
+                localStorage.setItem('attended_session_notes', JSON.stringify(localNotesMap));
+
+                if (supabaseClient && recordId) {
+                    const currentMeta = match ? parseAttendanceCenterMeta(match.center) : {};
+                    const updatedMeta = {
+                        c: currentMeta.cleanCenter || center,
+                        d: currentMeta.day || day,
+                        dt: match?.created_at ? match.created_at.split('T')[0] : todayStr,
+                        b: currentMeta.bonus || 0,
+                        ded: currentMeta.deduction || 0,
+                        l: currentMeta.lecture || 'Regular Lecture',
+                        mr_payment: mrPayment,
+                        deduct_note: deductNote
+                    };
+
+                    const { error } = await supabaseClient
+                        .from('attendance')
+                        .update({ center: JSON.stringify(updatedMeta) })
+                        .eq('id', recordId);
+
+                    if (error) {
+                        console.warn("Supabase notes update error:", error);
+                    } else if (match) {
+                        match.center = JSON.stringify(updatedMeta);
+                    }
+                }
+
+                closeAdminNotesModal();
+                renderAttendanceRecordsView();
+                showToast(`Notes saved for ${assistantName}! ✅`, "success");
+            } catch(e) {
+                console.error("Error saving admin notes:", e);
+                showToast("Error saving notes: " + e.message, "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">check_circle</span> <span>Save Notes</span>`;
+                }
+            }
+        };
+
         document.getElementById('add-center-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const input = document.getElementById('new-center-input');
@@ -2426,20 +2668,16 @@
 
                     // Filter only assistants who scanned their ID for this center AND this specific day
                     const scannedRecordsForCenter = (State.attendances || []).filter(att => {
-                        const rawCenter = (att.center || '').trim().toLowerCase();
+                        const meta = parseAttendanceCenterMeta(att.center);
+                        const attCenterName = (meta.cleanCenter || att.center || '').trim().toLowerCase();
                         const schedCenter = (sched.center || '').trim().toLowerCase();
                         
-                        // Extract center name and embedded day if present (e.g. "Center Name (Monday)")
-                        let attCenterName = rawCenter;
-                        let attEmbeddedDay = '';
-                        const parenMatch = rawCenter.match(/\((sunday|monday|tuesday|wednesday|thursday|friday|saturday)\)$/i);
-                        if (parenMatch) {
-                            attEmbeddedDay = parenMatch[1].toLowerCase();
-                            attCenterName = rawCenter.replace(/\s*\((sunday|monday|tuesday|wednesday|thursday|friday|saturday)\)$/i, '').trim();
-                        }
-
-                        // Must match center name
-                        if (attCenterName !== schedCenter && rawCenter !== schedCenter) return false;
+                        // Check center match (exact match or one contains the other)
+                        const rawCenterLower = (att.center || '').trim().toLowerCase();
+                        const centerMatches = attCenterName === schedCenter || 
+                                              rawCenterLower === schedCenter ||
+                                              (attCenterName && schedCenter && (attCenterName.includes(schedCenter) || schedCenter.includes(attCenterName)));
+                        if (!centerMatches) return false;
 
                         // Check day match:
                         // 1. Explicit day column
@@ -2447,12 +2685,11 @@
                             return att.day.toLowerCase() === day.toLowerCase();
                         }
 
-                        // 2. Embedded day in center string e.g. "i Learn Helwan (Wednesday)"
-                        if (attEmbeddedDay) {
-                            return attEmbeddedDay === day.toLowerCase();
+                        // 2. Extracted day from meta
+                        if (meta.day) {
+                            return meta.day.toLowerCase() === day.toLowerCase();
                         }
 
-                        // If no day column and no embedded day, do NOT cross-match to any day
                         return false;
                     });
 
@@ -2495,27 +2732,27 @@
                                 arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">schedule</span> Arrived at ${arrTime}</span>`;
                             }
 
-                            let astMrPayment = '';
-                            let astDeductNote = '';
-                            if (scanRecord && typeof scanRecord.center === 'string' && scanRecord.center.trim().startsWith('{')) {
-                                try {
-                                    const meta = JSON.parse(scanRecord.center.trim());
-                                    astMrPayment = meta.mr_payment || '';
-                                    astDeductNote = meta.deduct_note || '';
-                                } catch(e) {}
-                            }
+                            const scanMeta = scanRecord ? parseAttendanceCenterMeta(scanRecord.center) : {};
+                            let astMrPayment = scanMeta.mrPayment || '';
+                            let astDeductNote = scanMeta.deductNote || '';
 
                             let localNotesMap = {};
                             try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e) {}
-                            const todayStr = new Date().toISOString().split('T')[0];
-                            const altKey = `${todayStr}_${sched.center}_${day}`;
-                            const lNote = (scanRecord && localNotesMap[scanRecord.id]) || localNotesMap[altKey];
-                            if (lNote) {
-                                if (lNote.mr_payment && !astMrPayment) astMrPayment = lNote.mr_payment;
-                                if (lNote.deduct_note && !astDeductNote) astDeductNote = lNote.deduct_note;
+                            if (scanRecord) {
+                                const scanDate = scanRecord.created_at ? scanRecord.created_at.split('T')[0] : '';
+                                const altKey1 = `${scanDate}_${sched.center}_${day}`;
+                                const altKey2 = `${sched.center}_${day}`;
+                                const lNote = localNotesMap[scanRecord.id] || localNotesMap[altKey1] || localNotesMap[altKey2];
+                                if (lNote) {
+                                    if (lNote.mr_payment && !astMrPayment) astMrPayment = lNote.mr_payment;
+                                    if (lNote.deduct_note && !astDeductNote) astDeductNote = lNote.deduct_note;
+                                }
                             }
 
-                            const notesBadge = (astMrPayment || astDeductNote) ? `
+                            const hasNotes = Boolean((astMrPayment && astMrPayment.trim()) || (astDeductNote && astDeductNote.trim()));
+                            const scanRecId = scanRecord ? scanRecord.id : '';
+
+                            const notesBadge = hasNotes ? `
                                 <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                     ${astMrPayment ? `
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary/15 text-secondary text-[11px] font-semibold border border-secondary/30">
@@ -2529,11 +2766,20 @@
                                             <span>Deduct: <strong>${escapeHtml(astDeductNote)}</strong></span>
                                         </span>
                                     ` : ''}
+                                    <button type="button" onclick="openAdminNotesModal('${escapeHtml(name)}', '${escapeHtml(sched.center)}', '${day}', '${scanRecId}')" class="text-on-surface-variant hover:text-primary transition-colors p-0.5 rounded" title="Edit lecture notes">
+                                        <span class="material-symbols-outlined text-[14px]">edit</span>
+                                    </button>
                                 </div>
                             ` : `
-                                <div class="text-[10px] text-outline italic mt-1 flex items-center gap-1">
-                                    <span class="material-symbols-outlined text-[12px]">rate_review</span>
-                                    <span>No notes reported yet</span>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[10px] text-outline italic flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[12px]">rate_review</span>
+                                        <span>No notes reported yet</span>
+                                    </span>
+                                    <button type="button" onclick="openAdminNotesModal('${escapeHtml(name)}', '${escapeHtml(sched.center)}', '${day}', '${scanRecId}')" class="text-[10px] font-semibold text-primary hover:underline flex items-center gap-0.5">
+                                        <span class="material-symbols-outlined text-[12px]">add</span>
+                                        <span>Add Note</span>
+                                    </button>
                                 </div>
                             `;
 
@@ -3793,7 +4039,12 @@
                             <div class="font-label-lg font-bold text-on-surface truncate">${scan.assistant_name}</div>
                             <div class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1 truncate">
                                 <span class="material-symbols-outlined text-[13px] shrink-0">storefront</span>
-                                <span class="truncate">${scan.center.includes('(') ? scan.center : `${scan.center}${dayDisplay}`}</span>
+                                <span class="truncate">${(() => {
+                                    const meta = parseAttendanceCenterMeta(scan.center);
+                                    const c = meta.cleanCenter || scan.center;
+                                    const d = meta.day || scan.day;
+                                    return d ? `${c} (${d})` : c;
+                                })()}</span>
                             </div>
                         </div>
                     </div>

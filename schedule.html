@@ -1677,33 +1677,76 @@
                 }
                 localStorage.setItem('attended_session_notes', JSON.stringify(notesStore));
 
-                // 3. Sync to Supabase attendance table if online and record has valid Supabase row ID
-                if (supabaseClient && item && item.source === 'cloud' && item.id) {
+                // 3. Sync to Supabase attendance table
+                if (supabaseClient) {
                     try {
-                        let currentMeta = {};
-                        if (typeof item.rawCenter === 'string' && item.rawCenter.trim().startsWith('{')) {
-                            try { currentMeta = JSON.parse(item.rawCenter.trim()); } catch(e){}
+                        let targetId = (item && item.id && String(item.id).length > 20 && !String(item.id).includes('_')) ? String(item.id) : null;
+                        
+                        // If targetId is not a direct UUID, find matching row in attendance by assistant_name and center
+                        if (!targetId && item) {
+                            const astName = (currentAssistant.name || '').trim();
+                            const { data: rows } = await supabaseClient
+                                .from('attendance')
+                                .select('id, center, created_at')
+                                .ilike('assistant_name', `%${astName}%`)
+                                .order('created_at', { ascending: false })
+                                .limit(20);
+
+                            if (rows && rows.length > 0) {
+                                const cTarget = (item.center || '').toLowerCase();
+                                const dateTarget = item.date || '';
+                                const found = rows.find(r => {
+                                    const rCenter = (r.center || '').toLowerCase();
+                                    const rDate = r.created_at ? r.created_at.split('T')[0] : '';
+                                    return (rCenter.includes(cTarget) || cTarget.includes(rCenter)) &&
+                                           (!dateTarget || rDate === dateTarget || !rDate);
+                                });
+                                if (found) targetId = found.id;
+                            }
                         }
-                        const updatedMeta = {
-                            c: currentMeta.c || item.center,
-                            d: currentMeta.d || item.day || '',
-                            dt: currentMeta.dt || item.date || '',
-                            b: currentMeta.b !== undefined ? currentMeta.b : (item.bonus || 0),
-                            ded: currentMeta.ded !== undefined ? currentMeta.ded : (item.deduction || 0),
-                            l: currentMeta.l || item.lecture || 'Regular Lecture',
-                            mr_payment: mrPayment,
-                            deduct_note: deductNote
-                        };
 
-                        const { error } = await supabaseClient
-                            .from('attendance')
-                            .update({ center: JSON.stringify(updatedMeta) })
-                            .eq('id', item.id);
+                        if (targetId) {
+                            let currentMeta = {};
+                            if (typeof item?.rawCenter === 'string' && item.rawCenter.trim().startsWith('{')) {
+                                try { currentMeta = JSON.parse(item.rawCenter.trim()); } catch(e){}
+                            }
+                            const updatedMeta = {
+                                c: currentMeta.c || item?.center || '',
+                                d: currentMeta.d || item?.day || '',
+                                dt: currentMeta.dt || item?.date || '',
+                                b: currentMeta.b !== undefined ? currentMeta.b : (item?.bonus || 0),
+                                ded: currentMeta.ded !== undefined ? currentMeta.ded : (item?.deduction || 0),
+                                l: currentMeta.l || item?.lecture || 'Regular Lecture',
+                                mr_payment: mrPayment,
+                                deduct_note: deductNote
+                            };
 
-                        if (error) {
-                            console.warn("Supabase update error (saved locally):", error);
-                        } else {
-                            item.rawCenter = JSON.stringify(updatedMeta);
+                            const { error } = await supabaseClient
+                                .from('attendance')
+                                .update({ center: JSON.stringify(updatedMeta) })
+                                .eq('id', targetId);
+
+                            if (error) {
+                                console.warn("Supabase update error (saved locally):", error);
+                            } else {
+                                if (item) item.rawCenter = JSON.stringify(updatedMeta);
+                                // Broadcast instant update to Admin dashboard
+                                if (arrivalsChannel) {
+                                    try {
+                                        arrivalsChannel.send({
+                                            type: 'broadcast',
+                                            event: 'arrival',
+                                            payload: {
+                                                id: targetId,
+                                                assistant_name: currentAssistant.name,
+                                                center: item?.center,
+                                                mr_payment: mrPayment,
+                                                deduct_note: deductNote
+                                            }
+                                        });
+                                    } catch(e) {}
+                                }
+                            }
                         }
                     } catch(cloudErr) {
                         console.warn("Could not sync notes to cloud, cached locally:", cloudErr);
