@@ -1256,14 +1256,45 @@
             localStorage.setItem('ct_data_version', DATA_VERSION);
         }
 
+        const OFFLINE_ATTENDANCE_QUEUE_KEY = 'centers_attendance_offline_queue';
+        const CACHED_ATTENDANCE_KEY = 'cached_admin_attendance';
+        const CACHED_SCHEDULES_KEY = 'cached_admin_schedules';
+
+        let fetchingSchedule = false;
+        let scheduleHasLoaded = false;
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        window.escapeHtml = escapeHtml;
+
         // --- Local State Management ---
         const State = {
             centers: (JSON.parse(localStorage.getItem('ct_centers')) || []).map(c => typeof c === 'string' ? { name: c, address: '' } : c),
             assistants: (JSON.parse(localStorage.getItem('ct_assistants')) || []).map(a => typeof a === 'string' ? { name: a, email: '' } : a),
             entries: JSON.parse(localStorage.getItem('ct_entries')) || [],
-            schedules: [], // populated from supabase
-            attendances: [] // populated from supabase attendance table
+            schedules: (() => {
+                try {
+                    const c = localStorage.getItem(CACHED_SCHEDULES_KEY);
+                    return c ? JSON.parse(c) : [];
+                } catch(e) { return []; }
+            })(),
+            attendances: (() => {
+                try {
+                    const c = localStorage.getItem(CACHED_ATTENDANCE_KEY);
+                    return c ? JSON.parse(c) : [];
+                } catch(e) { return []; }
+            })()
         };
+        if (State.schedules && State.schedules.length > 0) {
+            scheduleHasLoaded = true;
+        }
 
         function saveState() {
             localStorage.setItem('ct_centers', JSON.stringify(State.centers));
@@ -2624,7 +2655,7 @@
             if (!container) return;
 
             if (!State.schedules || State.schedules.length === 0) {
-                if (typeof fetchingSchedule !== 'undefined' && fetchingSchedule) {
+                if (!scheduleHasLoaded || fetchingSchedule) {
                     container.innerHTML = `
                         <div class="flex flex-col items-center justify-center py-12 text-on-surface-variant gap-3">
                             <div class="loading-spinner"></div>
@@ -3107,7 +3138,7 @@
 
 
         // --- Schedule View (Supabase) ---
-        let fetchingSchedule = false;
+        fetchingSchedule = false;
 
         async function initScheduleView() {
 
@@ -3171,6 +3202,7 @@
 
                 if (error) throw error;
                 State.schedules = data || [];
+                scheduleHasLoaded = true;
                 try {
                     localStorage.setItem('cached_admin_schedules', JSON.stringify(State.schedules));
                 } catch(e) {}
@@ -3187,10 +3219,13 @@
                 if (cached) {
                     try {
                         State.schedules = JSON.parse(cached);
+                        scheduleHasLoaded = true;
                         renderScheduleList();
                         updateAttendanceCenters();
                         renderAttendanceRecordsView();
                     } catch(e) {}
+                } else {
+                    scheduleHasLoaded = true;
                 }
             } finally {
                 if (loadingEl) loadingEl.classList.add('hidden');
@@ -3969,9 +4004,6 @@
         }
 
         // --- Offline Attendance Queue & Persistence ---
-        const OFFLINE_ATTENDANCE_QUEUE_KEY = 'centers_attendance_offline_queue';
-        const CACHED_ATTENDANCE_KEY = 'cached_admin_attendance';
-
         function getOfflineQueue() {
             try {
                 return JSON.parse(localStorage.getItem(OFFLINE_ATTENDANCE_QUEUE_KEY) || '[]');
@@ -4116,16 +4148,24 @@
             const todayScans = (State.attendances || []).filter(a => a.created_at && a.created_at.startsWith(today));
             renderAttendanceList(todayScans.length > 0 ? todayScans : (State.attendances || []).slice(0, 20));
 
-            // Also update Attendance Records view if active
-            const recordsView = document.getElementById('view-new-entry');
-            if (recordsView && !recordsView.classList.contains('hidden')) {
-                renderAttendanceRecordsView();
+            // Also update Attendance Records view if active and schedules are available
+            try {
+                const recordsView = document.getElementById('view-new-entry');
+                if (recordsView && !recordsView.classList.contains('hidden') && scheduleHasLoaded) {
+                    renderAttendanceRecordsView();
+                }
+            } catch(e) {
+                console.warn("Error updating attendance records view from fetchAttendance:", e);
             }
 
             // Also update Manage Assistant Records view if active
-            const manageView = document.getElementById('view-manage');
-            if (manageView && !manageView.classList.contains('hidden')) {
-                renderManageAssistantRecords();
+            try {
+                const manageView = document.getElementById('view-manage');
+                if (manageView && !manageView.classList.contains('hidden')) {
+                    renderManageAssistantRecords();
+                }
+            } catch(e) {
+                console.warn("Error updating manage view from fetchAttendance:", e);
             }
 
             updateOfflineIndicatorUI();
@@ -4361,10 +4401,22 @@
 
         // --- Init & Service Worker ---
         document.addEventListener('DOMContentLoaded', async () => {
-            await checkAdminAuth();
-            await fetchAttendance();
-            await fetchSchedule();
-            await fetchRequests();
+            try {
+                await checkAdminAuth();
+            } catch(authErr) {
+                console.warn("Auth check error:", authErr);
+            }
+
+            try {
+                await Promise.allSettled([
+                    fetchSchedule(),
+                    fetchAttendance(),
+                    fetchRequests()
+                ]);
+            } catch(fetchErr) {
+                console.warn("Parallel fetch error:", fetchErr);
+            }
+
             const hash = window.location.hash.replace('#', '');
             if (['new-entry', 'records', 'manage', 'schedule'].includes(hash)) {
                 switchTab(hash);
@@ -4372,10 +4424,16 @@
                 switchTab('new-entry');
             }
 
+            // Always ensure the attendance records view is rendered after fetches complete
+            renderAttendanceRecordsView();
+
             // Register Service Worker for Offline PWA
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('[PWA Admin] Service Worker registered:', reg.scope))
+                    .then(reg => {
+                        console.log('[PWA Admin] Service Worker registered:', reg.scope);
+                        reg.update();
+                    })
                     .catch(err => console.log('[PWA Admin] Service Worker registration failed:', err));
             }
         });
