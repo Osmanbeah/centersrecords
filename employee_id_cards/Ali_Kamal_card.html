@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ID Card - Ali Kamal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              navy: '#0F1E36',
+              deep: '#091322',
+              teal: '#0D9488',
+              tealLight: '#14B8A6',
+              accent: '#06B6D4',
+              surface: '#F8FAFC'
+            }
+          },
+          boxShadow: {
+            'card-elevated': '0 20px 40px -15px rgba(15, 30, 54, 0.22), 0 8px 16px -6px rgba(15, 30, 54, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+            'slot': 'inset 0 2px 4px rgba(0,0,0,0.4), 0 1px 1px rgba(255,255,255,0.8)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #F1F5F9;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .id-card {
+      width: 320px;
+      height: 507px;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+  <div id="badge-wrapper" class="p-3">
+    <div class="id-card bg-white rounded-[24px] shadow-card-elevated border border-slate-200/80 overflow-hidden flex flex-col justify-between select-none">
+      
+      <!-- Top Lanyard Slot -->
+      <div class="relative w-full pt-3.5 pb-1 flex justify-center bg-brand-navy">
+        <div class="w-12 h-2.5 rounded-full bg-slate-900 border border-slate-700/80 shadow-slot relative flex items-center justify-center">
+          <span class="w-8 h-[1px] bg-slate-800/80"></span>
+        </div>
+      </div>
+
+      <!-- Header Section: Teacher & Subject -->
+      <div class="bg-brand-navy px-5 pb-5 pt-1.5 text-center relative overflow-hidden flex flex-col items-center justify-center">
+        <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-teal-500/10 rounded-full blur-xl pointer-events-none"></div>
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-navy to-slate-900 border-2 border-teal-500/30 p-2 shadow-md flex items-center justify-center mb-2 overflow-hidden">
+          <img src="data:image/png;base64,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" alt="Logo" class="w-full h-full object-contain filter drop-shadow">
+        </div>
+        <span class="text-sm font-bold tracking-wider text-white uppercase font-sans">MR. MOHAMED KELANY</span>
+        <p class="text-[10px] uppercase font-semibold tracking-widest text-teal-300/80 mt-0.5">mathematics</p>
+      </div>
+
+      <!-- Middle & Bottom Section: Assistant Name + Role + QR -->
+      <div class="flex-1 flex flex-col items-center justify-around px-4 py-3 bg-gradient-to-b from-slate-50/60 to-white">
+        <div class="text-center mt-1">
+          <h2 class="text-xl font-extrabold text-brand-navy text-center tracking-tight leading-tight mb-1">Ali Kamal</h2>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-700 shadow-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+            <span class="text-[10px] font-bold uppercase tracking-wider">Assistant</span>
+          </div>
+        </div>
+
+        <!-- Real QR Code -->
+        <div class="flex flex-col items-center py-1">
+          <div class="p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARQAAAEUCAIAAABlEl4uAAAEPklEQVR4nO3dwW0bMQBFQTtwAdtBykj/R5eRDtTBpgNj80BRpHbmHMuylAdePrif53l+AP/vV/gZQDzQiQci8UAkHojEA5F4IBIPROKBSDwQiQeiryv/6Pj95+OuHn+/h7zOlc/wyu8a9TpX+N5/5uSBSDwQiQci8UAkHojEA5F4IBIPROKBSDwQiQeeuW27YtSeaqZR262Ze7PVPufHYu9n5vfu5IFIPBCJByLxQCQeiMQDkXggEg9E4oFIPBCJB169bVvtHrCZm6uZ962N+gxnfj7Hm37vTh6IxAOReCASD0TigUg8EIkHIvFAJB6IxAOReGCHbRt77d/4mZMHIvFAJB6IxAOReCASD0TigUg8EIkHIvFAJB6IbNsGsEm7JycPROKBSDwQiQci8UAkHojEA5F4IBIPROKBSDyww7Zt5vMiZ7Jbu+f37uSBSDwQiQci8UAkHojEA5F4IBIPROKBSDwQiQdevW2783brzve2HRu+51GcPBCJByLxQCQeiMQDkXggEg9E4oFIPBCJByLxQPR5nmf9WTbekr3rXWozOXkgEg9E4oFIPBCJByLxQCQeiMQDkXggEg9E4oFn3ts2816yHV/nipm/a7Xd2vGmn7OTByLxQCQeiMQDkXggEg9E4oFIPBCJByLxQCQeeOa9bTveFWb/Nud3HRP/b8x8/umV9+PkgUg8EIkHIvFAJB6IxAOReCASD0TigUg8EIkHnnlv20wz90ur7btGGfV+Vvu7VuPkgUg8EIkHIvFAJB6IxAOReCASD0TigUg8EIkHIve2QeTkgUg8EIkHIvFAJB6IxAOReCASD0TigUg8EIkHnrltu+LO+7fVnpW547NNZxr1np08EIkHIvFAJB6IxAOReCASD0TigUg8EIkHIvHAq7dtd/auW7J3fSbpY9Dn4+SBSDwQiQci8UAkHojEA5F4IBIPROKBSDwQiQeirztvnEbtoFa7l4yfubcNXkw8EIkHIvFAJB6IxAOReCASD0TigUg8EIkHnrltu2LHfdfMzd6O963t+HzYmZw8EIkHIvFAJB6IxAOReCASD0TigUg8EIkHIvHAq7dtq23JdtxlrbZJm/l3PRbbrV3h5IFIPBCJByLxQCQeiMQDkXggEg9E4oFIPBCJB3bYtr2rO++7jkF7vB13dE4eiMQDkXggEg9E4oFIPBCJByLxQCQeiMQDkXggsm3b7D66K0btu1a7a+5YbP/m5IFIPBCJByLxQCQeiMQDkXggEg9E4oFIPBCJB3bYtu14L9mOzwBd7f0cG+7frnDyQCQeiMQDkXggEg9E4oFIPBCJByLxQCQeiMQDr962rXZ32Uyr/e2rPf/0MXFrN+p13NsGTyQeiMQDkXggEg9E4oFIPBCJByLxQCQeiMQD0ed5nvVn4dacPBCJByLxQCQeiMQDkXggEg9E4oFIPBCJByLxwEfzDw6AAgjnFjWPAAAAAElFTkSuQmCC" class="w-32 h-32 object-contain" alt="QR Code for Ali Kamal">
+          </div>
+          <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-widest mt-1.5">Scan to verify</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
