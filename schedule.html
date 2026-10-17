@@ -655,6 +655,116 @@
             </div>
         </div>
 
+        <!-- Attended Lecture Notes Modal (Mr Payments & Deductions) -->
+        <div id="attended-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm transition-opacity animate-fade-in">
+            <div class="bg-surface rounded-2xl sm:rounded-3xl shadow-elevation-4 max-w-md w-full overflow-hidden p-5 sm:p-6 border border-outline-variant/60 flex flex-col gap-4 animate-scale-up">
+                <input type="hidden" id="attended_notes_record_id" value="" />
+                
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-3 border-b border-outline-variant/40">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[22px]">post_add</span>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-on-surface text-sm sm:text-base">Lecture Attendance Notes</h2>
+                            <p class="text-[11px] text-on-surface-variant">Payments for Mr & deduction notes</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeAttendedNotesModal()" class="text-on-surface-variant hover:text-on-surface p-1 rounded-lg">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Session Context Banner -->
+                <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/50 flex items-center justify-between text-xs">
+                    <div>
+                        <span class="text-on-surface-variant text-[11px] block">Attended Session</span>
+                        <span id="modal_notes_center_name" class="font-bold text-on-surface text-sm">Center</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-on-surface-variant text-[11px] block">Date</span>
+                        <span id="modal_notes_session_date" class="font-semibold text-primary">--</span>
+                    </div>
+                </div>
+
+                <!-- Note 1: Did you pay anything for the Mr? -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px] text-secondary">payments</span>
+                            <span>1. Did you pay anything for the Mr?</span>
+                        </label>
+                        <span class="text-[10px] text-outline">Expenses</span>
+                    </div>
+                    <p class="text-[11px] text-on-surface-variant">Did you pay out of pocket for the Mr (taxi, coffee, printing, etc.)?</p>
+                    
+                    <!-- Quick Presets -->
+                    <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <button type="button" onclick="setMrPaymentPreset('No, didn\'t pay anything')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            No / Nothing
+                        </button>
+                        <button type="button" onclick="setMrPaymentPreset('Paid for Taxi: ')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            🚕 Taxi
+                        </button>
+                        <button type="button" onclick="setMrPaymentPreset('Paid for Printing: ')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            🖨️ Printing
+                        </button>
+                        <button type="button" onclick="setMrPaymentPreset('Paid for Coffee/Food: ')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            ☕ Food/Drink
+                        </button>
+                    </div>
+
+                    <textarea id="notes_mr_payment_input" rows="2" placeholder="e.g. Paid 60 EGP for Mr's Uber, or No"
+                        class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-2.5 text-xs text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm transition-all resize-none"></textarea>
+                </div>
+
+                <!-- Note 2: Do you have any deducts? -->
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px] text-rose-500">remove_circle_outline</span>
+                            <span>2. Do you have any deducts?</span>
+                        </label>
+                        <span class="text-[10px] text-outline">Deductions</span>
+                    </div>
+                    <p class="text-[11px] text-on-surface-variant">Any deductions applied for this session (e.g. late arrival, left early)?</p>
+                    
+                    <!-- Quick Presets -->
+                    <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <button type="button" onclick="setDeductPreset('No deducts')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            No Deducts
+                        </button>
+                        <button type="button" onclick="setDeductPreset('Late arrival: ')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            ⏰ Late
+                        </button>
+                        <button type="button" onclick="setDeductPreset('Left early: ')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            🚪 Left Early
+                        </button>
+                        <button type="button" onclick="setDeductPreset('Other deduction: ')" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high border border-outline-variant/50 text-on-surface transition-all active:scale-95">
+                            📝 Other
+                        </button>
+                    </div>
+
+                    <textarea id="notes_deduct_input" rows="2" placeholder="e.g. No deducts, or -20 EGP late 15 minutes"
+                        class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-2.5 text-xs text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm transition-all resize-none"></textarea>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="flex items-center gap-2.5 pt-2 border-t border-outline-variant/40">
+                    <button type="button" onclick="closeAttendedNotesModal()" 
+                        class="flex-1 h-10 rounded-xl border border-outline-variant text-on-surface text-xs font-semibold hover:bg-surface-container transition-colors">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-save-attended-notes" onclick="saveAttendedNotes()" 
+                        class="flex-1 h-10 rounded-xl bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span>Save Notes</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Logout Confirmation Modal -->
         <div id="logout-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/50 backdrop-blur-sm">
             <div class="bg-surface rounded-2xl shadow-elevation-4 max-w-xs w-full p-6 border border-outline-variant/60 text-center flex flex-col items-center gap-3">
@@ -944,6 +1054,11 @@
                 const astName = (currentAssistant.name || '').trim();
                 const astEmail = (currentAssistant.email || '').trim();
 
+                let localNotesMap = {};
+                try {
+                    localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}');
+                } catch(e) {}
+
                 let combinedRecords = [];
                 const seenKeys = new Set();
 
@@ -965,6 +1080,8 @@
                                     let bonus = parseFloat(row.bonus) || 0;
                                     let deduction = parseFloat(row.deduction) || 0;
                                     let arrivalTime = '';
+                                    let mrPayment = '';
+                                    let deductNote = '';
 
                                     if (row.created_at) {
                                         try {
@@ -988,6 +1105,8 @@
                                                 bonus = parseFloat(meta.b) || bonus;
                                                 deduction = parseFloat(meta.ded) || deduction;
                                                 lectureName = meta.l || lectureName;
+                                                mrPayment = meta.mr_payment || '';
+                                                deductNote = meta.deduct_note || '';
                                             } catch(e) {}
                                         } else {
                                             const parenMatch = trimmed.match(/^(.*?)\s*\(([^)]+)\)$/);
@@ -999,6 +1118,12 @@
                                     }
 
                                     const uniqueKey = `${dateStr}_${centerName}_${dayStr}`;
+                                    const savedLocal = localNotesMap[row.id] || localNotesMap[uniqueKey];
+                                    if (savedLocal) {
+                                        if (savedLocal.mr_payment && !mrPayment) mrPayment = savedLocal.mr_payment;
+                                        if (savedLocal.deduct_note && !deductNote) deductNote = savedLocal.deduct_note;
+                                    }
+
                                     if (!seenKeys.has(uniqueKey)) {
                                         seenKeys.add(uniqueKey);
                                         combinedRecords.push({
@@ -1010,7 +1135,10 @@
                                             bonus: bonus,
                                             deduction: deduction,
                                             arrivalTime: arrivalTime,
+                                            mr_payment: mrPayment,
+                                            deduct_note: deductNote,
                                             source: 'cloud',
+                                            rawCenter: row.center,
                                             rawDate: row.created_at || dateStr
                                         });
                                     }
@@ -1048,11 +1176,17 @@
                             }
 
                             const uniqueKey = `${dateStr}_${cName}_${dStr}`;
+                            const savedLocal = localNotesMap[entry.id] || localNotesMap[uniqueKey];
+                            const mrPayment = savedLocal?.mr_payment || '';
+                            const deductNote = savedLocal?.deduct_note || '';
+
                             const existingIdx = combinedRecords.findIndex(r => r.date === dateStr && r.center.toLowerCase() === cName.toLowerCase());
                             if (existingIdx >= 0) {
                                 if (bonus > 0) combinedRecords[existingIdx].bonus = bonus;
                                 if (deduction > 0) combinedRecords[existingIdx].deduction = deduction;
                                 if (dStr && !combinedRecords[existingIdx].day) combinedRecords[existingIdx].day = dStr;
+                                if (mrPayment && !combinedRecords[existingIdx].mr_payment) combinedRecords[existingIdx].mr_payment = mrPayment;
+                                if (deductNote && !combinedRecords[existingIdx].deduct_note) combinedRecords[existingIdx].deduct_note = deductNote;
                             } else if (!seenKeys.has(uniqueKey)) {
                                 seenKeys.add(uniqueKey);
                                 combinedRecords.push({
@@ -1064,6 +1198,8 @@
                                     bonus: bonus,
                                     deduction: deduction,
                                     arrivalTime: '',
+                                    mr_payment: mrPayment,
+                                    deduct_note: deductNote,
                                     source: 'local',
                                     rawDate: entry.createdAt || dateStr
                                 });
@@ -1088,6 +1224,10 @@
                                 if (!dStr) dStr = parenMatch[2].trim();
                             }
                             const uniqueKey = `${scanDate}_${cName}_${dStr}`;
+                            const savedLocal = localNotesMap[item.id] || localNotesMap[uniqueKey];
+                            const mrPayment = item.mr_payment || savedLocal?.mr_payment || '';
+                            const deductNote = item.deduct_note || savedLocal?.deduct_note || '';
+
                             if (!seenKeys.has(uniqueKey)) {
                                 seenKeys.add(uniqueKey);
                                 let arrTime = '';
@@ -1103,6 +1243,8 @@
                                     bonus: 0,
                                     deduction: 0,
                                     arrivalTime: arrTime,
+                                    mr_payment: mrPayment,
+                                    deduct_note: deductNote,
                                     source: 'offline',
                                     rawDate: item.created_at || scanDate
                                 });
@@ -1213,6 +1355,7 @@
                 const bonusText = item.bonus > 0 ? `<span class="text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 px-2 py-0.5 rounded-md text-[10px]">+${item.bonus} EGP</span>` : '';
                 const deductText = item.deduction > 0 ? `<span class="text-rose-700 dark:text-rose-400 font-bold bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 px-2 py-0.5 rounded-md text-[10px]">-${item.deduction} EGP</span>` : '';
                 const standardText = (!item.bonus && !item.deduction) ? `<span class="text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-md text-[10px] font-medium">Standard</span>` : '';
+                const notesBadge = (item.mr_payment || item.deduct_note) ? `<span class="text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-[11px]">edit_note</span> Notes</span>` : '';
                 const timeText = item.arrivalTime ? `• ⏰ ${escapeHtml(item.arrivalTime)}` : '';
                 const dayText = item.day ? `• ${escapeHtml(item.day)}` : '';
 
@@ -1232,6 +1375,7 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
+                            ${notesBadge}
                             ${bonusText}
                             ${deductText}
                             ${standardText}
@@ -1347,6 +1491,8 @@
                     ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">cloud_sync</span> Offline Sync</span>`
                     : `<span class="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">verified</span> Attended</span>`;
 
+                const hasNotes = Boolean((item.mr_payment && item.mr_payment.trim()) || (item.deduct_note && item.deduct_note.trim()));
+
                 return `
                     <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant/80 shadow-sm hover:shadow-md hover:border-primary/40 transition-all">
                         <div class="flex items-start justify-between gap-3 mb-2.5">
@@ -1379,12 +1525,192 @@
                                 <span>Recorded & Verified</span>
                             </div>
                         </div>
+
+                        <!-- Lecture Notes (Mr Payment & Deductions) -->
+                        <div class="mt-3 pt-3 border-t border-outline-variant/40 bg-surface-container-low/70 rounded-xl p-3 sm:p-3.5 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[16px] text-primary">rate_review</span>
+                                    <span class="text-[11px] font-bold text-on-surface uppercase tracking-wider">Attendance Notes</span>
+                                    ${hasNotes ? `<span class="w-2 h-2 rounded-full bg-emerald-500 inline-block" title="Notes recorded"></span>` : ''}
+                                </div>
+                                <button type="button" onclick="openAttendedNotesModal('${escapeHtml(String(item.id))}')" 
+                                    class="text-[11px] font-bold text-primary hover:text-primary/90 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/60 shadow-xs transition-all active:scale-95">
+                                    <span class="material-symbols-outlined text-[14px]">${hasNotes ? 'edit_note' : 'post_add'}</span>
+                                    <span>${hasNotes ? 'Edit Notes' : 'Enter Notes'}</span>
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                <!-- Note 1: Did you pay anything for the Mr? -->
+                                <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/50 space-y-1">
+                                    <div class="flex items-center justify-between text-[11px] text-on-surface-variant font-medium">
+                                        <span class="flex items-center gap-1 text-secondary font-semibold">
+                                            <span class="material-symbols-outlined text-[14px]">payments</span>
+                                            <span>Paid for Mr:</span>
+                                        </span>
+                                        <span class="text-[10px] text-outline">Expenses</span>
+                                    </div>
+                                    <p class="font-semibold text-xs leading-relaxed ${item.mr_payment ? 'text-on-surface' : 'text-outline italic text-[11px]'}">
+                                        ${item.mr_payment ? escapeHtml(item.mr_payment) : 'No payment notes recorded'}
+                                    </p>
+                                </div>
+
+                                <!-- Note 2: Do you have any deducts? -->
+                                <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/50 space-y-1">
+                                    <div class="flex items-center justify-between text-[11px] text-on-surface-variant font-medium">
+                                        <span class="flex items-center gap-1 text-rose-500 font-semibold">
+                                            <span class="material-symbols-outlined text-[14px]">remove_circle_outline</span>
+                                            <span>Deducts Note:</span>
+                                        </span>
+                                        <span class="text-[10px] text-outline">Deductions</span>
+                                    </div>
+                                    <p class="font-semibold text-xs leading-relaxed ${item.deduct_note ? 'text-on-surface' : 'text-outline italic text-[11px]'}">
+                                        ${item.deduct_note ? escapeHtml(item.deduct_note) : 'No deduction notes recorded'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 `;
             }).join('');
         }
 
         window.renderAttendedLecturesList = renderAttendedList;
+
+        // --- Attended Lecture Notes Modal Functions ---
+        window.openAttendedNotesModal = function(recordId) {
+            const item = allAttendedLectures.find(r => String(r.id) === String(recordId));
+            if (!item) return;
+
+            document.getElementById('attended_notes_record_id').value = String(recordId);
+            
+            const centerEl = document.getElementById('modal_notes_center_name');
+            if (centerEl) centerEl.textContent = item.center || 'Lecture';
+            
+            const dateEl = document.getElementById('modal_notes_session_date');
+            if (dateEl) {
+                dateEl.textContent = `${item.date || 'Recorded'} ${item.day ? '(' + item.day + ')' : ''}`;
+            }
+
+            const mrInput = document.getElementById('notes_mr_payment_input');
+            if (mrInput) mrInput.value = item.mr_payment || '';
+
+            const deductInput = document.getElementById('notes_deduct_input');
+            if (deductInput) deductInput.value = item.deduct_note || '';
+
+            const modal = document.getElementById('attended-notes-modal');
+            if (modal) modal.classList.remove('hidden');
+        };
+
+        window.closeAttendedNotesModal = function() {
+            const modal = document.getElementById('attended-notes-modal');
+            if (modal) modal.classList.add('hidden');
+            document.getElementById('attended_notes_record_id').value = '';
+        };
+
+        window.setMrPaymentPreset = function(text) {
+            const input = document.getElementById('notes_mr_payment_input');
+            if (!input) return;
+            input.value = text;
+            input.focus();
+        };
+
+        window.setDeductPreset = function(text) {
+            const input = document.getElementById('notes_deduct_input');
+            if (!input) return;
+            input.value = text;
+            input.focus();
+        };
+
+        window.saveAttendedNotes = async function() {
+            const recordId = document.getElementById('attended_notes_record_id').value;
+            if (!recordId) return;
+
+            const mrPayment = (document.getElementById('notes_mr_payment_input')?.value || '').trim();
+            const deductNote = (document.getElementById('notes_deduct_input')?.value || '').trim();
+
+            const btn = document.getElementById('btn-save-attended-notes');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<div class="loading-spinner w-3.5 h-3.5 border-2"></div> <span>Saving...</span>`;
+            }
+
+            try {
+                // 1. Update in-memory record
+                const item = allAttendedLectures.find(r => String(r.id) === String(recordId));
+                if (item) {
+                    item.mr_payment = mrPayment;
+                    item.deduct_note = deductNote;
+                }
+
+                // 2. Persist to localStorage ('attended_session_notes')
+                let notesStore = {};
+                try {
+                    notesStore = JSON.parse(localStorage.getItem('attended_session_notes') || '{}');
+                } catch(e) {}
+                notesStore[String(recordId)] = {
+                    mr_payment: mrPayment,
+                    deduct_note: deductNote,
+                    updated_at: new Date().toISOString()
+                };
+                if (item && item.date && item.center) {
+                    const altKey = `${item.date}_${item.center}_${item.day || ''}`;
+                    notesStore[altKey] = {
+                        mr_payment: mrPayment,
+                        deduct_note: deductNote,
+                        updated_at: new Date().toISOString()
+                    };
+                }
+                localStorage.setItem('attended_session_notes', JSON.stringify(notesStore));
+
+                // 3. Sync to Supabase attendance table if online and record has valid Supabase row ID
+                if (supabaseClient && item && item.source === 'cloud' && !isNaN(Number(item.id))) {
+                    try {
+                        let currentMeta = {};
+                        if (typeof item.rawCenter === 'string' && item.rawCenter.trim().startsWith('{')) {
+                            try { currentMeta = JSON.parse(item.rawCenter.trim()); } catch(e){}
+                        }
+                        const updatedMeta = {
+                            c: currentMeta.c || item.center,
+                            d: currentMeta.d || item.day || '',
+                            dt: currentMeta.dt || item.date || '',
+                            b: currentMeta.b !== undefined ? currentMeta.b : (item.bonus || 0),
+                            ded: currentMeta.ded !== undefined ? currentMeta.ded : (item.deduction || 0),
+                            l: currentMeta.l || item.lecture || 'Regular Lecture',
+                            mr_payment: mrPayment,
+                            deduct_note: deductNote
+                        };
+
+                        const { error } = await supabaseClient
+                            .from('attendance')
+                            .update({ center: JSON.stringify(updatedMeta) })
+                            .eq('id', Number(item.id));
+
+                        if (error) {
+                            console.warn("Supabase update error (saved locally):", error);
+                        } else {
+                            item.rawCenter = JSON.stringify(updatedMeta);
+                        }
+                    } catch(cloudErr) {
+                        console.warn("Could not sync notes to cloud, cached locally:", cloudErr);
+                    }
+                }
+
+                closeAttendedNotesModal();
+                renderAttendedList();
+                renderHomeAttendedPreview();
+                showToast("Attendance notes saved successfully! ✅", "success");
+            } catch(err) {
+                console.error("Error saving attended notes:", err);
+                showToast("Error saving notes: " + (err.message || 'Check storage'), "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">check_circle</span> <span>Save Notes</span>`;
+                }
+            }
+        };
 
         function escapeHtml(str) {
             if (!str) return '';

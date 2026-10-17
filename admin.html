@@ -1437,6 +1437,11 @@
             const selectedDay = daySelect ? daySelect.value : 'ALL';
 
             // 3. Build list of records
+            let localNotesStore = {};
+            try {
+                localNotesStore = JSON.parse(localStorage.getItem('attended_session_notes') || '{}');
+            } catch(e) {}
+
             const assistantRecords = [];
 
             // A. From State.entries (official saved session entries)
@@ -1467,6 +1472,11 @@
                     const bonus = parseFloat(adjustments[astName]?.bonus) || 0;
                     const deduct = parseFloat(adjustments[astName]?.deduction) || 0;
 
+                    const altKey = `${entryDate}_${entry.center}_${entry.day || ''}`;
+                    const localNote = localNotesStore[entry.id] || localNotesStore[altKey];
+                    const mrPayment = localNote?.mr_payment || '';
+                    const deductNote = localNote?.deduct_note || '';
+
                     assistantRecords.push({
                         entryId: entry.id,
                         assistant: astName,
@@ -1479,14 +1489,39 @@
                         deduction: deduct,
                         net: bonus - deduct,
                         createdAt: entry.createdAt || entryDate || '',
-                        isEntry: true
+                        isEntry: true,
+                        mr_payment: mrPayment,
+                        deduct_note: deductNote
                     });
                 });
             });
 
             // B. Also include any raw scans from State.attendances that haven't been saved in entries yet
             State.attendances.forEach(att => {
-                const scanDate = att.created_at ? att.created_at.split('T')[0] : 'Today';
+                let cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
+                let attDay = att.day || (att.center && att.center.match(/\(([^)]+)\)/) ? att.center.match(/\(([^)]+)\)/)[1] : '');
+                let scanDate = att.created_at ? att.created_at.split('T')[0] : 'Today';
+                let bonus = 0;
+                let deduction = 0;
+                let mrPayment = '';
+                let deductNote = '';
+
+                if (typeof att.center === 'string') {
+                    const trimmed = att.center.trim();
+                    if (trimmed.startsWith('{')) {
+                        try {
+                            const meta = JSON.parse(trimmed);
+                            cleanCenter = meta.c || cleanCenter;
+                            if (meta.d) attDay = meta.d;
+                            if (meta.dt) scanDate = meta.dt;
+                            if (meta.b !== undefined) bonus = parseFloat(meta.b) || 0;
+                            if (meta.ded !== undefined) deduction = parseFloat(meta.ded) || 0;
+                            if (meta.mr_payment) mrPayment = meta.mr_payment;
+                            if (meta.deduct_note) deductNote = meta.deduct_note;
+                        } catch(e) {}
+                    }
+                }
+
                 if (!matchesMonth(scanDate)) return;
 
                 const astName = att.assistant_name;
@@ -1494,19 +1529,29 @@
                 if (selectedAssistant !== 'ALL' && astName.toLowerCase() !== selectedAssistant.toLowerCase()) {
                     return;
                 }
-                const attDay = att.day || (att.center && att.center.match(/\(([^)]+)\)/) ? att.center.match(/\(([^)]+)\)/)[1] : '');
                 if (selectedDay !== 'ALL' && attDay && attDay.toLowerCase() !== selectedDay.toLowerCase()) {
                     return;
                 }
 
-                const cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
-                const alreadyRecorded = assistantRecords.some(r => 
+                const altKey = `${scanDate}_${cleanCenter}_${attDay}`;
+                const localNote = localNotesStore[att.id] || localNotesStore[altKey];
+                if (localNote) {
+                    if (localNote.mr_payment && !mrPayment) mrPayment = localNote.mr_payment;
+                    if (localNote.deduct_note && !deductNote) deductNote = localNote.deduct_note;
+                }
+
+                const alreadyRecorded = assistantRecords.find(r => 
                     r.assistant.toLowerCase() === astName.toLowerCase() &&
                     r.center.toLowerCase().includes(cleanCenter.toLowerCase()) &&
                     (attDay ? r.day.toLowerCase() === attDay.toLowerCase() : true)
                 );
 
-                if (!alreadyRecorded) {
+                if (alreadyRecorded) {
+                    if (mrPayment && !alreadyRecorded.mr_payment) alreadyRecorded.mr_payment = mrPayment;
+                    if (deductNote && !alreadyRecorded.deduct_note) alreadyRecorded.deduct_note = deductNote;
+                    if (bonus > 0 && !alreadyRecorded.bonus) alreadyRecorded.bonus = bonus;
+                    if (deduction > 0 && !alreadyRecorded.deduction) alreadyRecorded.deduction = deduction;
+                } else {
                     const scanTime = att.created_at ? new Date(att.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
                     assistantRecords.push({
                         entryId: null,
@@ -1516,11 +1561,13 @@
                         date: scanDate,
                         time: scanTime,
                         status: 'Scanned',
-                        bonus: 0,
-                        deduction: 0,
-                        net: 0,
+                        bonus: bonus,
+                        deduction: deduction,
+                        net: bonus - deduction,
                         createdAt: att.created_at || '',
-                        isEntry: false
+                        isEntry: false,
+                        mr_payment: mrPayment,
+                        deduct_note: deductNote
                     });
                 }
             });
@@ -1667,40 +1714,60 @@
                     ? `<button type="button" onclick="deleteSessionRecord('${r.entryId}')" title="Delete this session record" class="text-on-surface-variant hover:text-error hover:bg-error-container/30 p-1.5 rounded-full transition-colors active:scale-95"><span class="material-symbols-outlined text-[16px]">delete</span></button>`
                     : ``;
 
-                return `
-                    <div class="p-3 sm:p-4 rounded-xl bg-surface-container-low border border-outline-variant/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container transition-colors">
-                        <div class="flex items-start sm:items-center gap-3 min-w-0">
-                            <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary shrink-0 border border-outline-variant/50">
-                                <span class="material-symbols-outlined text-[18px]">storefront</span>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="font-bold text-xs sm:text-sm text-on-surface">${r.center}</span>
-                                    <span class="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">${r.day}</span>
-                                    ${statusBadge}
-                                </div>
-                                <div class="flex items-center gap-2 text-[11px] text-on-surface-variant mt-0.5">
-                                    <span class="font-semibold text-on-surface">${r.assistant}</span>
-                                    <span>&bull;</span>
-                                    <span>${r.date}</span>
-                                    ${r.time ? `<span>&bull;</span><span>${r.time}</span>` : ''}
-                                </div>
-                            </div>
-                        </div>
+                const notesHtml = (r.mr_payment || r.deduct_note) ? `
+                    <div class="mt-2.5 pt-2 border-t border-outline-variant/30 flex flex-wrap gap-2 text-[11px]">
+                        ${r.mr_payment ? `
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/10 text-secondary border border-secondary/20">
+                                <span class="material-symbols-outlined text-[14px]">payments</span>
+                                <span>Paid for Mr: <strong class="text-on-surface">${escapeHtml(r.mr_payment)}</strong></span>
+                            </span>
+                        ` : ''}
+                        ${r.deduct_note ? `
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-error/10 text-error border border-error/20">
+                                <span class="material-symbols-outlined text-[14px]">remove_circle</span>
+                                <span>Deducts Note: <strong class="text-on-surface">${escapeHtml(r.deduct_note)}</strong></span>
+                            </span>
+                        ` : ''}
+                    </div>
+                ` : '';
 
-                        <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-outline-variant/40 shrink-0">
-                            <div class="flex items-center gap-3">
-                                <div class="flex flex-col items-end">
-                                    <span class="text-[9px] uppercase tracking-wider text-secondary font-medium">Bonus</span>
-                                    ${bonusDisplay}
+                return `
+                    <div class="p-3 sm:p-4 rounded-xl bg-surface-container-low border border-outline-variant/60 flex flex-col gap-2 hover:bg-surface-container transition-colors">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-start sm:items-center gap-3 min-w-0">
+                                <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary shrink-0 border border-outline-variant/50">
+                                    <span class="material-symbols-outlined text-[18px]">storefront</span>
                                 </div>
-                                <div class="flex flex-col items-end">
-                                    <span class="text-[9px] uppercase tracking-wider text-error font-medium">Deduct</span>
-                                    ${deductDisplay}
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="font-bold text-xs sm:text-sm text-on-surface">${r.center}</span>
+                                        <span class="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">${r.day}</span>
+                                        ${statusBadge}
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[11px] text-on-surface-variant mt-0.5">
+                                        <span class="font-semibold text-on-surface">${r.assistant}</span>
+                                        <span>&bull;</span>
+                                        <span>${r.date}</span>
+                                        ${r.time ? `<span>&bull;</span><span>${r.time}</span>` : ''}
+                                    </div>
                                 </div>
                             </div>
-                            ${deleteBtn}
+
+                            <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-outline-variant/40 shrink-0">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex flex-col items-end">
+                                        <span class="text-[9px] uppercase tracking-wider text-secondary font-medium">Bonus</span>
+                                        ${bonusDisplay}
+                                    </div>
+                                    <div class="flex flex-col items-end">
+                                        <span class="text-[9px] uppercase tracking-wider text-error font-medium">Deduct</span>
+                                        ${deductDisplay}
+                                    </div>
+                                </div>
+                                ${deleteBtn}
+                            </div>
                         </div>
+                        ${notesHtml}
                     </div>
                 `;
             }).join('');
@@ -1776,13 +1843,18 @@
                 return (dateStr || '').startsWith(selectedMonth);
             };
 
+            let localNotesStore = {};
+            try {
+                localNotesStore = JSON.parse(localStorage.getItem('attended_session_notes') || '{}');
+            } catch(e) {}
+
             const assistantStats = {};
 
             // Ensure all known assistants exist in map
             State.assistants.forEach(a => {
                 const name = getAssistantName(a);
                 if (name) {
-                    assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set() };
+                    assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set(), mrPayments: [], deductNotes: [] };
                 }
             });
 
@@ -1797,16 +1869,27 @@
                 presentList.forEach(name => {
                     if (!name) return;
                     if (!assistantStats[name]) {
-                        assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set() };
+                        assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set(), mrPayments: [], deductNotes: [] };
                     }
                     assistantStats[name].attended++;
                     if (entry.center) assistantStats[name].centers.add(entry.center);
+
+                    const altKey = `${entryDate}_${entry.center}_${entry.day || ''}`;
+                    const localNote = localNotesStore[entry.id] || localNotesStore[altKey];
+                    if (localNote) {
+                        if (localNote.mr_payment && !assistantStats[name].mrPayments.includes(`${entry.center}: ${localNote.mr_payment}`)) {
+                            assistantStats[name].mrPayments.push(`${entry.center}: ${localNote.mr_payment}`);
+                        }
+                        if (localNote.deduct_note && !assistantStats[name].deductNotes.includes(`${entry.center}: ${localNote.deduct_note}`)) {
+                            assistantStats[name].deductNotes.push(`${entry.center}: ${localNote.deduct_note}`);
+                        }
+                    }
                 });
 
                 Object.keys(adjustments).forEach(name => {
                     if (!name) return;
                     if (!assistantStats[name]) {
-                        assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set() };
+                        assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set(), mrPayments: [], deductNotes: [] };
                     }
                     const b = parseFloat(adjustments[name].bonus) || 0;
                     const d = parseFloat(adjustments[name].deduction) || 0;
@@ -1823,8 +1906,26 @@
                 const name = att.assistant_name;
                 if (!name) return;
 
-                const cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
-                
+                let cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
+                let attMrPayment = '';
+                let attDeductNote = '';
+
+                if (typeof att.center === 'string' && att.center.trim().startsWith('{')) {
+                    try {
+                        const meta = JSON.parse(att.center.trim());
+                        cleanCenter = meta.c || cleanCenter;
+                        attMrPayment = meta.mr_payment || '';
+                        attDeductNote = meta.deduct_note || '';
+                    } catch(e) {}
+                }
+
+                const altKey = `${scanDate}_${cleanCenter}_${att.day || ''}`;
+                const localNote = localNotesStore[att.id] || localNotesStore[altKey];
+                if (localNote) {
+                    if (localNote.mr_payment && !attMrPayment) attMrPayment = localNote.mr_payment;
+                    if (localNote.deduct_note && !attDeductNote) attDeductNote = localNote.deduct_note;
+                }
+
                 // If not already counted in entries for that date and center
                 const inEntry = State.entries.some(e => {
                     const eDate = e.date || (e.createdAt ? e.createdAt.split('T')[0] : '');
@@ -1833,10 +1934,19 @@
 
                 if (!inEntry) {
                     if (!assistantStats[name]) {
-                        assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set() };
+                        assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set(), mrPayments: [], deductNotes: [] };
                     }
                     assistantStats[name].attended++;
                     if (cleanCenter) assistantStats[name].centers.add(cleanCenter);
+                }
+
+                if (assistantStats[name]) {
+                    if (attMrPayment && !assistantStats[name].mrPayments.includes(`${cleanCenter}: ${attMrPayment}`)) {
+                        assistantStats[name].mrPayments.push(`${cleanCenter}: ${attMrPayment}`);
+                    }
+                    if (attDeductNote && !assistantStats[name].deductNotes.includes(`${cleanCenter}: ${attDeductNote}`)) {
+                        assistantStats[name].deductNotes.push(`${cleanCenter}: ${attDeductNote}`);
+                    }
                 }
             });
 
@@ -1855,14 +1965,25 @@
                         const netClass = net > 0 ? 'text-secondary font-bold' : (net < 0 ? 'text-error font-bold' : 'text-on-surface');
                         const netPrefix = net > 0 ? '+' : '';
 
+                        const notesChips = [];
+                        if (s.mrPayments && s.mrPayments.length > 0) {
+                            notesChips.push(`<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-secondary bg-secondary/10 px-1.5 py-0.5 rounded border border-secondary/20" title="${escapeHtml(s.mrPayments.join(' | '))}">💵 Paid for Mr (${s.mrPayments.length})</span>`);
+                        }
+                        if (s.deductNotes && s.deductNotes.length > 0) {
+                            notesChips.push(`<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-error bg-error/10 px-1.5 py-0.5 rounded border border-error/20" title="${escapeHtml(s.deductNotes.join(' | '))}">⚠️ Deducts (${s.deductNotes.length})</span>`);
+                        }
+
                         return `
                         <tr class="hover:bg-surface-container-low transition-colors">
                             <td class="py-3 px-4 font-mono text-outline">${idx + 1}</td>
-                            <td class="py-3 px-4 font-bold text-on-surface flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full avatar-color-${idx % 3} flex items-center justify-center text-[10px] font-bold">
-                                    ${getInitials(name)}
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-on-surface flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full avatar-color-${idx % 3} flex items-center justify-center text-[10px] font-bold shrink-0">
+                                        ${getInitials(name)}
+                                    </div>
+                                    <span>${escapeHtml(name)}</span>
                                 </div>
-                                <span>${name}</span>
+                                ${notesChips.length > 0 ? `<div class="flex flex-wrap gap-1 mt-1 pl-8">${notesChips.join(' ')}</div>` : ''}
                             </td>
                             <td class="py-3 px-4 text-center">
                                 <span class="inline-flex items-center gap-1 font-bold text-xs px-2.5 py-0.5 rounded-full ${s.attended > 0 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-surface-container text-on-surface-variant'}">
@@ -1918,6 +2039,12 @@
                 const net = s.bonus - s.deduct;
                 const netStr = (net > 0 ? `+${net}` : `${net}`) + ' EGP';
                 lines.push(`${count}. ${name} -> Attended: ${s.attended} lectures | Bonus: +${s.bonus} EGP | Deduct: -${s.deduct} EGP | Net: ${netStr}`);
+                if (s.mrPayments && s.mrPayments.length > 0) {
+                    lines.push(`   - 💵 Paid for Mr: ${s.mrPayments.join('; ')}`);
+                }
+                if (s.deductNotes && s.deductNotes.length > 0) {
+                    lines.push(`   - ⚠️ Deduct notes: ${s.deductNotes.join('; ')}`);
+                }
                 count++;
             });
 
