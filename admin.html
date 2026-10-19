@@ -1317,7 +1317,7 @@
             return Date.now().toString(36) + Math.random().toString(36).substr(2);
         }
 
-        // Helper to parse center string or JSON metadata (center name, day, notes, bonuses)
+        // Helper to parse center string or JSON metadata (center name, day, notes, bonuses, arrival time)
         function parseAttendanceCenterMeta(rawCenterVal) {
             let cleanCenter = '';
             let day = '';
@@ -1326,6 +1326,8 @@
             let bonus = 0;
             let deduction = 0;
             let lecture = '';
+            let arr = '';
+            let dt = '';
 
             if (typeof rawCenterVal === 'string') {
                 const trimmed = rawCenterVal.trim();
@@ -1339,6 +1341,8 @@
                         bonus = parseFloat(meta.b) || 0;
                         deduction = parseFloat(meta.ded) || 0;
                         lecture = (meta.l || '').trim();
+                        arr = (meta.arr || '').trim();
+                        dt = (meta.dt || '').trim();
                     } catch(e) {}
                 } else {
                     const parenMatch = trimmed.match(/^(.*?)\s*\(([^)]+)\)$/);
@@ -1350,7 +1354,7 @@
                     }
                 }
             }
-            return { cleanCenter, day, mrPayment, deductNote, bonus, deduction, lecture };
+            return { cleanCenter, day, mrPayment, deductNote, bonus, deduction, lecture, arr, dt };
         }
 
         // --- Navigation ---
@@ -1639,13 +1643,38 @@
                     const mrPayment = localNote?.mr_payment || '';
                     const deductNote = localNote?.deduct_note || '';
 
+                    // Look up assistant's actual physical scan arrival time
+                    let astArrivalTime = '';
+                    const assistantScans = (State.attendances || []).filter(att => {
+                        if ((att.assistant_name || '').trim().toLowerCase() !== astName.toLowerCase()) return false;
+                        const meta = parseAttendanceCenterMeta(att.center);
+                        const cMatch = (meta.cleanCenter || att.center || '').toLowerCase().includes(entry.center.toLowerCase()) || entry.center.toLowerCase().includes((meta.cleanCenter || att.center || '').toLowerCase());
+                        const dMatch = !entry.day || !att.day || (att.day || meta.day || '').toLowerCase() === (entry.day || '').toLowerCase();
+                        return cMatch && dMatch;
+                    });
+                    if (assistantScans.length > 0) {
+                        for (const att of assistantScans) {
+                            const meta = parseAttendanceCenterMeta(att.center);
+                            if (meta.arr) { astArrivalTime = meta.arr; break; }
+                            if (att.time) { astArrivalTime = att.time; break; }
+                        }
+                        if (!astArrivalTime) {
+                            const sorted = [...assistantScans].filter(a => a.created_at).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+                            if (sorted.length > 0) {
+                                astArrivalTime = new Date(sorted[0].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            }
+                        }
+                    }
+
+                    const recordTime = astArrivalTime || entry.savedAt || (entry.createdAt ? new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+
                     assistantRecords.push({
                         entryId: entry.id,
                         assistant: astName,
                         center: entry.center,
                         day: entry.day,
                         date: entryDate,
-                        time: entry.savedAt || (entry.createdAt ? new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''),
+                        time: recordTime,
                         status: isPresent ? 'Attended' : 'Absent',
                         bonus: bonus,
                         deduction: deduct,
@@ -1708,13 +1737,20 @@
                     (attDay ? r.day.toLowerCase() === attDay.toLowerCase() : true)
                 );
 
+                let scanTime = meta.arr || att.time;
+                if (!scanTime && att.created_at) {
+                    scanTime = new Date(att.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+
                 if (alreadyRecorded) {
+                    if (scanTime && (!alreadyRecorded.time || alreadyRecorded.time === alreadyRecorded.savedAt)) {
+                        alreadyRecorded.time = scanTime;
+                    }
                     if (mrPayment && !alreadyRecorded.mr_payment) alreadyRecorded.mr_payment = mrPayment;
                     if (deductNote && !alreadyRecorded.deduct_note) alreadyRecorded.deduct_note = deductNote;
                     if (bonus > 0 && !alreadyRecorded.bonus) alreadyRecorded.bonus = bonus;
                     if (deduction > 0 && !alreadyRecorded.deduction) alreadyRecorded.deduction = deduction;
                 } else {
-                    const scanTime = att.created_at ? new Date(att.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
                     assistantRecords.push({
                         entryId: null,
                         assistant: astName,
@@ -2344,6 +2380,7 @@
 
                 if (supabaseClient && recordId) {
                     const currentMeta = match ? parseAttendanceCenterMeta(match.center) : {};
+                    const originalArrTime = currentMeta.arr || match?.time || (match?.created_at ? new Date(match.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
                     const updatedMeta = {
                         c: currentMeta.cleanCenter || center,
                         d: currentMeta.day || day,
@@ -2351,6 +2388,7 @@
                         b: currentMeta.bonus || 0,
                         ded: currentMeta.deduction || 0,
                         l: currentMeta.lecture || 'Regular Lecture',
+                        arr: originalArrTime,
                         mr_payment: mrPayment,
                         deduct_note: deductNote
                     };
@@ -2814,11 +2852,27 @@
                             const savedBonus = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.bonus) ? existingEntry.adjustments[name].bonus : '';
                             const savedDeduct = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.deduction) ? existingEntry.adjustments[name].deduction : '';
 
-                            const scanRecord = scannedRecordsForCenter.find(att => (att.assistant_name || '').trim().toLowerCase() === name.trim().toLowerCase());
+                            const assistantScans = scannedRecordsForCenter.filter(att => (att.assistant_name || '').trim().toLowerCase() === name.trim().toLowerCase());
+                            const scanRecord = assistantScans[0] || null;
                             let arrivalBadge = '';
-                            if (scanRecord && scanRecord.created_at) {
-                                const arrTime = new Date(scanRecord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Arrived at ${arrTime}</span>`;
+                            if (assistantScans.length > 0) {
+                                let bestArrTime = '';
+                                for (const att of assistantScans) {
+                                    const meta = parseAttendanceCenterMeta(att.center);
+                                    if (meta.arr) { bestArrTime = meta.arr; break; }
+                                    if (att.time) { bestArrTime = att.time; break; }
+                                }
+                                if (!bestArrTime) {
+                                    const sortedScans = [...assistantScans].filter(a => a.created_at).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+                                    if (sortedScans.length > 0) {
+                                        bestArrTime = new Date(sortedScans[0].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    }
+                                }
+                                if (bestArrTime) {
+                                    arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Arrived at ${bestArrTime}</span>`;
+                                } else {
+                                    arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Scanned ID</span>`;
+                                }
                             } else if (isScanned) {
                                 arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Scanned ID</span>`;
                             } else if (existingEntry) {
@@ -2831,9 +2885,13 @@
                                 arrivalBadge = `<span class="text-[11px] text-on-surface-variant font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[12px] text-outline">schedule</span> Assigned (Not scanned yet)</span>`;
                             }
 
-                            const scanMeta = scanRecord ? parseAttendanceCenterMeta(scanRecord.center) : {};
-                            let astMrPayment = scanMeta.mrPayment || '';
-                            let astDeductNote = scanMeta.deductNote || '';
+                            let astMrPayment = '';
+                            let astDeductNote = '';
+                            for (const att of assistantScans) {
+                                const sm = parseAttendanceCenterMeta(att.center);
+                                if (sm.mrPayment && !astMrPayment) astMrPayment = sm.mrPayment;
+                                if (sm.deductNote && !astDeductNote) astDeductNote = sm.deductNote;
+                            }
 
                             let localNotesMap = {};
                             try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e) {}
@@ -3097,39 +3155,68 @@
                     renderManageAssistantRecords();
                 }
 
-                // 2. Sync attended assistants to Supabase attendance table
+                // 2. Sync attended assistants to Supabase attendance table (preserving original scan arrival time)
                 if (supabaseClient && present.length > 0) {
                     for (const astName of present) {
                         try {
                             const b = adjustments && adjustments[astName] && parseFloat(adjustments[astName].bonus) || 0;
                             const d = adjustments && adjustments[astName] && parseFloat(adjustments[astName].deduction) || 0;
                             
-                            // Pack attendance metadata so assistant portal can read exact lecture details, date, bonus, deduction
-                            let centerPayload = center;
-                            if (b > 0 || d > 0 || day || todayStr) {
-                                centerPayload = JSON.stringify({
-                                    c: center,
-                                    d: day,
-                                    dt: todayStr,
-                                    b: b,
-                                    ded: d
-                                });
+                            // Check if an existing attendance record exists for this assistant, center and day
+                            const existingAtt = (State.attendances || []).find(att => {
+                                if ((att.assistant_name || '').trim().toLowerCase() !== astName.trim().toLowerCase()) return false;
+                                const m = parseAttendanceCenterMeta(att.center);
+                                const cMatch = (m.cleanCenter || att.center || '').toLowerCase().includes(center.toLowerCase()) || center.toLowerCase().includes((m.cleanCenter || att.center || '').toLowerCase());
+                                const dMatch = !day || !att.day || (att.day || m.day || '').toLowerCase() === day.toLowerCase();
+                                return cMatch && dMatch;
+                            });
+
+                            const existingMeta = existingAtt ? parseAttendanceCenterMeta(existingAtt.center) : {};
+                            const originalArr = existingMeta.arr || existingAtt?.time || (existingAtt?.created_at ? new Date(existingAtt.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : nowTimeStr);
+                            const mrPayment = existingMeta.mrPayment || '';
+                            const deductNote = existingMeta.deductNote || '';
+
+                            const centerPayloadObj = {
+                                c: center,
+                                d: day,
+                                dt: existingMeta.dt || todayStr,
+                                b: b,
+                                ded: d,
+                                arr: originalArr,
+                                mr_payment: mrPayment,
+                                deduct_note: deductNote
+                            };
+
+                            let updated = false;
+                            if (existingAtt && existingAtt.id && !String(existingAtt.id).startsWith('local_')) {
+                                const { error: updErr } = await supabaseClient
+                                    .from('attendance')
+                                    .update({ center: JSON.stringify(centerPayloadObj) })
+                                    .eq('id', existingAtt.id);
+                                if (!updErr) {
+                                    updated = true;
+                                    existingAtt.center = JSON.stringify(centerPayloadObj);
+                                }
                             }
 
-                            let { error } = await supabaseClient
-                                .from('attendance')
-                                .insert([{
-                                    assistant_name: astName,
-                                    center: centerPayload
-                                }]);
-                            if (error) {
-                                // Fallback to plain string if JSON exceeds or fails
-                                await supabaseClient
+                            if (!updated) {
+                                let { data: insData, error: insErr } = await supabaseClient
                                     .from('attendance')
                                     .insert([{
                                         assistant_name: astName,
-                                        center: `${center} (${day})`
-                                    }]);
+                                        center: JSON.stringify(centerPayloadObj)
+                                    }])
+                                    .select();
+                                if (insErr) {
+                                    await supabaseClient
+                                        .from('attendance')
+                                        .insert([{
+                                            assistant_name: astName,
+                                            center: `${center} (${day})`
+                                        }]);
+                                } else if (insData && insData[0]) {
+                                    State.attendances.unshift(insData[0]);
+                                }
                             }
                         } catch(syncErr) {
                             console.warn("Error syncing attendance for", astName, syncErr);
@@ -3969,6 +4056,21 @@
                         fetchAttendance();
                     }
                 })
+                .on('broadcast', { event: 'notes_updated' }, ({ payload }) => {
+                    if (payload) {
+                        let localNotesMap = {};
+                        try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e){}
+                        const val = {
+                            mr_payment: payload.mr_payment || '',
+                            deduct_note: payload.deduct_note || '',
+                            updated_at: new Date().toISOString()
+                        };
+                        if (payload.id) localNotesMap[payload.id] = val;
+                        if (payload.center && payload.day) localNotesMap[`${payload.center}_${payload.day}`] = val;
+                        localStorage.setItem('attended_session_notes', JSON.stringify(localNotesMap));
+                        fetchAttendance();
+                    }
+                })
                 .subscribe();
         }
 
@@ -4161,16 +4263,93 @@
 
                 if (error) throw error;
                 const cloudAttendances = data || [];
+
+                // Deduplicate redundant records for the same assistant, center, day, and date
+                // Always preserve the EARLIEST physical scan timestamp
+                const groups = new Map();
+                const duplicateIdsToDelete = [];
+
+                for (const att of cloudAttendances) {
+                    const meta = parseAttendanceCenterMeta(att.center);
+                    const cleanCenter = (meta.cleanCenter || att.center || '').trim().toLowerCase();
+                    const day = (meta.day || att.day || '').trim().toLowerCase();
+                    const dateStr = meta.date || (att.created_at ? att.created_at.split('T')[0] : '');
+                    const nameStr = (att.assistant_name || '').trim().toLowerCase();
+                    const key = `${nameStr}_${cleanCenter}_${day}_${dateStr}`;
+
+                    if (!groups.has(key)) {
+                        groups.set(key, [att]);
+                    } else {
+                        groups.get(key).push(att);
+                    }
+                }
+
+                const cleanCloudAttendances = [];
+                for (const [key, items] of groups.entries()) {
+                    if (items.length === 1) {
+                        cleanCloudAttendances.push(items[0]);
+                    } else {
+                        // Sort by created_at ascending so earliest scan is first
+                        items.sort((a, b) => {
+                            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                            return timeA - timeB;
+                        });
+
+                        const canonical = items[0];
+                        const canonicalMeta = parseAttendanceCenterMeta(canonical.center);
+
+                        // Merge any notes, bonuses, deductions, or earlier arr from redundant entries
+                        for (let i = 1; i < items.length; i++) {
+                            const other = items[i];
+                            const otherMeta = parseAttendanceCenterMeta(other.center);
+                            if (!canonicalMeta.arr && otherMeta.arr) canonicalMeta.arr = otherMeta.arr;
+                            if (otherMeta.bonus !== undefined && canonicalMeta.bonus === undefined) canonicalMeta.bonus = otherMeta.bonus;
+                            if (otherMeta.deduction !== undefined && canonicalMeta.deduction === undefined) canonicalMeta.deduction = otherMeta.deduction;
+                            if (otherMeta.mrPayment && !canonicalMeta.mrPayment) canonicalMeta.mrPayment = otherMeta.mrPayment;
+                            if (otherMeta.deductNote && !canonicalMeta.deductNote) canonicalMeta.deductNote = otherMeta.deductNote;
+
+                            if (other.id && !String(other.id).startsWith('local_')) {
+                                duplicateIdsToDelete.push(other.id);
+                            }
+                        }
+
+                        canonical.center = JSON.stringify({
+                            c: canonicalMeta.cleanCenter || canonical.center,
+                            d: canonicalMeta.day || canonical.day,
+                            dt: canonicalMeta.date || (canonical.created_at ? canonical.created_at.split('T')[0] : ''),
+                            arr: canonicalMeta.arr || canonical.time || (canonical.created_at ? new Date(canonical.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''),
+                            b: canonicalMeta.bonus || 0,
+                            ded: canonicalMeta.deduction || 0,
+                            mr_payment: canonicalMeta.mrPayment || '',
+                            deduct_note: canonicalMeta.deductNote || ''
+                        });
+
+                        cleanCloudAttendances.push(canonical);
+                    }
+                }
+
+                // Silently delete duplicate rows in background so they never reappear
+                if (duplicateIdsToDelete.length > 0) {
+                    supabaseClient
+                        .from('attendance')
+                        .delete()
+                        .in('id', duplicateIdsToDelete)
+                        .then(({ error: delErr }) => {
+                            if (!delErr) console.log(`Purged ${duplicateIdsToDelete.length} duplicate attendance rows from Supabase.`);
+                        }).catch(e => console.warn("Duplicate cleanup err:", e));
+                }
+
                 try {
-                    localStorage.setItem(CACHED_ATTENDANCE_KEY, JSON.stringify(cloudAttendances));
+                    localStorage.setItem(CACHED_ATTENDANCE_KEY, JSON.stringify(cleanCloudAttendances));
                 } catch(e) {}
 
                 // Merge pending offline scans with cloud scans
                 const queue = getOfflineQueue();
-                const cloudKeys = new Set(cloudAttendances.map(a => `${a.assistant_name}_${a.created_at}`));
+                const cloudKeys = new Set(cleanCloudAttendances.map(a => `${a.assistant_name}_${a.created_at}`));
                 const pendingScans = queue.filter(q => !cloudKeys.has(`${q.assistant_name}_${q.created_at}`));
                 
-                State.attendances = [...pendingScans, ...cloudAttendances];
+                State.attendances = [...pendingScans, ...cleanCloudAttendances];
                 syncEntriesFromAttendances();
             } catch (err) {
                 console.warn("Could not fetch attendance from Supabase, loading offline cache:", err);
@@ -4218,8 +4397,35 @@
                 return;
             }
             
-            listContainer.innerHTML = scans.map(scan => {
-                const timeStr = scan.time || (scan.created_at ? new Date(scan.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--');
+            // Deduplicate scans so each assistant appears only once with their earliest physical arrival
+            const dedupMap = new Map();
+            for (const scan of scans) {
+                const meta = parseAttendanceCenterMeta(scan.center);
+                const cleanCenter = (meta.cleanCenter || scan.center || '').trim().toLowerCase();
+                const day = (meta.day || scan.day || '').trim().toLowerCase();
+                const dateStr = meta.date || (scan.created_at ? scan.created_at.split('T')[0] : '');
+                const nameStr = (scan.assistant_name || '').trim().toLowerCase();
+                const key = `${nameStr}_${cleanCenter}_${day}_${dateStr}`;
+
+                const curTimeStr = meta.arr || scan.time || (scan.created_at ? new Date(scan.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--');
+
+                if (!dedupMap.has(key)) {
+                    dedupMap.set(key, { ...scan, displayTime: curTimeStr });
+                } else {
+                    const existing = dedupMap.get(key);
+                    // Compare created_at or timestamp to ensure earliest is kept
+                    const existingTime = existing.created_at ? new Date(existing.created_at).getTime() : 0;
+                    const curTime = scan.created_at ? new Date(scan.created_at).getTime() : 0;
+                    if (curTime > 0 && curTime < existingTime) {
+                        dedupMap.set(key, { ...scan, displayTime: curTimeStr });
+                    }
+                }
+            }
+
+            const uniqueScans = Array.from(dedupMap.values());
+
+            listContainer.innerHTML = uniqueScans.map(scan => {
+                const timeStr = scan.displayTime;
                 const dayDisplay = scan.day ? ` &bull; ${scan.day}` : '';
                 const isOffline = scan.is_offline_pending;
                 const statusBadge = isOffline 
@@ -4303,17 +4509,47 @@
             const center = document.getElementById('attendance_center').value;
             const day = document.getElementById('attendance_day').value;
             const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+
+            // Guard: Prevent duplicate check-in if assistant is already scanned in today
+            const alreadyCheckedIn = (State.attendances || []).find(a => {
+                if (!a.assistant_name || a.assistant_name.trim().toLowerCase() !== assistantName.trim().toLowerCase()) return false;
+                const meta = parseAttendanceCenterMeta(a.center);
+                const aDate = meta.date || (a.created_at ? a.created_at.split('T')[0] : '');
+                if (aDate !== todayStr) return false;
+                const cMatch = (!center || (meta.cleanCenter || a.center).trim().toLowerCase() === center.trim().toLowerCase());
+                return cMatch;
+            });
+
+            if (alreadyCheckedIn) {
+                const existingMeta = parseAttendanceCenterMeta(alreadyCheckedIn.center);
+                const existingTime = existingMeta.arr || alreadyCheckedIn.time || (alreadyCheckedIn.created_at ? new Date(alreadyCheckedIn.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+                showToast(`${assistantName} is already checked in today at ${existingTime}!`, "warning");
+                return;
+            }
+
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const shortTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const scanTimestamp = now.toISOString();
+
+            // Store arr inside JSON payload so arrival time is permanent and immutable
+            const centerPayload = JSON.stringify({
+                c: center,
+                d: day,
+                dt: todayStr,
+                arr: shortTimeStr
+            });
 
             // 1. Create offline-safe attendance record preserving the exact physical scan timestamp
             const record = {
                 id: 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
                 assistant_name: assistantName,
-                center: `${center} (${day})`,
+                center: centerPayload,
+                raw_center_name: `${center} (${day})`,
                 day: day,
                 created_at: scanTimestamp,
-                time: timeStr,
+                time: shortTimeStr,
+                arrival_time: shortTimeStr,
                 is_offline_pending: true
             };
 

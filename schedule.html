@@ -1093,6 +1093,7 @@
                                     }
                                     if (row.arrival_time) arrivalTime = row.arrival_time;
 
+                                    let metaArr = '';
                                     // Parse enriched JSON center metadata if present
                                     if (typeof row.center === 'string') {
                                         const trimmed = row.center.trim();
@@ -1107,6 +1108,7 @@
                                                 lectureName = meta.l || lectureName;
                                                 mrPayment = meta.mr_payment || '';
                                                 deductNote = meta.deduct_note || '';
+                                                metaArr = meta.arr || '';
                                             } catch(e) {}
                                         } else {
                                             const parenMatch = trimmed.match(/^(.*?)\s*\(([^)]+)\)$/);
@@ -1117,6 +1119,12 @@
                                         }
                                     }
 
+                                    if (metaArr) {
+                                        arrivalTime = metaArr;
+                                    } else if (row.arrival_time) {
+                                        arrivalTime = row.arrival_time;
+                                    }
+
                                     const uniqueKey = `${dateStr}_${centerName}_${dayStr}`;
                                     const savedLocal = localNotesMap[row.id] || localNotesMap[uniqueKey];
                                     if (savedLocal) {
@@ -1124,7 +1132,15 @@
                                         if (savedLocal.deduct_note && !deductNote) deductNote = savedLocal.deduct_note;
                                     }
 
-                                    if (!seenKeys.has(uniqueKey)) {
+                                    const existing = combinedRecords.find(r => r.date === dateStr && r.center.toLowerCase() === centerName.toLowerCase() && (!dayStr || !r.day || r.day.toLowerCase() === dayStr.toLowerCase()));
+                                    if (existing) {
+                                        if (bonus > 0 && !existing.bonus) existing.bonus = bonus;
+                                        if (deduction > 0 && !existing.deduction) existing.deduction = deduction;
+                                        if (mrPayment && !existing.mr_payment) existing.mr_payment = mrPayment;
+                                        if (deductNote && !existing.deduct_note) existing.deduct_note = deductNote;
+                                        if (metaArr) existing.arrivalTime = metaArr;
+                                        if (row.id && String(row.id).length > 20 && !String(row.id).includes('_')) existing.id = row.id;
+                                    } else {
                                         seenKeys.add(uniqueKey);
                                         combinedRecords.push({
                                             id: row.id || uniqueKey,
@@ -1710,6 +1726,7 @@
                             if (typeof item?.rawCenter === 'string' && item.rawCenter.trim().startsWith('{')) {
                                 try { currentMeta = JSON.parse(item.rawCenter.trim()); } catch(e){}
                             }
+                            const originalArr = currentMeta.arr || item?.arrivalTime || '';
                             const updatedMeta = {
                                 c: currentMeta.c || item?.center || '',
                                 d: currentMeta.d || item?.day || '',
@@ -1717,6 +1734,7 @@
                                 b: currentMeta.b !== undefined ? currentMeta.b : (item?.bonus || 0),
                                 ded: currentMeta.ded !== undefined ? currentMeta.ded : (item?.deduction || 0),
                                 l: currentMeta.l || item?.lecture || 'Regular Lecture',
+                                arr: originalArr,
                                 mr_payment: mrPayment,
                                 deduct_note: deductNote
                             };
@@ -1735,11 +1753,13 @@
                                     try {
                                         arrivalsChannel.send({
                                             type: 'broadcast',
-                                            event: 'arrival',
+                                            event: 'notes_updated',
                                             payload: {
                                                 id: targetId,
                                                 assistant_name: currentAssistant.name,
                                                 center: item?.center,
+                                                day: item?.day,
+                                                time: originalArr || item?.arrivalTime,
                                                 mr_payment: mrPayment,
                                                 deduct_note: deductNote
                                             }
