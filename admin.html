@@ -1356,6 +1356,44 @@
             return Date.now().toString(36) + Math.random().toString(36).substr(2);
         }
 
+        // Universal Toast Notification System
+        function showToast(msg, type = "success") {
+            let toast = document.getElementById("toast");
+            let toastMsg = document.getElementById("toast-message");
+            let toastIcon = document.getElementById("toast-icon");
+
+            if (!toast) {
+                toast = document.createElement("div");
+                toast.id = "toast";
+                toast.innerHTML = `<span id="toast-icon" class="material-symbols-outlined text-[18px]"></span><span id="toast-message" class="text-xs font-semibold leading-snug"></span>`;
+                document.body.appendChild(toast);
+                toastMsg = document.getElementById("toast-message");
+                toastIcon = document.getElementById("toast-icon");
+            }
+
+            toastMsg.textContent = msg;
+
+            if (type === "warning") {
+                toast.className = "fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-4 py-3 rounded-2xl shadow-xl border border-amber-500/40 bg-surface-container-highest text-amber-800 dark:text-amber-300 transition-all duration-300";
+                toastIcon.className = "material-symbols-outlined text-[20px] text-amber-600 dark:text-amber-400";
+                toastIcon.textContent = "warning";
+            } else if (type === "error") {
+                toast.className = "fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-4 py-3 rounded-2xl shadow-xl border border-error/40 bg-surface-container-highest text-error transition-all duration-300";
+                toastIcon.className = "material-symbols-outlined text-[20px] text-error";
+                toastIcon.textContent = "error";
+            } else {
+                toast.className = "fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-2 px-4 py-3 rounded-2xl shadow-xl border border-emerald-500/40 bg-surface-container-highest text-emerald-800 dark:text-emerald-300 transition-all duration-300";
+                toastIcon.className = "material-symbols-outlined text-[20px] text-emerald-600 dark:text-emerald-400";
+                toastIcon.textContent = "check_circle";
+            }
+
+            toast.classList.remove("hidden");
+            clearTimeout(window._toastTimeout);
+            window._toastTimeout = setTimeout(() => {
+                if (toast) toast.classList.add("hidden");
+            }, 3500);
+        }
+        window.showToast = showToast;
         // Helper to parse center string or JSON metadata (center name, day, notes, bonuses, arrival time)
         function parseAttendanceCenterMeta(rawCenterVal) {
             let cleanCenter = '';
@@ -1393,7 +1431,7 @@
                     }
                 }
             }
-            return { cleanCenter, day, mrPayment, deductNote, bonus, deduction, lecture, arr, dt };
+            return { cleanCenter, day, mrPayment, deductNote, bonus, deduction, lecture, arr, dt, date: dt };
         }
 
         // --- Navigation ---
@@ -1728,29 +1766,14 @@
 
             // B. Also include any raw scans from State.attendances that haven't been saved in entries yet
             State.attendances.forEach(att => {
-                let cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
-                let attDay = att.day || (att.center && att.center.match(/\(([^)]+)\)/) ? att.center.match(/\(([^)]+)\)/)[1] : '');
-                let scanDate = att.created_at ? att.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
-                let bonus = 0;
-                let deduction = 0;
-                let mrPayment = '';
-                let deductNote = '';
-
-                if (typeof att.center === 'string') {
-                    const trimmed = att.center.trim();
-                    if (trimmed.startsWith('{')) {
-                        try {
-                            const meta = JSON.parse(trimmed);
-                            cleanCenter = meta.c || cleanCenter;
-                            if (meta.d) attDay = meta.d;
-                            if (meta.dt) scanDate = meta.dt;
-                            if (meta.b !== undefined) bonus = parseFloat(meta.b) || 0;
-                            if (meta.ded !== undefined) deduction = parseFloat(meta.ded) || 0;
-                            if (meta.mr_payment) mrPayment = meta.mr_payment;
-                            if (meta.deduct_note) deductNote = meta.deduct_note;
-                        } catch(e) {}
-                    }
-                }
+                const meta = parseAttendanceCenterMeta(att.center);
+                let cleanCenter = meta.cleanCenter || (att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '');
+                let attDay = meta.day || att.day || (att.center && att.center.match(/\(([^)]+)\)/) ? att.center.match(/\(([^)]+)\)/)[1] : '');
+                let scanDate = meta.date || meta.dt || (att.created_at ? att.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+                let bonus = meta.bonus !== undefined ? meta.bonus : 0;
+                let deduction = meta.deduction !== undefined ? meta.deduction : 0;
+                let mrPayment = meta.mrPayment || '';
+                let deductNote = meta.deductNote || '';
 
                 if (!matchesMonth(scanDate)) return;
 
@@ -1773,7 +1796,8 @@
                 const alreadyRecorded = assistantRecords.find(r => 
                     r.assistant.toLowerCase() === astName.toLowerCase() &&
                     r.center.toLowerCase().includes(cleanCenter.toLowerCase()) &&
-                    (attDay ? r.day.toLowerCase() === attDay.toLowerCase() : true)
+                    (attDay ? r.day.toLowerCase() === attDay.toLowerCase() : true) &&
+                    (!r.date || !scanDate || r.date === scanDate)
                 );
 
                 let scanTime = meta.arr || att.time;
@@ -2482,9 +2506,7 @@
             if (!document.getElementById('view-new-entry').classList.contains('hidden')) {
                 initNewEntryView();
             }
-            if (!document.getElementById('view-records').classList.contains('hidden')) {
 
-            }
         });
 
         document.getElementById('add-assistant-form').addEventListener('submit', async (e) => {
@@ -2640,9 +2662,7 @@
             if (!document.getElementById('view-new-entry').classList.contains('hidden')) {
                 initNewEntryView();
             }
-            if (!document.getElementById('view-records').classList.contains('hidden')) {
 
-            }
         };
 
         window.deleteAssistant = function(target) {
@@ -3341,25 +3361,27 @@
                 locationInput.value = '';
             }
             
-            // Populate Assistants checklist
+            // Populate Assistants checklist if present in DOM
             const assistantsList = document.getElementById('schedule_assistants_list');
-            if (State.assistants.length === 0) {
-                assistantsList.innerHTML = `<p class="text-sm text-on-surface-variant italic">No assistants added yet.</p>`;
-            } else {
-                assistantsList.innerHTML = State.assistants.map((assistant) => {
-                    const name = getAssistantName(assistant);
-                    const email = getAssistantEmail(assistant);
-                    return `
-                    <label class="flex items-center justify-between p-3 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low cursor-pointer transition-colors">
-                        <div class="flex items-center flex-grow">
-                            <input type="checkbox" name="sched_assistants" value="${name}" 
-                                class="sched-assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
-                            <span class="ml-3 font-body-lg text-on-surface font-medium">${name}</span>
-                        </div>
-                        ${email ? `<span class="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded border border-outline-variant/60">${email}</span>` : ''}
-                    </label>
-                `;
-                }).join('');
+            if (assistantsList) {
+                if (State.assistants.length === 0) {
+                    assistantsList.innerHTML = `<p class="text-sm text-on-surface-variant italic">No assistants added yet.</p>`;
+                } else {
+                    assistantsList.innerHTML = State.assistants.map((assistant) => {
+                        const name = getAssistantName(assistant);
+                        const email = getAssistantEmail(assistant);
+                        return `
+                        <label class="flex items-center justify-between p-3 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low cursor-pointer transition-colors">
+                            <div class="flex items-center flex-grow">
+                                <input type="checkbox" name="sched_assistants" value="${name}" 
+                                    class="sched-assistant-cb h-5 w-5 rounded text-primary-container focus:ring-primary-container border-outline-variant bg-surface-container-lowest"/>
+                                <span class="ml-3 font-body-lg text-on-surface font-medium">${name}</span>
+                            </div>
+                            ${email ? `<span class="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded border border-outline-variant/60">${email}</span>` : ''}
+                        </label>
+                    `;
+                    }).join('');
+                }
             }
 
             await fetchSchedule();

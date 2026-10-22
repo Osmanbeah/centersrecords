@@ -819,7 +819,7 @@
                     if (payload && currentAssistant && currentAssistant.name) {
                         const myName = currentAssistant.name.trim().toLowerCase();
                         const pName = (payload.assistant_name || '').trim().toLowerCase();
-                        if (pName && (pName === myName || pName.includes(myName) || myName.includes(pName))) {
+                        if (pName && (isSameAssistant(pName, myName) || (payload.assistant_email && currentAssistant && currentAssistant.email && payload.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase()))) {
                             if (typeof markArrivedOnPhone === 'function') {
                                 markArrivedOnPhone(payload.time, payload.center);
                             }
@@ -1015,26 +1015,26 @@
             selectAssistantTab(scope === 'all' ? 'all' : 'my');
         };
 
-        // =================== ATTENDED LECTURES LOGIC ===================
+        // =================== HELPER & ATTENDED LECTURES LOGIC ===================
+        function normalizeAssistantName(n) {
+            return (n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+        function isSameAssistant(name1, name2) {
+            const n1 = normalizeAssistantName(name1);
+            const n2 = normalizeAssistantName(name2);
+            if (!n1 || !n2) return false;
+            return n1 === n2;
+        }
+
         function matchesAssistant(rowName, rowEmail, myName, myEmail) {
-            const rName = (rowName || '').trim().toLowerCase();
+            const rName = normalizeAssistantName(rowName);
             const rEmail = (rowEmail || '').trim().toLowerCase();
-            const cName = (myName || '').trim().toLowerCase();
+            const cName = normalizeAssistantName(myName);
             const cEmail = (myEmail || '').trim().toLowerCase();
 
             if (!cName && !cEmail) return true; // If no user specified, fallback
             if (cEmail && rEmail && cEmail === rEmail) return true;
-            if (cName && rName) {
-                if (cName === rName) return true;
-                if (rName.includes(cName) || cName.includes(rName)) return true;
-                const cParts = cName.split(/\s+/).filter(p => p.length > 2);
-                const rParts = rName.split(/\s+/).filter(p => p.length > 2);
-                if (cParts.some(cp => rParts.includes(cp))) return true;
-            }
-            if (cEmail && rName) {
-                const prefix = cEmail.split('@')[0].toLowerCase();
-                if (prefix.length > 2 && (rName.includes(prefix) || prefix.includes(rName))) return true;
-            }
+            if (cName && rName && cName === rName) return true;
             return false;
         }
 
@@ -2096,7 +2096,7 @@
             if (scheduleScope === 'my' && myName) {
                 sourceList = allSchedules.filter(s => (s.assistants || []).some(a => {
                     const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                    return aName.includes(myName) || myName.includes(aName);
+                    return isSameAssistant(aName, myName);
                 }));
             }
 
@@ -2366,7 +2366,7 @@
                 if (selectedWeekOffset === 0 && !hasWeeklyApprovals && myName) {
                     return (s.assistants || []).some(a => {
                         const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                        return aName.includes(myName) || myName.includes(aName);
+                        return isSameAssistant(aName, myName);
                     });
                 }
                 return false;
@@ -2438,7 +2438,7 @@
                     } else if (!weekStatus && selectedWeekOffset === 0 && !hasWeeklyApprovals && myName) {
                         amAssigned = (item.assistants || []).some(a => {
                             const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                            return aName.includes(myName) || myName.includes(aName);
+                            return isSameAssistant(aName, myName);
                         });
                     }
 
@@ -2501,7 +2501,7 @@
                             const coAssistants = item.assistants
                                 .filter(a => {
                                     const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                                    return !aName.includes(myName) && !myName.includes(aName);
+                                    return !isSameAssistant(aName, myName);
                                 })
                                 .map(a => typeof a === 'object' ? a.name : a);
 
@@ -2800,7 +2800,7 @@
                     if (payload && payload.new && currentAssistant && currentAssistant.name) {
                         const myName = currentAssistant.name.trim().toLowerCase();
                         const pName = (payload.new.assistant_name || '').trim().toLowerCase();
-                        if (pName && (pName === myName || pName.includes(myName) || myName.includes(pName))) {
+                        if (pName && (isSameAssistant(pName, myName) || (payload.new && payload.new.assistant_email && currentAssistant && currentAssistant.email && payload.new.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase()))) {
                             let centerName = payload.new.center || 'Center';
                             let timeStr = new Date(payload.new.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                             if (typeof markArrivedOnPhone === 'function') {
