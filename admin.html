@@ -17,7 +17,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com" rel="preconnect"/>
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -163,6 +163,37 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        @media print {
+            body * {
+                visibility: hidden !important;
+            }
+            #monthly-sheet-modal,
+            #monthly-sheet-modal * {
+                visibility: visible !important;
+            }
+            #monthly-sheet-modal {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                background: transparent !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                display: block !important;
+            }
+            #monthly-sheet-modal > div {
+                max-width: 100% !important;
+                width: 100% !important;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+            }
+            .no-print,
+            #monthly-sheet-modal button {
+                display: none !important;
+            }
         }
     </style>
     
@@ -4819,6 +4850,26 @@
         }
 
         // --- Init & Service Worker ---
+        // Modal Backdrop Dismiss & Escape Key Handler
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                if (typeof closeAdminNotesModal === "function") closeAdminNotesModal();
+                if (typeof closeMonthlySheetModal === "function") closeMonthlySheetModal();
+            }
+        });
+
+        ["admin-notes-modal", "monthly-sheet-modal"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener("click", (e) => {
+                    if (e.target === el) {
+                        if (id === "admin-notes-modal" && typeof closeAdminNotesModal === "function") closeAdminNotesModal();
+                        else if (id === "monthly-sheet-modal" && typeof closeMonthlySheetModal === "function") closeMonthlySheetModal();
+                        else el.classList.add("hidden");
+                    }
+                });
+            }
+        });
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await checkAdminAuth();

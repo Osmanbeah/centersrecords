@@ -15,7 +15,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com" rel="preconnect"/>
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -2413,6 +2413,40 @@
             _countdownInterval = setInterval(tick, 1000);
         }
 
+        // =================== OFFLINE WEB AUDIO CHIME ===================
+        let _audioCtx = null;
+        function unlockAudio() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                if (!_audioCtx) _audioCtx = new AudioCtx();
+                if (_audioCtx.state === "suspended") _audioCtx.resume();
+            } catch(e) {}
+        }
+        document.addEventListener("click", unlockAudio, { once: false, passive: true });
+        document.addEventListener("touchstart", unlockAudio, { once: false, passive: true });
+
+        function playArrivalChime() {
+            try {
+                unlockAudio();
+                if (!_audioCtx) return;
+                const now = _audioCtx.currentTime;
+                const osc = _audioCtx.createOscillator();
+                const gain = _audioCtx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(1046.50, now); // C6
+                osc.frequency.setValueAtTime(1567.98, now + 0.12); // G6
+                gain.gain.setValueAtTime(0.01, now);
+                gain.gain.exponentialRampToValueAtTime(0.25, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                osc.connect(gain);
+                gain.connect(_audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.45);
+            } catch(e) {
+                console.warn("Audio chime playback failed:", e);
+            }
+        }
         function markArrivedOnPhone(timeStr, centerName) {
             clearInterval(_countdownInterval);
 
@@ -2439,6 +2473,9 @@
 
             if (navigator.vibrate) {
                 navigator.vibrate([100, 50, 100]);
+            }
+            if (typeof playArrivalChime === "function") {
+                playArrivalChime();
             }
 
             fetchAttendedLectures();
@@ -2652,7 +2689,7 @@
                         <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3.5">
                             <div class="space-y-2 flex-grow">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <h3 class="font-bold text-on-surface text-base sm:text-lg leading-snug">${escapeHtml(item.center)}</h3>
+                                    <h3 dir="auto" class="font-bold text-on-surface text-base sm:text-lg leading-snug">${escapeHtml(item.center)}</h3>
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-secondary/10 text-secondary text-xs font-bold shrink-0">
                                         <span class="material-symbols-outlined text-[14px]">schedule</span>
                                         ${formatTime(item.time)}
@@ -2967,6 +3004,30 @@
         }
 
         // --- Init & Service Worker Registration ---
+        // Modal Backdrop Dismiss & Escape Key Handler
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                if (typeof closeAttendedNotesModal === "function") closeAttendedNotesModal();
+                if (typeof closeQRCode === "function") closeQRCode();
+                if (typeof closePickModal === "function") closePickModal();
+                const logoutModal = document.getElementById("logout-modal");
+                if (logoutModal) logoutModal.classList.add("hidden");
+            }
+        });
+
+        ["attended-notes-modal", "qr-modal", "pick-lecture-modal", "logout-modal"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener("click", (e) => {
+                    if (e.target === el) {
+                        if (id === "attended-notes-modal") closeAttendedNotesModal();
+                        else if (id === "qr-modal") closeQRCode();
+                        else if (id === "pick-lecture-modal") closePickModal();
+                        else el.classList.add("hidden");
+                    }
+                });
+            }
+        });
         document.addEventListener('DOMContentLoaded', async () => {
             const authed = await checkAssistantAuth();
             fetchSchedule();
