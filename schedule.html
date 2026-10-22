@@ -826,6 +826,15 @@
                         }
                     }
                 });
+                arrivalsChannel.on('broadcast', { event: 'notes_updated' }, ({ payload }) => {
+                    if (payload && currentAssistant && currentAssistant.name) {
+                        const myName = currentAssistant.name.trim().toLowerCase();
+                        const pName = (payload.assistant_name || '').trim().toLowerCase();
+                        if (isSameAssistant(pName, myName) || (payload.assistant_email && currentAssistant && currentAssistant.email && payload.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase())) {
+                            if (typeof fetchAttendedLectures === 'function') fetchAttendedLectures(true);
+                        }
+                    }
+                });
                 arrivalsChannel.subscribe();
                 window._arrivalsRealtimeChannel = arrivalsChannel;
             } catch(e) {
@@ -991,7 +1000,7 @@
                 if (btnAttended) btnAttended.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
                 viewSched.classList.add('hidden');
                 viewAttended.classList.remove('hidden');
-                fetchAttendedLectures();
+                fetchAttendedLectures(); if (typeof syncPendingNotesQueue === "function") syncPendingNotesQueue();
             } else if (tab === 'all') {
                 if (btnAll) btnAll.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-surface-container-lowest text-primary shadow-sm";
                 scheduleScope = 'all';
@@ -1053,6 +1062,19 @@
 
                 const astName = (currentAssistant.name || '').trim();
                 const astEmail = (currentAssistant.email || '').trim();
+                const cacheKey = 'cached_attended_lectures_' + normalizeAssistantName(astName || 'default');
+
+                // Hydrate from localStorage immediately if memory is empty
+                if (allAttendedLectures.length === 0) {
+                    try {
+                        const cached = localStorage.getItem(cacheKey);
+                        if (cached) {
+                            allAttendedLectures = JSON.parse(cached);
+                            renderAttendedList();
+                            renderHomeAttendedPreview();
+                        }
+                    } catch(e) {}
+                }
 
                 let localNotesMap = {};
                 try {
@@ -1273,6 +1295,9 @@
                 combinedRecords.sort((a, b) => (b.date || b.rawDate || '').localeCompare(a.date || a.rawDate || ''));
 
                 allAttendedLectures = combinedRecords;
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify(combinedRecords));
+                } catch(e) {}
 
                 // Update badge in top navigation
                 const badge = document.getElementById('badge_attended_count');
@@ -1661,6 +1686,63 @@
             if (modal) modal.classList.remove('hidden');
         };
 
+        // =================== OFFLINE NOTES QUEUE SYNC ===================
+        async function syncPendingNotesQueue() {
+            if (!navigator.onLine || !supabaseClient) return;
+            let pendingQueue = [];
+            try { pendingQueue = JSON.parse(localStorage.getItem('pending_notes_queue') || '[]'); } catch(e){}
+            if (!Array.isArray(pendingQueue) || pendingQueue.length === 0) return;
+
+            const remaining = [];
+            for (const q of pendingQueue) {
+                try {
+                    let targetId = (q.recordId && q.recordId.length > 20 && !q.recordId.includes('_')) ? q.recordId : null;
+                    if (!targetId && q.assistantName) {
+                        const { data: rows } = await supabaseClient
+                            .from('attendance')
+                            .select('id, center, created_at')
+                            .ilike('assistant_name', `%${q.assistantName}%`)
+                            .order('created_at', { ascending: false })
+                            .limit(20);
+                        if (rows && rows.length > 0) {
+                            const cTarget = (q.center || '').toLowerCase();
+                            const found = rows.find(r => {
+                                const rCenter = (r.center || '').toLowerCase();
+                                const rDate = r.created_at ? r.created_at.split('T')[0] : '';
+                                return (rCenter.includes(cTarget) || cTarget.includes(rCenter)) && (!q.date || rDate === q.date || !rDate);
+                            });
+                            if (found) targetId = found.id;
+                        }
+                    }
+
+                    if (targetId) {
+                        const { data: curRow } = await supabaseClient.from('attendance').select('center').eq('id', targetId).single();
+                        let currentMeta = {};
+                        if (curRow && typeof curRow.center === 'string' && curRow.center.trim().startsWith('{')) {
+                            try { currentMeta = JSON.parse(curRow.center.trim()); } catch(e){}
+                        }
+                        const updatedMeta = {
+                            c: currentMeta.c || q.center,
+                            d: currentMeta.d || q.day,
+                            dt: currentMeta.dt || q.date,
+                            b: currentMeta.b !== undefined ? currentMeta.b : 0,
+                            ded: currentMeta.ded !== undefined ? currentMeta.ded : 0,
+                            l: currentMeta.l || q.lecture || 'Regular Lecture',
+                            arr: currentMeta.arr || '',
+                            mr_payment: q.mrPayment,
+                            deduct_note: q.deductNote
+                        };
+                        const { error } = await supabaseClient.from('attendance').update({ center: JSON.stringify(updatedMeta) }).eq('id', targetId);
+                        if (error) throw error;
+                    }
+                } catch(err) {
+                    console.warn("Could not sync pending note, keeping in queue:", q, err);
+                    remaining.push(q);
+                }
+            }
+            localStorage.setItem('pending_notes_queue', JSON.stringify(remaining));
+        }
+        window.syncPendingNotesQueue = syncPendingNotesQueue;
         window.closeAttendedNotesModal = function() {
             const modal = document.getElementById('attended-notes-modal');
             if (modal) modal.classList.add('hidden');
@@ -1712,15 +1794,37 @@
                     deduct_note: deductNote,
                     updated_at: new Date().toISOString()
                 };
+                const cleanAst = normalizeAssistantName(currentAssistant?.name || '');
                 if (item && item.date && item.center) {
+                    const altKeyAst = `${item.date}_${item.center}_${item.day || ''}_${cleanAst}`;
                     const altKey = `${item.date}_${item.center}_${item.day || ''}`;
-                    notesStore[altKey] = {
+                    const nVal = {
                         mr_payment: mrPayment,
                         deduct_note: deductNote,
                         updated_at: new Date().toISOString()
                     };
+                    if (cleanAst) notesStore[altKeyAst] = nVal;
+                    notesStore[altKey] = nVal;
                 }
                 localStorage.setItem('attended_session_notes', JSON.stringify(notesStore));
+
+                // Add to pending notes offline queue
+                try {
+                    let pQueue = JSON.parse(localStorage.getItem('pending_notes_queue') || '[]');
+                    pQueue = pQueue.filter(q => String(q.recordId) !== String(recordId));
+                    pQueue.push({
+                        recordId: String(recordId),
+                        center: item?.center || '',
+                        day: item?.day || '',
+                        date: item?.date || '',
+                        lecture: item?.lecture || '',
+                        mrPayment: mrPayment,
+                        deductNote: deductNote,
+                        assistantName: currentAssistant?.name || '',
+                        timestamp: new Date().toISOString()
+                    });
+                    localStorage.setItem('pending_notes_queue', JSON.stringify(pQueue));
+                } catch(e) {}
 
                 // 3. Sync to Supabase attendance table
                 if (supabaseClient) {
@@ -1777,6 +1881,11 @@
                                 console.warn("Supabase update error (saved locally):", error);
                             } else {
                                 if (item) item.rawCenter = JSON.stringify(updatedMeta);
+                                try {
+                                    let pQueue = JSON.parse(localStorage.getItem('pending_notes_queue') || '[]');
+                                    pQueue = pQueue.filter(q => String(q.recordId) !== String(recordId));
+                                    localStorage.setItem('pending_notes_queue', JSON.stringify(pQueue));
+                                } catch(e) {}
                                 // Broadcast instant update to Admin dashboard
                                 if (arrivalsChannel) {
                                     try {
@@ -2875,6 +2984,7 @@
 
         // Network status listeners
         window.addEventListener('online', () => {
+            if (typeof syncPendingNotesQueue === 'function') syncPendingNotesQueue();
             updateStatus('fetching');
             fetchSchedule();
             if (currentAssistant) {

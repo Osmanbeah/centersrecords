@@ -1715,8 +1715,10 @@
                     const bonus = parseFloat(adjustments[astName]?.bonus) || 0;
                     const deduct = parseFloat(adjustments[astName]?.deduction) || 0;
 
+                    const cleanAst = (name || "").trim().toLowerCase();
+                    const altKeyAst = `${entryDate}_${entry.center}_${entry.day || ''}_${cleanAst}`;
                     const altKey = `${entryDate}_${entry.center}_${entry.day || ''}`;
-                    const localNote = localNotesStore[entry.id] || localNotesStore[altKey];
+                    const localNote = localNotesStore[entry.id] || localNotesStore[altKeyAst] || localNotesStore[altKey];
                     const mrPayment = localNote?.mr_payment || '';
                     const deductNote = localNote?.deduct_note || '';
 
@@ -1786,8 +1788,10 @@
                     return;
                 }
 
+                const cleanAst = (astName || "").trim().toLowerCase();
+                const altKeyAst = `${scanDate}_${cleanCenter}_${attDay}_${cleanAst}`;
                 const altKey = `${scanDate}_${cleanCenter}_${attDay}`;
-                const localNote = localNotesStore[att.id] || localNotesStore[altKey];
+                const localNote = localNotesStore[att.id] || localNotesStore[altKeyAst] || localNotesStore[altKey];
                 if (localNote) {
                     if (localNote.mr_payment && !mrPayment) mrPayment = localNote.mr_payment;
                     if (localNote.deduct_note && !deductNote) deductNote = localNote.deduct_note;
@@ -2185,8 +2189,10 @@
                     } catch(e) {}
                 }
 
+                const cleanAst = (name || "").trim().toLowerCase();
+                const altKeyAst = `${scanDate}_${cleanCenter}_${att.day || ''}_${cleanAst}`;
                 const altKey = `${scanDate}_${cleanCenter}_${att.day || ''}`;
-                const localNote = localNotesStore[att.id] || localNotesStore[altKey];
+                const localNote = localNotesStore[att.id] || localNotesStore[altKeyAst] || localNotesStore[altKey];
                 if (localNote) {
                     if (localNote.mr_payment && !attMrPayment) attMrPayment = localNote.mr_payment;
                     if (localNote.deduct_note && !attDeductNote) attDeductNote = localNote.deduct_note;
@@ -2361,7 +2367,12 @@
 
             let localNotesMap = {};
             try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e){}
-            const lNote = (recordId && localNotesMap[recordId]) || localNotesMap[`${center}_${day}`];
+            const cleanAst = (assistantName || "").trim().toLowerCase();
+            const todayStr = new Date().toISOString().split("T")[0];
+            const lNote = (recordId && localNotesMap[recordId])
+                || (cleanAst && localNotesMap[`${center}_${day}_${cleanAst}`])
+                || (cleanAst && localNotesMap[`${todayStr}_${center}_${day}_${cleanAst}`])
+                || localNotesMap[`${center}_${day}`];
             if (lNote) {
                 if (lNote.mr_payment && !mrVal) mrVal = lNote.mr_payment;
                 if (lNote.deduct_note && !dedVal) dedVal = lNote.deduct_note;
@@ -2436,8 +2447,13 @@
                     updated_at: new Date().toISOString()
                 };
                 if (recordId) localNotesMap[recordId] = updatedVal;
-                localNotesMap[`${center}_${day}`] = updatedVal;
+                const cleanAst = (assistantName || "").trim().toLowerCase();
                 const todayStr = new Date().toISOString().split('T')[0];
+                if (cleanAst) {
+                    localNotesMap[`${center}_${day}_${cleanAst}`] = updatedVal;
+                    localNotesMap[`${todayStr}_${center}_${day}_${cleanAst}`] = updatedVal;
+                }
+                localNotesMap[`${center}_${day}`] = updatedVal;
                 localNotesMap[`${todayStr}_${center}_${day}`] = updatedVal;
                 localStorage.setItem('attended_session_notes', JSON.stringify(localNotesMap));
 
@@ -2979,9 +2995,12 @@
                             try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e) {}
                             if (scanRecord) {
                                 const scanDate = scanRecord.created_at ? scanRecord.created_at.split('T')[0] : '';
+                                const cleanAst = (astName || "").trim().toLowerCase();
+                                const altKeyAst1 = `${scanDate}_${sched.center}_${day}_${cleanAst}`;
+                                const altKeyAst2 = `${sched.center}_${day}_${cleanAst}`;
                                 const altKey1 = `${scanDate}_${sched.center}_${day}`;
                                 const altKey2 = `${sched.center}_${day}`;
-                                const lNote = localNotesMap[scanRecord.id] || localNotesMap[altKey1] || localNotesMap[altKey2];
+                                const lNote = localNotesMap[scanRecord.id] || localNotesMap[altKeyAst1] || localNotesMap[altKeyAst2] || localNotesMap[altKey1] || localNotesMap[altKey2];
                                 if (lNote) {
                                     if (lNote.mr_payment && !astMrPayment) astMrPayment = lNote.mr_payment;
                                     if (lNote.deduct_note && !astDeductNote) astDeductNote = lNote.deduct_note;

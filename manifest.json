@@ -15,5 +15,31 @@
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Assistant Portal",
+      "short_name": "Schedule",
+      "description": "View lecture schedule and QR ID badge",
+      "url": "./schedule.html",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Admin Portal",
+      "short_name": "Admin",
+      "description": "Scan attendance and manage centers",
+      "url": "./admin.html",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

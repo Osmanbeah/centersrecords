@@ -7,7 +7,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes"/>
     <meta name="apple-mobile-web-app-title" content="Centers Record"/>
     <link rel="manifest" href="manifest.json"/>
-    <meta http-equiv="refresh" content="0; url='admin.html'" />
     <title>Centers Record</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23006d44'><path d='M4 22v-2h16v2H4Zm2-4v-7H4v-2l8-5 8 5v2h-2v7h-3v-7h-2v7h-3v-7H9v7H6Zm3-7h2v-5H9v5Zm5 0h2v-5h-2v5Z'/></svg>">
   </head>
@@ -16,7 +15,17 @@
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(() => {});
       }
-      window.location.replace('admin.html');
+      try {
+        const hasAssistant = localStorage.getItem('cached_current_assistant');
+        const hasAdmin = localStorage.getItem('cached_admin_session');
+        if (hasAssistant && !hasAdmin) {
+          window.location.replace('schedule.html');
+        } else {
+          window.location.replace('admin.html');
+        }
+      } catch(e) {
+        window.location.replace('admin.html');
+      }
     </script>
   </body>
 </html>
