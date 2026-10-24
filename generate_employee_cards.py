@@ -3,170 +3,176 @@ import sys
 import json
 import base64
 import io
+import zipfile
 import subprocess
-import urllib.request
 from PIL import Image
 import qrcode
 
 # Paths
 WORKSPACE = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(WORKSPACE, "employee_id_cards")
+OUTPUT_DIR = os.path.join(WORKSPACE, "All_29_Employee_ID_Cards")
+LEGACY_DIR = os.path.join(WORKSPACE, "employee_id_cards")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(LEGACY_DIR, exist_ok=True)
 
-# Find browser
+# Find Browser
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 EDGE_PATH = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 BROWSER_PATH = CHROME_PATH if os.path.exists(CHROME_PATH) else EDGE_PATH
 
-# Load teacher logo (fallback to online if local file missing)
-LOGO_PATH = os.path.join(WORKSPACE, "kelany_logo.png")
+# Load portrait logo base64
+LOGO_PATH = os.path.join(WORKSPACE, "kelany_new_portrait.png")
 if not os.path.exists(LOGO_PATH):
-    fallback_url = "https://lh3.googleusercontent.com/aida-public/AB6AXuDkqxElV86sCe0LBid5gJE7sguNEq5TTOJLLuhoOI9BWFwYq2kF-C7JALor7FaSq2NR-SOZn8crmXxJE9weKmtmpTerHvRTG27S21bXaMI-hcoM0teU6i1CyrQUSzxRfCGa9gJoSvsKgepH5TAaIV2WRMZN7rkiRd3bOILQMDai2-PR85NjqEjmVL250XwIJPMPCYDcShr73-sexPFbgr50fIRikg1E0tJZUkqpFhXQfhj4V0QdyGTqkaujF4j3wIgLQg"
-    try:
-        urllib.request.urlretrieve(fallback_url, LOGO_PATH)
-    except Exception as e:
-        print(f"Warning: could not download logo: {e}")
+    LOGO_PATH = os.path.join(WORKSPACE, "kelany_logo.png")
 
-LOGO_BASE64 = ""
-if os.path.exists(LOGO_PATH):
-    with open(LOGO_PATH, "rb") as f:
-        LOGO_BASE64 = "data:image/png;base64," + base64.b64encode(f.read()).decode("utf-8")
+with open(LOGO_PATH, "rb") as f:
+    LOGO_BASE64 = "data:image/png;base64," + base64.b64encode(f.read()).decode("utf-8")
 
 
 def generate_qr_base64(name: str) -> str:
-    """Generate high-contrast QR code for the assistant name."""
+    """Generate high-contrast QR code for the assistant name with high error correction."""
     qr = qrcode.QRCode(
         version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=12,
-        border=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=0,
     )
     qr.add_data(name)
     qr.make(fit=True)
-    img = qr.make_image(fill_color="#0F1E36", back_color="white")
+    img = qr.make_image(fill_color="#08182b", back_color="white")
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
-def build_card_html(name: str, role: str = "Assistant", teacher: str = "MR. MOHAMED KELANY", subject: str = "mathematics") -> str:
-    """Build standalone, self-contained HTML for a single vertical card."""
+def build_card_html(name: str, role: str = "ACADEMIC ASSISTANT", id_code: str = "AST-2026-001") -> str:
+    """Build standalone, self-contained HTML for the new vertical employee ID card."""
     qr_b64 = generate_qr_base64(name)
-    
-    html = f"""<!DOCTYPE html>
+
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>ID Card - {name}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="utf-8">
+  <title>{name} - Employee ID Badge</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {{
       theme: {{
         extend: {{
           fontFamily: {{
             sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
           }},
           colors: {{
-            brand: {{
-              navy: '#0F1E36',
-              deep: '#091322',
-              teal: '#0D9488',
-              tealLight: '#14B8A6',
-              accent: '#06B6D4',
-              surface: '#F8FAFC'
-            }}
+            navy: {{ 900: '#061325', 950: '#040d1a' }},
+            badgeTeal: '#00ccb3',
           }},
           boxShadow: {{
-            'card-elevated': '0 20px 40px -15px rgba(15, 30, 54, 0.22), 0 8px 16px -6px rgba(15, 30, 54, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-            'slot': 'inset 0 2px 4px rgba(0,0,0,0.4), 0 1px 1px rgba(255,255,255,0.8)'
+            'card': '0 25px 50px -12px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(226, 232, 240, 0.8)',
           }}
         }}
       }}
     }}
   </script>
   <style>
-    * {{
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }}
-    body {{
-      background: #F1F5F9;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 24px;
-    }}
     .id-card {{
       width: 320px;
-      height: 507px;
-      position: relative;
+      height: 480px;
+      aspect-ratio: 2 / 3;
+    }}
+    .lanyard-slot {{
+      width: 52px;
+      height: 10px;
+      border-radius: 9999px;
+      background-color: #030811;
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), 0 1px 1px rgba(255, 255, 255, 0.08);
     }}
   </style>
 </head>
-<body>
-  <div id="badge-wrapper" class="p-3">
-    <div class="id-card bg-white rounded-[24px] shadow-card-elevated border border-slate-200/80 overflow-hidden flex flex-col justify-between select-none">
-      
-      <!-- Top Lanyard Slot -->
-      <div class="relative w-full pt-3.5 pb-1 flex justify-center bg-brand-navy">
-        <div class="w-12 h-2.5 rounded-full bg-slate-900 border border-slate-700/80 shadow-slot relative flex items-center justify-center">
-          <span class="w-8 h-[1px] bg-slate-800/80"></span>
+<body class="bg-[#f0f4f8] min-h-screen flex items-center justify-center p-0 m-0 font-sans antialiased text-slate-800">
+  <article class="id-card bg-white rounded-[32px] overflow-hidden shadow-card flex flex-col relative select-none border border-slate-200/80">
+    <!-- Header (37% height) -->
+    <header class="bg-gradient-to-b from-[#060e1d] via-[#09152b] to-[#0c1b35] h-[37%] pt-3 px-4 flex flex-col items-center justify-between pb-3.5 relative border-b border-[#0a182b] overflow-hidden">
+      <!-- Coordinate Grid Overlay -->
+      <div class="absolute inset-0 opacity-15 pointer-events-none">
+        <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern height="20" id="math-grid-1" patternUnits="userSpaceOnUse" width="20">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#38bdf8" stroke-dasharray="2 2" stroke-width="0.6"></path>
+              <circle cx="0" cy="0" fill="#38bdf8" r="0.8"></circle>
+            </pattern>
+          </defs>
+          <rect fill="url(#math-grid-1)" height="100%" width="100%"></rect>
+          <path d="M -10 60 Q 40 30, 90 60 T 190 60 T 290 60 T 360 60" fill="none" opacity="0.4" stroke="#38bdf8" stroke-width="0.8"></path>
+          <path d="M -10 75 Q 50 100, 110 75 T 230 75 T 350 75" fill="none" opacity="0.3" stroke="#2dd4bf" stroke-width="0.7"></path>
+        </svg>
+      </div>
+      <!-- Lanyard Punch Slot -->
+      <div aria-hidden="true" class="lanyard-slot mt-0.5 relative z-10"></div>
+      <!-- Instructor Emblem -->
+      <div class="w-[96px] h-[96px] rounded-2xl bg-[#0a182b] border border-cyan-400/40 p-0.5 flex items-center justify-center relative z-10 shadow-sm overflow-hidden">
+        <img alt="Portrait" class="w-full h-full object-contain" src="{LOGO_BASE64}">
+      </div>
+      <!-- Header Titles -->
+      <div class="text-center space-y-0.5 relative z-10">
+        <h1 class="text-white font-extrabold text-[13px] tracking-[0.12em] uppercase leading-tight font-sans drop-shadow-sm">MR. MOHAMED KELANY</h1>
+        <div class="flex items-center justify-center gap-1.5">
+          <span class="h-[1px] w-3 bg-cyan-400/40"></span>
+          <p class="text-cyan-400 font-bold text-[9px] tracking-[0.24em] uppercase font-sans">DEPARTMENT OF MATHEMATICS</p>
+          <span class="h-[1px] w-3 bg-cyan-400/40"></span>
         </div>
       </div>
-
-      <!-- Header Section: Teacher & Subject -->
-      <div class="bg-brand-navy px-5 pb-5 pt-1.5 text-center relative overflow-hidden flex flex-col items-center justify-center">
-        <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-teal-500/10 rounded-full blur-xl pointer-events-none"></div>
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-navy to-slate-900 border-2 border-teal-500/30 p-2 shadow-md flex items-center justify-center mb-2 overflow-hidden">
-          <img src="{LOGO_BASE64}" alt="Logo" class="w-full h-full object-contain filter drop-shadow">
+    </header>
+    <!-- Body Info (63% height) -->
+    <section class="h-[63%] bg-white px-5 pt-4 pb-4 flex flex-col items-center justify-between relative">
+      <div class="flex flex-col items-center text-center w-full">
+        <h2 class="text-slate-900 font-extrabold text-[21px] tracking-tight leading-tight mb-1.5 font-sans">{name}</h2>
+        <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full border border-teal-400/70 bg-gradient-to-r from-teal-50 to-cyan-50/70 text-teal-700 shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-[0_0_6px_#14b8a6]"></span>
+          <span class="text-[9.5px] font-extrabold tracking-[0.14em] uppercase">{role}</span>
         </div>
-        <span class="text-sm font-bold tracking-wider text-white uppercase font-sans">{teacher}</span>
-        <p class="text-[10px] uppercase font-semibold tracking-widest text-teal-300/80 mt-0.5">{subject}</p>
+        <div class="flex items-center w-full max-w-[210px] mt-2 px-1 text-[8.5px] font-semibold text-slate-400 border-t border-b border-slate-100 py-0.5 tracking-wider uppercase justify-center">
+          <span>ID: <strong class="text-slate-700 font-bold">{id_code}</strong></span>
+        </div>
       </div>
-
-      <!-- Middle & Bottom Section: Assistant Name + Role + QR -->
-      <div class="flex-1 flex flex-col items-center justify-around px-4 py-3 bg-gradient-to-b from-slate-50/60 to-white">
-        <div class="text-center mt-1">
-          <h2 class="text-xl font-extrabold text-brand-navy text-center tracking-tight leading-tight mb-1">{name}</h2>
-          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-700 shadow-sm">
-            <span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-            <span class="text-[10px] font-bold uppercase tracking-wider">{role}</span>
+      <div class="flex flex-col items-center w-full">
+        <div class="relative w-[154px] h-[154px] rounded-2xl border border-slate-200/90 bg-slate-50/40 p-2.5 shadow-sm flex items-center justify-center">
+          <span class="absolute top-1 left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-cyan-500/80 rounded-tl-sm pointer-events-none"></span>
+          <span class="absolute top-1 right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-cyan-500/80 rounded-tr-sm pointer-events-none"></span>
+          <span class="absolute bottom-1 left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-500/80 rounded-bl-sm pointer-events-none"></span>
+          <span class="absolute bottom-1 right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-500/80 rounded-br-sm pointer-events-none"></span>
+          <div class="w-full h-full bg-white rounded-xl p-2 border border-slate-100 flex items-center justify-center relative">
+            <img src="{qr_b64}" class="w-full h-full object-contain" alt="QR Code">
+            <div class="absolute w-5 h-5 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center p-0.5 pointer-events-none">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#0a182b] flex items-center justify-center text-[6px] text-cyan-300 font-bold">M</span>
+            </div>
           </div>
         </div>
-
-        <!-- Real QR Code -->
-        <div class="flex flex-col items-center py-1">
-          <div class="p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm">
-            <img src="{qr_b64}" class="w-32 h-32 object-contain" alt="QR Code for {name}">
-          </div>
-          <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-widest mt-1.5">Scan to verify</span>
+        <div class="flex items-center gap-1.5 mt-2 text-slate-400 font-extrabold text-[8.5px] tracking-[0.18em] uppercase">
+          <svg class="w-3 h-3 text-cyan-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"></path>
+          </svg>
+          <span>SCAN TO VERIFY CREDENTIALS</span>
         </div>
       </div>
-
-    </div>
-  </div>
+    </section>
+  </article>
 </body>
 </html>
 """
-    return html
 
 
 def capture_card_photo(html_file: str, output_image: str) -> bool:
-    """Use Chrome/Edge headless to capture high-res card photo and crop to the badge."""
+    """Capture high-res card photo with Chrome/Edge headless and crop to the badge cleanly."""
     if not os.path.exists(BROWSER_PATH):
         print(f"Error: Browser not found at {BROWSER_PATH}")
         return False
 
     temp_raw = output_image.replace(".png", "_raw.png")
-    abs_html = os.path.abspath(html_file).replace("\\", "/")
-    file_url = f"file:///{abs_html}"
+    file_url = "file:///" + os.path.abspath(html_file).replace("\\", "/")
 
     cmd = [
         BROWSER_PATH,
@@ -174,28 +180,23 @@ def capture_card_photo(html_file: str, output_image: str) -> bool:
         "--disable-gpu",
         "--hide-scrollbars",
         "--force-device-scale-factor=2",
-        "--window-size=500,750",
+        "--window-size=440,620",
         f"--screenshot={temp_raw}",
         file_url
     ]
 
     try:
-        subprocess.run(cmd, check=True, capture_output=True, timeout=15)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=20)
         if os.path.exists(temp_raw):
-            # Crop to badge area cleanly
             im = Image.open(temp_raw)
-            # Find bounding box or crop centered
-            # Window size 500x750 at 2x scale = 1000x1500
             w, h = im.size
-            # Card is ~344x531 px at 1x, at 2x it is ~688x1062
-            # Center crop
-            crop_w = int(380 * 2)
-            crop_h = int(580 * 2)
+            crop_w = int(360 * 2)
+            crop_h = int(520 * 2)
             left = max(0, (w - crop_w) // 2)
             top = max(0, (h - crop_h) // 2)
             right = min(w, left + crop_w)
             bottom = min(h, top + crop_h)
-            
+
             cropped = im.crop((left, top, right, bottom))
             cropped.save(output_image, "PNG", optimize=True)
             try:
@@ -209,101 +210,62 @@ def capture_card_photo(html_file: str, output_image: str) -> bool:
     return False
 
 
-def generate_for_assistants(assistants: list):
-    """Generate HTML and photos for each assistant."""
-    results = []
-    print(f"Starting card generation for {len(assistants)} assistant(s)...")
+def main():
+    assistants_file = os.path.join(WORKSPACE, "assistants_list.json")
+    with open(assistants_file, "r", encoding="utf-8") as f:
+        assistants = json.load(f)
 
-    for i, item in enumerate(assistants, 1):
-        if isinstance(item, str):
-            name = item.strip()
-            role = "Assistant"
-        elif isinstance(item, dict):
-            name = item.get("name", "").strip()
-            role = item.get("role", "Assistant").strip()
+    print(f"Loaded {len(assistants)} assistants from assistants_list.json.")
+    print(f"Browser path: {BROWSER_PATH}")
+    print(f"Output directory: {OUTPUT_DIR}")
+
+    generated_photos = []
+
+    for i, a in enumerate(assistants, 1):
+        name = a["name"].strip()
+        role = "SENIOR ASSISTANT" if name == "Ahmed Osman" else "ACADEMIC ASSISTANT"
+        if name == "Ahmed Osman":
+            id_code = "AST-2026-094"
+        elif name == "Omar Gamal":
+            id_code = "AST-2026-095"
         else:
-            continue
-
-        if not name:
-            continue
+            id_code = f"AST-2026-{str(i).zfill(3)}"
 
         safe_name = "".join(c for c in name if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")
-        html_path = os.path.join(OUTPUT_DIR, f"{safe_name}_card.html")
-        png_path = os.path.join(OUTPUT_DIR, f"{safe_name}_id_card.png")
+        html_file = os.path.join(OUTPUT_DIR, f"{safe_name}_card.html")
+        png_file = os.path.join(OUTPUT_DIR, f"{safe_name}_id_card.png")
 
-        print(f"[{i}/{len(assistants)}] Generating card for '{name}' ({role})...")
-        
-        # 1. Write HTML
-        card_html = build_card_html(name=name, role=role)
-        with open(html_path, "w", encoding="utf-8") as f:
+        print(f"[{i:2d}/{len(assistants)}] Generating: {name} ({role}) -> {id_code}...")
+
+        card_html = build_card_html(name=name, role=role, id_code=id_code)
+        with open(html_file, "w", encoding="utf-8") as f:
             f.write(card_html)
 
-        # 2. Capture Photo
-        success = capture_card_photo(html_path, png_path)
+        success = capture_card_photo(html_file, png_file)
         if success:
-            file_size_kb = os.path.getsize(png_path) / 1024
-            print(f"    -> Saved photo: {png_path} ({file_size_kb:.1f} KB)")
-            results.append({
-                "name": name,
-                "role": role,
-                "photo": png_path,
-                "html": html_path
-            })
+            kb = os.path.getsize(png_file) / 1024
+            print(f"       -> OK: {os.path.basename(png_file)} ({kb:.1f} KB)")
+            generated_photos.append(png_file)
+            # Also copy to legacy employee_id_cards if desired
+            legacy_png = os.path.join(LEGACY_DIR, f"{safe_name}_id_card.png")
+            try:
+                with open(png_file, "rb") as rf, open(legacy_png, "wb") as wf:
+                    wf.write(rf.read())
+            except:
+                pass
         else:
-            print(f"    -> Failed to render photo for '{name}'")
+            print(f"       -> FAILED to capture photo for {name}")
 
-    print("\nGeneration completed successfully!")
-    print(f"All photos and HTML cards saved to: {OUTPUT_DIR}")
-    return results
-
-
-def fetch_supabase_assistants() -> list:
-    """Fetch all unique assistant names from Supabase schedules."""
-    url = "https://mwposurgahrcdexfvywa.supabase.co/rest/v1/schedule?select=assistants"
-    headers = {
-        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13cG9zdXJnYWhyY2RleGZ2eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE2NDAsImV4cCI6MjEwNzIxNzY0MH0.fxr7qxygr5Fl8urhcFWC1oYYqAxtYiObf5kNGnInPfk",
-        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13cG9zdXJnYWhyY2RleGZ2eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE2NDAsImV4cCI6MjEwNzIxNzY0MH0.fxr7qxygr5Fl8urhcFWC1oYYqAxtYiObf5kNGnInPfk"
-    }
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req) as response:
-            schedules = json.loads(response.read().decode())
-            names = set()
-            for s in schedules:
-                for a in s.get("assistants", []):
-                    if isinstance(a, str) and a.strip():
-                        names.add(a.strip())
-                    elif isinstance(a, dict) and a.get("name"):
-                        names.add(a["name"].strip())
-            return sorted(list(names))
-    except Exception as e:
-        print(f"Error fetching from Supabase: {e}")
-        return []
+    # Build ZIP archive of all 29 employee ID cards
+    zip_path = os.path.join(WORKSPACE, "All_29_Employee_ID_Cards.zip")
+    print(f"\nPackaging {len(generated_photos)} cards into {zip_path}...")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for photo in generated_photos:
+            arcname = os.path.basename(photo)
+            zf.write(photo, arcname=arcname)
+    print(f"Zip created successfully: {os.path.getsize(zip_path) / (1024*1024):.2f} MB")
+    print("All 29 employee ID cards generated with the new design!")
 
 
 if __name__ == "__main__":
-    names = []
-    
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "--supabase":
-            print("Fetching assistants from Supabase...")
-            names = fetch_supabase_assistants()
-            if not names:
-                print("No assistants found in Supabase schedules. Defaulting to 'Ahmed Osman'.")
-                names = ["Ahmed Osman"]
-        elif sys.argv[1] == "--file" and len(sys.argv) > 2:
-            file_path = sys.argv[2]
-            if os.path.exists(file_path):
-                with open(file_path, "r", encoding="utf-8") as f:
-                    names = [line.strip() for line in f if line.strip()]
-            else:
-                print(f"File not found: {file_path}")
-                sys.exit(1)
-        else:
-            names = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
-    
-    if not names:
-        names = ["Ahmed Osman"]
-
-    generate_for_assistants(names)
-
+    main()

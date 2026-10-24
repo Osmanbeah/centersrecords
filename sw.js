@@ -1,11 +1,13 @@
 // Service Worker for Centers Record (Offline PWA)
-const CACHE_NAME = 'centers-record-v13';
+const CACHE_NAME = 'centers-record-v14';
 
 const STATIC_ASSETS = [
     './',
     './index.html',
     './admin.html',
     './schedule.html',
+    './generate_cards.html',
+    './kelany_new_portrait.png',
     './qrcode.min.js',
     './supabase.min.js',
     './html5-qrcode.min.js',

@@ -577,29 +577,96 @@
         </div>
 
         <!-- Request Shift Modal -->
-        <!-- QR Code Modal (100% Offline Ready) -->
-        <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/50 backdrop-blur-sm animate-fade-in">
-            <div class="bg-surface rounded-3xl shadow-2xl border border-outline-variant/60 max-w-sm w-full overflow-hidden flex flex-col items-center p-6 text-center animate-scale-up">
-                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 text-xs font-semibold mb-3">
-                    <span class="material-symbols-outlined text-[15px]">offline_pin</span>
-                    <span>100% Offline Ready Badge</span>
-                </div>
-                <h2 class="text-xl font-bold text-on-surface">Your Assistant ID</h2>
-                <p id="qr_modal_name" class="text-sm font-semibold text-primary mt-0.5">Assistant</p>
-                <p class="text-xs text-on-surface-variant mt-1 mb-4">Show this QR code to Admin upon arrival. Scans instantly with zero internet required.</p>
-                
-                <div class="bg-white p-4 rounded-2xl border-2 border-emerald-500/30 shadow-sm mb-4 flex flex-col items-center justify-center">
-                    <div id="qr-canvas-container" class="flex items-center justify-center min-w-[200px] min-h-[200px]"></div>
-                </div>
+        <!-- QR Code Modal (New Vertical Employee ID Card Design) -->
+        <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-scrim/60 backdrop-blur-md animate-fade-in">
+            <div class="relative flex flex-col items-center animate-scale-up max-w-[340px] w-full">
+                <!-- ID Card Container (2:3 Vertical Ratio) -->
+                <article id="employee_id_badge_card" class="w-[320px] h-[480px] bg-white rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative select-none border border-slate-200/90 text-slate-800">
+                    <!-- Dark Header with Geometric/Coordinate Grid Watermark -->
+                    <header class="bg-gradient-to-b from-[#060e1d] via-[#09152b] to-[#0c1b35] h-[37%] pt-3 px-4 flex flex-col items-center justify-between pb-3.5 relative border-b border-[#0a182b] overflow-hidden shrink-0">
+                        <!-- Faint Mathematical / Coordinate Grid Overlay -->
+                        <div class="absolute inset-0 opacity-15 pointer-events-none">
+                            <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <pattern height="20" id="sched-math-grid" patternUnits="userSpaceOnUse" width="20">
+                                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#38bdf8" stroke-dasharray="2 2" stroke-width="0.6"></path>
+                                        <circle cx="0" cy="0" fill="#38bdf8" r="0.8"></circle>
+                                    </pattern>
+                                </defs>
+                                <rect fill="url(#sched-math-grid)" height="100%" width="100%"></rect>
+                                <path d="M -10 60 Q 40 30, 90 60 T 190 60 T 290 60 T 360 60" fill="none" opacity="0.4" stroke="#38bdf8" stroke-width="0.8"></path>
+                                <path d="M -10 75 Q 50 100, 110 75 T 230 75 T 350 75" fill="none" opacity="0.3" stroke="#2dd4bf" stroke-width="0.7"></path>
+                            </svg>
+                        </div>
+                        <!-- Lanyard Punch Slot cutout at top -->
+                        <div aria-hidden="true" class="w-[52px] h-[10px] rounded-full bg-[#030811] border-[1.5px] border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.8),0_1px_1px_rgba(255,255,255,0.08)] mt-0.5 relative z-10"></div>
+                        <!-- Instructor Avatar Emblem Box -->
+                        <div class="w-[96px] h-[96px] rounded-2xl bg-[#0a182b] border border-cyan-400/40 p-0.5 flex items-center justify-center relative z-10 shadow-sm overflow-hidden">
+                            <img alt="Mr. Mohamed Kelany Portrait" class="w-full h-full object-contain" src="kelany_new_portrait.png" onerror="this.src='https://lh3.googleusercontent.com/aida-public/AB6AXuBEDQU366hnCRbuVgS7sRgJJhjX0mIbxKf2gDR1clXCGMsRF8_Sri70-IFez6KJ4UzrDoXspYRi2clqz7vuOFjX39UXkvZMEcL1dSE3mjlHADVmfLHpwbr3FLEO-LIkQEa0XTau9DfNQiaTMq3b6wgp9GDU-xNx6UvQC3rbgLjq_cNfKB9-_qs8z_LPfecb10-LF7XMKJrKswAyA8rchK6Gff_cjykuNUlgeHcfs5R5ps2aleWuB2B7'">
+                        </div>
+                        <!-- Header Titles & Department Label -->
+                        <div class="text-center space-y-0.5 relative z-10">
+                            <h1 class="text-white font-extrabold text-[13px] tracking-[0.12em] uppercase leading-tight font-sans drop-shadow-sm">MR. MOHAMED KELANY</h1>
+                            <div class="flex items-center justify-center gap-1.5">
+                                <span class="h-[1px] w-3 bg-cyan-400/40"></span>
+                                <p class="text-cyan-400 font-bold text-[9px] tracking-[0.24em] uppercase font-sans">DEPARTMENT OF MATHEMATICS</p>
+                                <span class="h-[1px] w-3 bg-cyan-400/40"></span>
+                            </div>
+                        </div>
+                    </header>
 
-                <div class="text-[11px] text-on-surface-variant/80 flex items-center gap-1 mb-5">
-                    <span class="material-symbols-outlined text-[15px] text-emerald-600">bolt</span>
-                    <span>Generates locally &bull; Works in airplane mode</span>
+                    <!-- Card Body Info -->
+                    <section class="h-[63%] bg-white px-5 pt-4 pb-4 flex flex-col items-center justify-between relative">
+                        <!-- Name & Status Pill -->
+                        <div class="flex flex-col items-center text-center w-full">
+                            <h2 id="qr_modal_name" class="text-slate-900 font-extrabold text-[21px] tracking-tight leading-tight mb-1.5 font-sans">Assistant</h2>
+                            <!-- Premium Frosted Status Pill -->
+                            <div id="qr_modal_role_pill" class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full border border-teal-400/70 bg-gradient-to-r from-teal-50 to-cyan-50/70 text-teal-700 shadow-sm">
+                                <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-[0_0_6px_#14b8a6]"></span>
+                                <span id="qr_modal_role" class="text-[9.5px] font-extrabold tracking-[0.14em] uppercase">ACADEMIC ASSISTANT</span>
+                            </div>
+                            <!-- Security Metadata Micro-label -->
+                            <div class="flex items-center w-full max-w-[210px] mt-2 px-1 text-[8.5px] font-semibold text-slate-400 border-t border-b border-slate-100 py-0.5 tracking-wider uppercase justify-center">
+                                <span>ID: <strong id="qr_modal_id_code" class="text-slate-700 font-bold">AST-2026-001</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- QR Code Section with Framing Reticles -->
+                        <div class="flex flex-col items-center w-full">
+                            <div class="relative w-[154px] h-[154px] rounded-2xl border border-slate-200/90 bg-slate-50/40 p-2.5 shadow-sm flex items-center justify-center">
+                                <!-- Reticle Corner Accents -->
+                                <span class="absolute top-1 left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-cyan-500/80 rounded-tl-sm pointer-events-none"></span>
+                                <span class="absolute top-1 right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-cyan-500/80 rounded-tr-sm pointer-events-none"></span>
+                                <span class="absolute bottom-1 left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-500/80 rounded-bl-sm pointer-events-none"></span>
+                                <span class="absolute bottom-1 right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-500/80 rounded-br-sm pointer-events-none"></span>
+                                
+                                <!-- QR Canvas Container -->
+                                <div class="w-full h-full bg-white rounded-xl p-1.5 border border-slate-100 flex items-center justify-center relative overflow-hidden">
+                                    <div id="qr-canvas-container" class="w-full h-full flex items-center justify-center"></div>
+                                    <!-- Micro Brand Pip at QR center -->
+                                    <div class="absolute w-5 h-5 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center p-0.5 pointer-events-none z-10">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-[#0a182b] flex items-center justify-center text-[5px] text-cyan-300 font-bold">M</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Verification Tagline -->
+                            <div class="flex items-center gap-1.5 mt-2 text-slate-400 font-extrabold text-[8.5px] tracking-[0.18em] uppercase">
+                                <svg class="w-3 h-3 text-cyan-600" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"></path>
+                                </svg>
+                                <span>SCAN TO VERIFY CREDENTIALS</span>
+                            </div>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- Actions: Close Button -->
+                <div class="flex items-center gap-2 mt-4 w-full">
+                    <button type="button" onclick="document.getElementById('qr-modal').classList.add('hidden')" class="flex-1 h-11 bg-slate-900 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-[18px]">close</span>
+                        <span>Close Badge</span>
+                    </button>
                 </div>
-                
-                <button type="button" onclick="document.getElementById('qr-modal').classList.add('hidden')" class="w-full h-11 bg-primary text-on-primary rounded-xl font-semibold shadow-sm hover:bg-primary/90 transition-colors">
-                    Close Badge
-                </button>
             </div>
         </div>
 
@@ -2963,7 +3030,22 @@
             const modal = document.getElementById('qr-modal');
             const container = document.getElementById('qr-canvas-container');
             const nameEl = document.getElementById('qr_modal_name');
+            const roleEl = document.getElementById('qr_modal_role');
+            const idCodeEl = document.getElementById('qr_modal_id_code');
+            
+            const isSenior = currentAssistant.name === 'Ahmed Osman' || currentAssistant.name === 'Omar Gamal';
             if (nameEl) nameEl.textContent = currentAssistant.name;
+            if (roleEl) roleEl.textContent = isSenior ? 'SENIOR ASSISTANT' : 'ACADEMIC ASSISTANT';
+            
+            // Assign formatted ID AST-2026-XXX
+            let astId = 'AST-2026-001';
+            if (currentAssistant.name === 'Ahmed Osman') astId = 'AST-2026-094';
+            else if (currentAssistant.name === 'Omar Gamal') astId = 'AST-2026-095';
+            else if (currentAssistant.id) {
+                const num = parseInt(currentAssistant.id, 10);
+                astId = isNaN(num) ? 'AST-2026-001' : `AST-2026-${String(num).padStart(3, '0')}`;
+            }
+            if (idCodeEl) idCodeEl.textContent = astId;
 
             container.innerHTML = '';
             
@@ -2972,11 +3054,11 @@
                 if (typeof QRCode !== 'undefined') {
                     new QRCode(container, {
                         text: qrText,
-                        width: 200,
-                        height: 200,
-                        colorDark: "#012d1d",
+                        width: 136,
+                        height: 136,
+                        colorDark: "#08182b",
                         colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.M
+                        correctLevel: QRCode.CorrectLevel.H
                     });
                     // Save rendered canvas DataURL to localStorage for instant offline recall
                     setTimeout(() => {
@@ -2994,9 +3076,9 @@
                 console.warn("Using cached QR code fallback:", err);
                 const cachedImg = localStorage.getItem('cached_qr_' + currentAssistant.name);
                 if (cachedImg) {
-                    container.innerHTML = `<img src="${cachedImg}" alt="QR Code" class="w-48 h-48 mx-auto rounded-lg">`;
+                    container.innerHTML = `<img src="${cachedImg}" alt="QR Code" class="w-[136px] h-[136px] mx-auto rounded-lg">`;
                 } else {
-                    container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrText)}" alt="QR Code" class="w-48 h-48 mx-auto rounded-lg">`;
+                    container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=136x136&data=${encodeURIComponent(qrText)}" alt="QR Code" class="w-[136px] h-[136px] mx-auto rounded-lg">`;
                 }
             }
 
