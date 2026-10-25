@@ -117,22 +117,17 @@ def build_card_html(name: str, role: str = "ACADEMIC ASSISTANT", id_code: str = 
         <img alt="Portrait" class="w-full h-full object-contain" src="{LOGO_BASE64}">
       </div>
       <!-- Header Titles -->
-      <div class="text-center space-y-0.5 relative z-10">
-        <h1 class="text-white font-extrabold text-[13px] tracking-[0.12em] uppercase leading-tight font-sans drop-shadow-sm">MR. MOHAMED KELANY</h1>
-        <div class="flex items-center justify-center gap-1.5">
-          <span class="h-[1px] w-3 bg-cyan-400/40"></span>
-          <p class="text-cyan-400 font-bold text-[9px] tracking-[0.24em] uppercase font-sans">DEPARTMENT OF MATHEMATICS</p>
-          <span class="h-[1px] w-3 bg-cyan-400/40"></span>
-        </div>
+      <div class="text-center relative z-10">
+        <h1 class="text-white font-extrabold text-[14px] tracking-[0.15em] uppercase leading-tight font-sans drop-shadow-sm">MR. MOHAMED KELANY</h1>
       </div>
     </header>
     <!-- Body Info (63% height) -->
     <section class="h-[63%] bg-white px-5 pt-4 pb-4 flex flex-col items-center justify-between relative">
       <div class="flex flex-col items-center text-center w-full">
         <h2 class="text-slate-900 font-extrabold text-[21px] tracking-tight leading-tight mb-1.5 font-sans">{name}</h2>
-        <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full border border-teal-400/70 bg-gradient-to-r from-teal-50 to-cyan-50/70 text-teal-700 shadow-sm">
-          <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-[0_0_6px_#14b8a6]"></span>
-          <span class="text-[9.5px] font-extrabold tracking-[0.14em] uppercase">{role}</span>
+        <div class="inline-flex items-center justify-center gap-1.5 px-3.5 py-1 rounded-full border border-teal-500/30 bg-teal-50 text-teal-700 shadow-xs leading-none">
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0 shadow-[0_0_4px_#14b8a6]"></span>
+          <span class="text-[9.5px] font-extrabold tracking-[0.12em] uppercase leading-none block">{role}</span>
         </div>
         <div class="flex items-center w-full max-w-[210px] mt-2 px-1 text-[8.5px] font-semibold text-slate-400 border-t border-b border-slate-100 py-0.5 tracking-wider uppercase justify-center">
           <span>ID: <strong class="text-slate-700 font-bold">{id_code}</strong></span>
