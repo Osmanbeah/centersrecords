@@ -305,12 +305,32 @@
     }
 
     async function downloadSingleCard(cardId, name) {
+      const safeFileName = `${name.replace(/\s+/g, '_')}_id_card.png`;
+      const preGeneratedPath = `All_29_Employee_ID_Cards/${safeFileName}`;
+      
+      try {
+        // Try downloading pixel-perfect pre-rendered high-res PNG first
+        const resp = await fetch(preGeneratedPath);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const link = document.createElement('a');
+          link.download = safeFileName;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+          return;
+        }
+      } catch(err) {
+        console.warn("Direct file fetch failed, falling back to local canvas:", err);
+      }
+
+      // Fallback to client-side capture
       const cardEl = document.getElementById(cardId);
       if (!cardEl) return;
       try {
         const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
         const link = document.createElement('a');
-        link.download = `${name.replace(/\s+/g, '_')}_id_card.png`;
+        link.download = safeFileName;
         link.href = canvas.toDataURL('image/png');
         link.click();
       } catch(e) {
@@ -320,28 +340,55 @@
     }
 
     async function downloadAllAsZip() {
-      const names = getNames();
       const zipBtn = document.getElementById('btn_zip_all');
       zipBtn.disabled = true;
-      zipBtn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Generating ZIP...`;
+      zipBtn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Downloading ZIP...`;
 
       try {
+        // Direct download of the pre-packaged master zip with all 29 high-res cards
+        const resp = await fetch('All_29_Employee_ID_Cards.zip');
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'All_29_Employee_ID_Cards.zip';
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+          return;
+        }
+      } catch(err) {
+        console.warn("Direct ZIP download failed, generating client-side:", err);
+      }
+
+      // Fallback generation if master zip isn't accessible
+      try {
+        const names = getNames();
         const zip = new JSZip();
         for (let i = 0; i < names.length; i++) {
           const name = names[i];
+          const fileName = `${name.replace(/\s+/g, '_')}_id_card.png`;
+          try {
+            const imgResp = await fetch(`All_29_Employee_ID_Cards/${fileName}`);
+            if (imgResp.ok) {
+              const blob = await imgResp.blob();
+              zip.file(fileName, blob);
+              continue;
+            }
+          } catch(e) {}
+
           const cardId = 'card_' + i;
           const cardEl = document.getElementById(cardId);
           if (cardEl) {
             const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
             const dataUrl = canvas.toDataURL('image/png');
             const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
-            zip.file(`${name.replace(/\s+/g, '_')}_id_card.png`, base64Data, { base64: true });
+            zip.file(fileName, base64Data, { base64: true });
           }
         }
         const content = await zip.generateAsync({ type: 'blob' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(content);
-        link.download = `All_${names.length}_Employee_ID_Cards.zip`;
+        link.download = `All_Employee_ID_Cards.zip`;
         link.click();
       } catch(e) {
         console.error("ZIP generation error:", e);
