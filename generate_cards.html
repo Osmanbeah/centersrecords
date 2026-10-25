@@ -204,9 +204,16 @@
         const safeId = 'card_' + index;
         const role = (name.toLowerCase() === 'ahmed osman') ? 'SENIOR ASSISTANT' : defaultRole;
         let idStr = 'AST-2026-001';
-        if (name.toLowerCase() === 'ahmed osman') idStr = 'AST-2026-094';
-        else if (name.toLowerCase() === 'omar gamal') idStr = 'AST-2026-095';
-        else idStr = `AST-2026-${String(index + 1).padStart(3, '0')}`;
+        if (name.toLowerCase() === 'ahmed osman') {
+          idStr = 'AST-2026-094';
+        } else if (name.toLowerCase() === 'omar gamal') {
+          idStr = 'AST-2026-095';
+        } else {
+          // Look up official index from ALL_29_NAMES so IDs never shift when filtering names
+          const officialIdx = ALL_29_NAMES.findIndex(n => n.toLowerCase() === name.toLowerCase());
+          const badgeNum = officialIdx !== -1 ? (officialIdx + 1) : (index + 1);
+          idStr = `AST-2026-${String(badgeNum).padStart(3, '0')}`;
+        }
 
         const cardWrapper = document.createElement('div');
         cardWrapper.className = 'flex flex-col items-center gap-3.5';
@@ -340,56 +347,73 @@
     }
 
     async function downloadAllAsZip() {
-      const zipBtn = document.getElementById('btn_zip_all');
-      zipBtn.disabled = true;
-      zipBtn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Downloading ZIP...`;
-
-      try {
-        // Direct download of the pre-packaged master zip with all 29 high-res cards
-        const resp = await fetch('All_29_Employee_ID_Cards.zip');
-        if (resp.ok) {
-          const blob = await resp.blob();
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = 'All_29_Employee_ID_Cards.zip';
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-          return;
-        }
-      } catch(err) {
-        console.warn("Direct ZIP download failed, generating client-side:", err);
+      const names = getNames();
+      if (!names.length) {
+        alert("No assistants to download.");
+        return;
       }
 
-      // Fallback generation if master zip isn't accessible
+      const zipBtn = document.getElementById('btn_zip_all');
+      zipBtn.disabled = true;
+      zipBtn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span> Packaging ${names.length} Badges...`;
+
+      // If user is downloading exactly all 29 default assistants, offer instant master ZIP
+      if (names.length === ALL_29_NAMES.length && names.every((n, i) => n.toLowerCase() === ALL_29_NAMES[i].toLowerCase())) {
+        try {
+          const resp = await fetch('All_29_Employee_ID_Cards.zip');
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'All_29_Employee_ID_Cards.zip';
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            zipBtn.disabled = false;
+            zipBtn.innerHTML = `<span class="material-symbols-outlined text-[16px]">folder_zip</span> <span>Download All Photos (ZIP)</span>`;
+            return;
+          }
+        } catch(err) {
+          console.warn("Direct ZIP download failed, generating client-side:", err);
+        }
+      }
+
+      // Package ONLY the selected/filtered assistants into a custom ZIP
       try {
-        const names = getNames();
         const zip = new JSZip();
         for (let i = 0; i < names.length; i++) {
           const name = names[i];
           const fileName = `${name.replace(/\s+/g, '_')}_id_card.png`;
+          let added = false;
+
+          // 1. Try pulling high-res pre-rendered PNG
           try {
             const imgResp = await fetch(`All_29_Employee_ID_Cards/${fileName}`);
             if (imgResp.ok) {
               const blob = await imgResp.blob();
               zip.file(fileName, blob);
-              continue;
+              added = true;
             }
           } catch(e) {}
 
-          const cardId = 'card_' + i;
-          const cardEl = document.getElementById(cardId);
-          if (cardEl) {
-            const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
-            const dataUrl = canvas.toDataURL('image/png');
-            const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
-            zip.file(fileName, base64Data, { base64: true });
+          // 2. If custom name not in pre-rendered list, capture from DOM
+          if (!added) {
+            const cardId = 'card_' + i;
+            const cardEl = document.getElementById(cardId);
+            if (cardEl) {
+              const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
+              const dataUrl = canvas.toDataURL('image/png');
+              const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+              zip.file(fileName, base64Data, { base64: true });
+            }
           }
         }
+
         const content = await zip.generateAsync({ type: 'blob' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(content);
-        link.download = `All_Employee_ID_Cards.zip`;
+        link.download = `${names.length}_Employee_ID_Cards.zip`;
         link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
       } catch(e) {
         console.error("ZIP generation error:", e);
         alert("Failed to build ZIP: " + e.message);
