@@ -1301,12 +1301,15 @@
             return typeof a === 'object' ? (a.email || '') : '';
         }
 
-        // --- One-time Cleanup: Reset Test Attendance Records, Bonuses, & Deductions Only ---
-        // (Centers, assistants, and schedules are strictly preserved)
-        const ATTENDANCE_CLEANUP_FLAG = 'v4_reset_test_attendance_only';
+        // --- One-time Cleanup: Reset Test Schedule Assignments, Requests, Attendance, & Adjustments ---
+        // (Center definitions and assistant accounts are strictly preserved)
+        const ATTENDANCE_CLEANUP_FLAG = 'v5_reset_schedule_assignments_and_attendance';
         if (localStorage.getItem('ct_attendance_reset_flag') !== ATTENDANCE_CLEANUP_FLAG) {
             localStorage.removeItem('ct_entries');
             localStorage.removeItem('cached_admin_attendance');
+            localStorage.removeItem('cached_admin_schedules');
+            localStorage.removeItem('cached_schedules');
+            localStorage.removeItem('cached_my_requests');
             localStorage.removeItem('centers_attendance_offline_queue');
             localStorage.removeItem('offline_attendance_queue');
             localStorage.removeItem('attended_session_notes');
@@ -2754,65 +2757,124 @@
             }
         };
 
-        window.clearAttendanceAndAdjustmentsOnly = async function() {
-            if (!confirm("Are you sure you want to clear test attendance records, bonuses, and deductions? Centers, schedules, and assistant accounts will NOT be touched.")) {
-                return;
-            }
-            const btn = document.getElementById('btn_clear_attendance_only');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = `<div class="loading-spinner"></div> Clearing...`;
-            }
-
-            try {
-                // 1. Clear Supabase attendance table
-                if (supabaseClient) {
-                    try {
-                        await supabaseClient
-                            .from('attendance')
-                            .delete()
-                            .neq('id', '00000000-0000-0000-0000-000000000000');
-                    } catch(e) {
-                        console.warn("Could not delete from Supabase attendance:", e);
-                    }
-                }
-
-                // 2. Clear Local Storage attendance & adjustments ONLY
-                localStorage.removeItem('ct_entries');
-                localStorage.removeItem('cached_admin_attendance');
-                localStorage.removeItem('centers_attendance_offline_queue');
-                localStorage.removeItem('offline_attendance_queue');
-                localStorage.removeItem('attended_session_notes');
-                try {
-                    Object.keys(localStorage).forEach(k => {
-                        if (k.startsWith('cached_attended_lectures_') || k.startsWith('attendance_') || k === 'pending_notes_queue') {
-                            localStorage.removeItem(k);
-                        }
-                    });
-                } catch(e) {}
-
-                // 3. Reset in-memory State
-                State.entries = [];
-                State.attendances = [];
-
-                // 4. Re-render views
-                renderAttendanceRecordsView();
-                renderRecords();
-                renderManageAssistantRecords();
-                renderAttendanceList();
-
-                alert("All attendance records, bonuses, and deductions have been cleared! Centers, schedules, and assistant accounts remain completely safe. ✅");
-            } catch (err) {
-                console.error("Error clearing attendance records:", err);
-                alert("Error clearing attendance records: " + err.message);
-            } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">cleaning_services</span> Clear Attendance Only`;
-                }
-            }
-        };
-
+        window.clearAttendanceAndAdjustmentsOnly = async function() {
+
+            if (!confirm("Are you sure you want to clear test attendance records, bonuses, and deductions? Centers, schedules, and assistant accounts will NOT be touched.")) {
+
+                return;
+
+            }
+
+            const btn = document.getElementById('btn_clear_attendance_only');
+
+            if (btn) {
+
+                btn.disabled = true;
+
+                btn.innerHTML = `<div class="loading-spinner"></div> Clearing...`;
+
+            }
+
+
+
+            try {
+
+                // 1. Clear Supabase attendance table
+
+                if (supabaseClient) {
+
+                    try {
+
+                        await supabaseClient
+
+                            .from('attendance')
+
+                            .delete()
+
+                            .neq('id', '00000000-0000-0000-0000-000000000000');
+
+                    } catch(e) {
+
+                        console.warn("Could not delete from Supabase attendance:", e);
+
+                    }
+
+                }
+
+
+
+                // 2. Clear Local Storage attendance & adjustments ONLY
+
+                localStorage.removeItem('ct_entries');
+
+                localStorage.removeItem('cached_admin_attendance');
+
+                localStorage.removeItem('centers_attendance_offline_queue');
+
+                localStorage.removeItem('offline_attendance_queue');
+
+                localStorage.removeItem('attended_session_notes');
+
+                try {
+
+                    Object.keys(localStorage).forEach(k => {
+
+                        if (k.startsWith('cached_attended_lectures_') || k.startsWith('attendance_') || k === 'pending_notes_queue') {
+
+                            localStorage.removeItem(k);
+
+                        }
+
+                    });
+
+                } catch(e) {}
+
+
+
+                // 3. Reset in-memory State
+
+                State.entries = [];
+
+                State.attendances = [];
+
+
+
+                // 4. Re-render views
+
+                renderAttendanceRecordsView();
+
+                renderRecords();
+
+                renderManageAssistantRecords();
+
+                renderAttendanceList();
+
+
+
+                alert("All attendance records, bonuses, and deductions have been cleared! Centers, schedules, and assistant accounts remain completely safe. ✅");
+
+            } catch (err) {
+
+                console.error("Error clearing attendance records:", err);
+
+                alert("Error clearing attendance records: " + err.message);
+
+            } finally {
+
+                if (btn) {
+
+                    btn.disabled = false;
+
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">cleaning_services</span> Clear Attendance Only`;
+
+                }
+
+            }
+
+        };
+
+
+
         window.clearAllData = async function() {
             if (!confirm("Are you sure you want to clear ALL data? This will delete all centers, assistants, records, and schedules permanently.")) {
                 return;
