@@ -425,6 +425,26 @@
                 </div>
             </div>
 
+            <!-- Active Week Assignment Selector -->
+            <div class="bg-surface-container-lowest border border-outline-variant/70 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center justify-between gap-3 mb-4">
+                <button type="button" onclick="changeAdminWeekOffset(-1)" class="w-10 h-10 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 flex items-center justify-center text-on-surface transition-all active:scale-95 shadow-sm" title="Previous Week">
+                    <span class="material-symbols-outlined text-[20px]">chevron_left</span>
+                </button>
+                <div class="text-center">
+                    <div id="admin_week_badge" class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                        <span id="admin_week_dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span id="admin_week_badge_text">Active Week Assignment</span>
+                    </div>
+                    <div id="admin_week_label" class="font-headline-sm font-bold text-on-surface text-base sm:text-lg mt-0.5">Oct 31 – Nov 6</div>
+                    <button type="button" id="admin_btn_current_week" onclick="resetAdminWeekToCurrent()" class="hidden text-[11px] font-semibold text-primary hover:underline mt-0.5 inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[13px]">today</span> Back to Current Week
+                    </button>
+                </div>
+                <button type="button" onclick="changeAdminWeekOffset(1)" class="w-10 h-10 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 flex items-center justify-center text-on-surface transition-all active:scale-95 shadow-sm" title="Next Week">
+                    <span class="material-symbols-outlined text-[20px]">chevron_right</span>
+                </button>
+            </div>
+
             <!-- Day Selector Pills (Starts from Sunday) -->
             <div class="space-y-2">
                 <div class="flex items-center justify-between">
@@ -1380,11 +1400,91 @@
         }
         window.formatLateDuration = formatLateDuration;
 
+        // --- Week Cycle & Dynamic Weekly Assignment Logic ---
+        let activeRecordsWeekOffset = 0; // 0 = current week, 1 = next week, -1 = past week
+
+        function getWeekInfo(dateObj = new Date(), offset = 0) {
+            const d = new Date(dateObj);
+            d.setHours(12, 0, 0, 0);
+            const day = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
+            
+            // In our Saturday-Friday week cycle:
+            // Friday (5) is prep/picking day for upcoming week!
+            let diffToSaturday = 0;
+            if (day === 5) {
+                diffToSaturday = 1;
+            } else if (day === 6) {
+                diffToSaturday = 0;
+            } else {
+                diffToSaturday = -(day + 1);
+            }
+
+            const sat = new Date(d);
+            sat.setDate(d.getDate() + diffToSaturday + (offset * 7));
+            const fri = new Date(sat);
+            fri.setDate(sat.getDate() + 6);
+
+            const formatShort = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const formatISO = (dt) => dt.toISOString().split('T')[0];
+
+            return {
+                weekKey: formatISO(sat),
+                startDate: formatISO(sat),
+                endDate: formatISO(fri),
+                label: `${formatShort(sat)} – ${formatShort(fri)}`,
+                isUpcomingOrCurrent: offset === 0
+            };
+        }
+        window.getWeekInfo = getWeekInfo;
+
+        function getAdminCurrentWeekInfo() {
+            return getWeekInfo(new Date(), activeRecordsWeekOffset);
+        }
+
+        window.changeAdminWeekOffset = function(delta) {
+            activeRecordsWeekOffset += delta;
+            renderAttendanceRecordsView();
+        };
+
+        window.resetAdminWeekToCurrent = function() {
+            activeRecordsWeekOffset = 0;
+            renderAttendanceRecordsView();
+        };
+
+        function updateAdminWeekUI() {
+            const week = getAdminCurrentWeekInfo();
+            const labelEl = document.getElementById('admin_week_label');
+            if (labelEl) labelEl.textContent = week.label;
+
+            const badgeText = document.getElementById('admin_week_badge_text');
+            const badgeDot = document.getElementById('admin_week_dot');
+            const badgeContainer = document.getElementById('admin_week_badge');
+            const backBtn = document.getElementById('admin_btn_current_week');
+
+            if (activeRecordsWeekOffset === 0) {
+                if (badgeText) badgeText.textContent = "Active Week Assignment";
+                if (badgeDot) badgeDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                if (badgeContainer) badgeContainer.className = "inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30";
+                if (backBtn) backBtn.classList.add('hidden');
+            } else if (activeRecordsWeekOffset < 0) {
+                if (badgeText) badgeText.textContent = `Past Week (${Math.abs(activeRecordsWeekOffset)}w ago)`;
+                if (badgeDot) badgeDot.className = "w-2 h-2 rounded-full bg-outline";
+                if (badgeContainer) badgeContainer.className = "inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant border border-outline-variant";
+                if (backBtn) backBtn.classList.remove('hidden');
+            } else {
+                if (badgeText) badgeText.textContent = `Upcoming Week (+${activeRecordsWeekOffset}w)`;
+                if (badgeDot) badgeDot.className = "w-2 h-2 rounded-full bg-primary";
+                if (badgeContainer) badgeContainer.className = "inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/15 text-primary border border-primary/30";
+                if (backBtn) backBtn.classList.remove('hidden');
+            }
+        }
+
         // --- Local State Management ---
         const State = {
             centers: (JSON.parse(localStorage.getItem('ct_centers')) || []).map(c => typeof c === 'string' ? { name: c, address: '' } : c),
             assistants: (JSON.parse(localStorage.getItem('ct_assistants')) || []).map(a => typeof a === 'string' ? { name: a, email: '' } : a),
             entries: JSON.parse(localStorage.getItem('ct_entries')) || [],
+            allShiftRequests: [],
             schedules: (() => {
                 try {
                     const c = localStorage.getItem(CACHED_SCHEDULES_KEY);
@@ -2968,6 +3068,8 @@
         function renderAttendanceRecordsView() {
             const container = document.getElementById('attendance_records_container');
             if (!container) return;
+            if (typeof updateAdminWeekUI === 'function') updateAdminWeekUI();
+            const currentWeek = getAdminCurrentWeekInfo();
 
             if (!State.schedules || State.schedules.length === 0) {
                 if (!scheduleHasLoaded || fetchingSchedule) {
@@ -3031,10 +3133,19 @@
 
                 const centersHtml = daySchedules.map(sched => {
                     const timeFmt = sched.time ? formatTime(sched.time) : '';
-                    const assignedAssistants = (Array.isArray(sched.assistants) ? sched.assistants : []).map(getAssistantName).filter(Boolean);
+                    
+                    // Dynamic weekly assistants: look up assistants approved for this schedule in THIS active week
+                    const weeklyApproved = (State.allShiftRequests || [])
+                        .filter(r => r.schedule_id === sched.id && (r.status === `approved#${currentWeek.weekKey}` || r.status === 'approved'))
+                        .map(r => r.assistant_name)
+                        .filter(Boolean);
+
+                    const staticAssistants = (Array.isArray(sched.assistants) ? sched.assistants : []).map(getAssistantName).filter(Boolean);
+                    const assignedAssistants = Array.from(new Set([...weeklyApproved, ...staticAssistants])).filter(Boolean);
+                    
                     const centerSafeId = `${day}_${sched.id}`.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-                    // Filter only assistants who scanned their ID for this center AND this specific day
+                    // Filter only assistants who scanned their ID for this center AND this specific day within this active week
                     const scannedRecordsForCenter = (State.attendances || []).filter(att => {
                         const meta = parseAttendanceCenterMeta(att.center);
                         const attCenterName = (meta.cleanCenter || att.center || '').trim().toLowerCase();
@@ -3048,26 +3159,27 @@
                         if (!centerMatches) return false;
 
                         // Check day match:
-                        // 1. Explicit day column
-                        if (att.day) {
-                            return att.day.toLowerCase() === day.toLowerCase();
+                        const dayMatches = (att.day && att.day.toLowerCase() === day.toLowerCase()) || 
+                                           (meta.day && meta.day.toLowerCase() === day.toLowerCase());
+                        if (!dayMatches) return false;
+
+                        // Date check: ensure scan occurred within this active week
+                        const scanDate = meta.dt || meta.date || (att.created_at ? att.created_at.split('T')[0] : '');
+                        if (scanDate) {
+                            return scanDate >= currentWeek.startDate && scanDate <= currentWeek.endDate;
                         }
 
-                        // 2. Extracted day from meta
-                        if (meta.day) {
-                            return meta.day.toLowerCase() === day.toLowerCase();
-                        }
-
-                        return false;
+                        return activeRecordsWeekOffset === 0;
                     });
 
                     // List of unique assistant names that scanned
                     const scannedAssistantNames = Array.from(new Set(scannedRecordsForCenter.map(att => att.assistant_name).filter(Boolean)));
 
-                    // Check for existing saved entry for this schedule/center and day
+                    // Check for existing saved entry for this schedule/center, day, and active week
                     const existingEntry = State.entries.find(e => 
                         ((e.scheduleId && e.scheduleId === sched.id) || (e.center === sched.center)) &&
-                        e.day && e.day.toLowerCase() === day.toLowerCase()
+                        e.day && e.day.toLowerCase() === day.toLowerCase() &&
+                        (!e.date || (e.date >= currentWeek.startDate && e.date <= currentWeek.endDate))
                     );
 
                     // Combine assigned assistants, live scanned assistants, and any previously saved attendees
@@ -3678,12 +3790,13 @@
                 const { data, error } = await supabaseClient
                     .from('shift_requests')
                     .select('*, schedule:schedule_id(center, time, days, address)')
-                    .ilike('status', 'pending%')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
-                State.requests = data || [];
+                State.allShiftRequests = data || [];
+                State.requests = (data || []).filter(r => (r.status || '').startsWith('pending'));
                 renderRequestsList();
+                renderAttendanceRecordsView();
             } catch (err) {
                 console.error("Error fetching requests:", err);
             } finally {
@@ -3871,43 +3984,35 @@
         window.approveRequest = async function(id, scheduleId, assistantName) {
             // 1. Optimistic instant UI update
             const prevRequests = [...State.requests];
-            const prevSchedules = JSON.parse(JSON.stringify(State.schedules));
+            const prevAll = [...(State.allShiftRequests || [])];
 
             const req = State.requests.find(r => r.id === id);
             const parsed = req ? parseRequestStatus(req) : { status: 'pending', targetWeek: null };
             const approvedStatus = parsed.targetWeek ? `approved#${parsed.targetWeek}` : 'approved';
 
             State.requests = State.requests.filter(r => r.id !== id);
-            
-            const sched = State.schedules.find(s => s.id === scheduleId);
-            if (sched) {
-                if (!sched.assistants) sched.assistants = [];
-                if (!sched.assistants.includes(assistantName)) {
-                    sched.assistants.push(assistantName);
-                }
+            if (req) {
+                req.status = approvedStatus;
+            }
+            const matchAll = (State.allShiftRequests || []).find(r => r.id === id);
+            if (matchAll) {
+                matchAll.status = approvedStatus;
             }
 
             renderRequestsList();
-            renderScheduleList();
+            renderAttendanceRecordsView();
 
-            // 2. Perform DB operations in parallel in the background
+            // 2. Update shift_requests status in Supabase (scoped strictly to target week)
             try {
-                const reqPromise = supabaseClient.from('shift_requests').update({ status: approvedStatus }).eq('id', id);
-                const schedPromise = (sched && scheduleId)
-                    ? supabaseClient.from('schedule').update({ assistants: sched.assistants }).eq('id', scheduleId)
-                    : Promise.resolve();
-
-                const [res1, res2] = await Promise.all([reqPromise, schedPromise]);
-                if (res1 && res1.error) throw res1.error;
-                if (res2 && res2.error) throw res2.error;
+                const { error } = await supabaseClient.from('shift_requests').update({ status: approvedStatus }).eq('id', id);
+                if (error) throw error;
             } catch(e) {
                 console.error("Error approving request:", e);
                 alert("Failed to approve request: " + (e.message || "Network error."));
-                // Revert on failure
                 State.requests = prevRequests;
-                State.schedules = prevSchedules;
+                State.allShiftRequests = prevAll;
                 renderRequestsList();
-                renderScheduleList();
+                renderAttendanceRecordsView();
             }
         };
         

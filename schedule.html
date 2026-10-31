@@ -2234,26 +2234,27 @@
             return { status, targetWeek };
         }
 
+        let allWeeklyShiftRequests = [];
+
         async function fetchMyRequests() {
             if (!supabaseClient) return;
             const assistantIdent = currentAssistant.name || currentAssistant.email;
             if (!assistantIdent) return;
 
             try {
-                let query = supabaseClient.from('shift_requests').select('*');
-                if (currentAssistant.email) {
-                    query = query.or(`assistant_email.eq.${currentAssistant.email},assistant_name.eq.${currentAssistant.name}`);
-                } else {
-                    query = query.eq('assistant_name', currentAssistant.name);
-                }
-                const { data, error } = await query;
+                const { data, error } = await supabaseClient.from('shift_requests').select('*');
                 if (!error && data) {
+                    allWeeklyShiftRequests = data || [];
                     myRequestsMap.clear();
                     data.forEach(r => {
-                        const parsed = parseRequestStatus(r);
-                        if (parsed.targetWeek) {
-                            const key = `${r.schedule_id}_${parsed.targetWeek}`;
-                            myRequestsMap.set(key, parsed.status);
+                        const isMe = (currentAssistant.email && r.assistant_email && r.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase()) ||
+                                     (currentAssistant.name && r.assistant_name && r.assistant_name.toLowerCase() === currentAssistant.name.toLowerCase());
+                        if (isMe) {
+                            const parsed = parseRequestStatus(r);
+                            if (parsed.targetWeek) {
+                                const key = `${r.schedule_id}_${parsed.targetWeek}`;
+                                myRequestsMap.set(key, parsed.status);
+                            }
                         }
                     });
                     try {
@@ -2723,22 +2724,28 @@
                         `;
                     }
 
-                    // Friendly Co-assistants summary
+                    // Weekly dynamic assigned assistants (computed for this specific week)
+                    const weeklyApprovedForLecture = (allWeeklyShiftRequests || [])
+                        .filter(r => r.schedule_id === item.id && (r.status === `approved#${currentWeek.weekKey}` || r.status === 'approved'))
+                        .map(r => r.assistant_name)
+                        .filter(Boolean);
+
+                    const effectiveAssistants = Array.from(new Set([
+                        ...weeklyApprovedForLecture,
+                        ...(item.assistants || []).map(a => typeof a === 'object' ? a.name : a).filter(Boolean)
+                    ]));
+
                     let teamHtml = '';
-                    if (item.assistants && item.assistants.length > 0) {
+                    if (effectiveAssistants.length > 0) {
                         if (amAssigned) {
-                            const coAssistants = item.assistants
-                                .filter(a => {
-                                    const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                                    return !isSameAssistant(aName, myName);
-                                })
-                                .map(a => typeof a === 'object' ? a.name : a);
+                            const coAssistants = effectiveAssistants
+                                .filter(a => !isSameAssistant(a, myName));
 
                             if (coAssistants.length > 0) {
                                 teamHtml = `
                                     <div class="text-xs text-on-surface-variant flex items-center gap-1.5">
                                         <span class="material-symbols-outlined text-[15px] text-outline">group</span>
-                                        <span>With you: <strong class="text-on-surface font-medium">${coAssistants.join(', ')}</strong></span>
+                                        <span>With you: <strong class="text-on-surface font-medium">${escapeHtml(coAssistants.join(', '))}</strong></span>
                                     </div>
                                 `;
                             } else {
@@ -2750,11 +2757,11 @@
                                 `;
                             }
                         } else {
-                            const namesList = item.assistants.map(a => typeof a === 'object' ? a.name : a).join(', ');
+                            const namesList = effectiveAssistants.join(', ');
                             teamHtml = `
                                 <div class="text-xs text-on-surface-variant flex items-center gap-1.5">
                                     <span class="material-symbols-outlined text-[15px] text-outline">group</span>
-                                    <span class="truncate max-w-sm">Assigned: <strong class="text-on-surface font-medium">${namesList}</strong></span>
+                                    <span class="truncate max-w-sm">Assigned: <strong class="text-on-surface font-medium">${escapeHtml(namesList)}</strong></span>
                                 </div>
                             `;
                         }
