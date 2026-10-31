@@ -702,6 +702,23 @@
                 </div>
             </section>
 
+            <!-- Reset Attendance Records & Adjustments Only -->
+            <section class="bg-surface-container-lowest rounded-xl border border-amber-500/30 p-stack-md shadow-sm mb-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h3 class="font-headline-md text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[20px]">rule_folder</span>
+                            Reset Attendance & Adjustments
+                        </h3>
+                        <p class="font-body-md text-on-surface-variant mt-1">Clears test attendance scans, bonuses, deductions, and payment notes. <strong>Centers, schedules, and assistant accounts are kept safe.</strong></p>
+                    </div>
+                    <button onclick="clearAttendanceAndAdjustmentsOnly()" id="btn_clear_attendance_only" class="px-5 py-2.5 bg-amber-600 text-white hover:bg-amber-700 active:scale-95 rounded-lg font-label-md transition-all shadow-sm shrink-0 flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-[18px]">cleaning_services</span>
+                        Clear Attendance Only
+                    </button>
+                </div>
+            </section>
+
             <!-- Reset / Clear All Data -->
             <section class="bg-surface-container-lowest rounded-xl border border-error/30 p-stack-md shadow-sm">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1284,13 +1301,23 @@
             return typeof a === 'object' ? (a.email || '') : '';
         }
 
-        // --- One-time Cleanup of Legacy / Previous Local Data ---
-        const DATA_VERSION = 'v2_cleared_all';
-        if (localStorage.getItem('ct_data_version') !== DATA_VERSION) {
-            localStorage.removeItem('ct_centers');
-            localStorage.removeItem('ct_assistants');
+        // --- One-time Cleanup: Reset Test Attendance Records, Bonuses, & Deductions Only ---
+        // (Centers, assistants, and schedules are strictly preserved)
+        const ATTENDANCE_CLEANUP_FLAG = 'v4_reset_test_attendance_only';
+        if (localStorage.getItem('ct_attendance_reset_flag') !== ATTENDANCE_CLEANUP_FLAG) {
             localStorage.removeItem('ct_entries');
-            localStorage.setItem('ct_data_version', DATA_VERSION);
+            localStorage.removeItem('cached_admin_attendance');
+            localStorage.removeItem('centers_attendance_offline_queue');
+            localStorage.removeItem('offline_attendance_queue');
+            localStorage.removeItem('attended_session_notes');
+            try {
+                Object.keys(localStorage).forEach(k => {
+                    if (k.startsWith('cached_attended_lectures_') || k.startsWith('attendance_') || k === 'pending_notes_queue') {
+                        localStorage.removeItem(k);
+                    }
+                });
+            } catch(e) {}
+            localStorage.setItem('ct_attendance_reset_flag', ATTENDANCE_CLEANUP_FLAG);
         }
 
         const OFFLINE_ATTENDANCE_QUEUE_KEY = 'centers_attendance_offline_queue';
@@ -1819,7 +1846,7 @@
                     return;
                 }
 
-                const cleanAst = (astName || "").trim().toLowerCase();
+                                const cleanAst = (astName || "").trim().toLowerCase();
                 const altKeyAst = `${scanDate}_${cleanCenter}_${attDay}_${cleanAst}`;
                 const altKey = `${scanDate}_${cleanCenter}_${attDay}`;
                 const localNote = localNotesStore[att.id] || localNotesStore[altKeyAst] || localNotesStore[altKey];
@@ -2727,6 +2754,65 @@
             }
         };
 
+        window.clearAttendanceAndAdjustmentsOnly = async function() {
+            if (!confirm("Are you sure you want to clear test attendance records, bonuses, and deductions? Centers, schedules, and assistant accounts will NOT be touched.")) {
+                return;
+            }
+            const btn = document.getElementById('btn_clear_attendance_only');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<div class="loading-spinner"></div> Clearing...`;
+            }
+
+            try {
+                // 1. Clear Supabase attendance table
+                if (supabaseClient) {
+                    try {
+                        await supabaseClient
+                            .from('attendance')
+                            .delete()
+                            .neq('id', '00000000-0000-0000-0000-000000000000');
+                    } catch(e) {
+                        console.warn("Could not delete from Supabase attendance:", e);
+                    }
+                }
+
+                // 2. Clear Local Storage attendance & adjustments ONLY
+                localStorage.removeItem('ct_entries');
+                localStorage.removeItem('cached_admin_attendance');
+                localStorage.removeItem('centers_attendance_offline_queue');
+                localStorage.removeItem('offline_attendance_queue');
+                localStorage.removeItem('attended_session_notes');
+                try {
+                    Object.keys(localStorage).forEach(k => {
+                        if (k.startsWith('cached_attended_lectures_') || k.startsWith('attendance_') || k === 'pending_notes_queue') {
+                            localStorage.removeItem(k);
+                        }
+                    });
+                } catch(e) {}
+
+                // 3. Reset in-memory State
+                State.entries = [];
+                State.attendances = [];
+
+                // 4. Re-render views
+                renderAttendanceRecordsView();
+                renderRecords();
+                renderManageAssistantRecords();
+                renderAttendanceList();
+
+                alert("All attendance records, bonuses, and deductions have been cleared! Centers, schedules, and assistant accounts remain completely safe. ✅");
+            } catch (err) {
+                console.error("Error clearing attendance records:", err);
+                alert("Error clearing attendance records: " + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">cleaning_services</span> Clear Attendance Only`;
+                }
+            }
+        };
+
         window.clearAllData = async function() {
             if (!confirm("Are you sure you want to clear ALL data? This will delete all centers, assistants, records, and schedules permanently.")) {
                 return;
@@ -3026,7 +3112,7 @@
                             try { localNotesMap = JSON.parse(localStorage.getItem('attended_session_notes') || '{}'); } catch(e) {}
                             if (scanRecord) {
                                 const scanDate = scanRecord.created_at ? scanRecord.created_at.split('T')[0] : '';
-                                const cleanAst = (astName || "").trim().toLowerCase();
+                                const cleanAst = (name || "").trim().toLowerCase();
                                 const altKeyAst1 = `${scanDate}_${sched.center}_${day}_${cleanAst}`;
                                 const altKeyAst2 = `${sched.center}_${day}_${cleanAst}`;
                                 const altKey1 = `${scanDate}_${sched.center}_${day}`;
