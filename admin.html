@@ -1323,7 +1323,7 @@
 
         // --- One-time Cleanup: Reset Test Schedule Assignments, Requests, Attendance, & Adjustments ---
         // (Center definitions and assistant accounts are strictly preserved)
-        const ATTENDANCE_CLEANUP_FLAG = 'v5_reset_schedule_assignments_and_attendance';
+        const ATTENDANCE_CLEANUP_FLAG = 'v6_purge_osmanbeah_and_clean_requests';
         if (localStorage.getItem('ct_attendance_reset_flag') !== ATTENDANCE_CLEANUP_FLAG) {
             localStorage.removeItem('ct_entries');
             localStorage.removeItem('cached_admin_attendance');
@@ -1335,10 +1335,19 @@
             localStorage.removeItem('attended_session_notes');
             try {
                 Object.keys(localStorage).forEach(k => {
-                    if (k.startsWith('cached_attended_lectures_') || k.startsWith('attendance_') || k === 'pending_notes_queue') {
+                    if (k.startsWith('cached_attended_lectures_') || k.startsWith('attendance_') || k === 'pending_notes_queue' || k === 'cached_current_assistant') {
                         localStorage.removeItem(k);
                     }
                 });
+                const rawAssts = localStorage.getItem('ct_assistants');
+                if (rawAssts && rawAssts.toLowerCase().includes('osmanbeah')) {
+                    let parsed = JSON.parse(rawAssts) || [];
+                    parsed = parsed.filter(a => {
+                        const name = typeof a === 'object' ? (a.name || '') : a;
+                        return !name.toLowerCase().includes('osmanbeah');
+                    });
+                    localStorage.setItem('ct_assistants', JSON.stringify(parsed));
+                }
             } catch(e) {}
             localStorage.setItem('ct_attendance_reset_flag', ATTENDANCE_CLEANUP_FLAG);
         }
@@ -1482,7 +1491,7 @@
         // --- Local State Management ---
         const State = {
             centers: (JSON.parse(localStorage.getItem('ct_centers')) || []).map(c => typeof c === 'string' ? { name: c, address: '' } : c),
-            assistants: (JSON.parse(localStorage.getItem('ct_assistants')) || []).map(a => typeof a === 'string' ? { name: a, email: '' } : a),
+            assistants: (JSON.parse(localStorage.getItem('ct_assistants')) || []).map(a => typeof a === 'string' ? { name: a, email: '' } : a).filter(a => !(a.name || '').toLowerCase().includes('osmanbeah')),
             entries: JSON.parse(localStorage.getItem('ct_entries')) || [],
             allShiftRequests: [],
             schedules: (() => {
@@ -3138,7 +3147,7 @@
                     const weeklyApproved = (State.allShiftRequests || [])
                         .filter(r => r.schedule_id === sched.id && (r.status === `approved#${currentWeek.weekKey}` || r.status === 'approved'))
                         .map(r => r.assistant_name)
-                        .filter(Boolean);
+                        .filter(n => n && !n.toLowerCase().includes('osmanbeah'));
 
                     const staticAssistants = (Array.isArray(sched.assistants) ? sched.assistants : []).map(getAssistantName).filter(Boolean);
                     const assignedAssistants = Array.from(new Set([...weeklyApproved, ...staticAssistants])).filter(Boolean);
@@ -3793,8 +3802,12 @@
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
-                State.allShiftRequests = data || [];
-                State.requests = (data || []).filter(r => (r.status || '').startsWith('pending'));
+                State.allShiftRequests = (data || []).filter(r => {
+                    const name = (r.assistant_name || '').toLowerCase();
+                    const email = (r.assistant_email || '').toLowerCase();
+                    return !name.includes('osmanbeah') && !email.includes('admin123');
+                });
+                State.requests = State.allShiftRequests.filter(r => (r.status || '').startsWith('pending'));
                 renderRequestsList();
                 renderAttendanceRecordsView();
             } catch (err) {

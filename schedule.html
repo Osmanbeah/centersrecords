@@ -966,8 +966,18 @@
             try {
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session && session.user) {
+                    const role = session.user.user_metadata?.role;
+                    if (role === 'admin') {
+                        console.warn("Signed in user is administrator, not assistant. Showing assistant login.");
+                        if (overlay) overlay.classList.remove('hidden');
+                        return false;
+                    }
                     const email = session.user.email || '';
                     const name = session.user.user_metadata?.name || email.split('@')[0];
+                    if (name.toLowerCase().includes('osmanbeah') || email.toLowerCase().includes('admin123')) {
+                        if (overlay) overlay.classList.remove('hidden');
+                        return false;
+                    }
                     currentAssistant = { name, email };
                     try { localStorage.setItem('cached_current_assistant', JSON.stringify(currentAssistant)); } catch(e) {}
                     applyAssistantUser(currentAssistant);
@@ -1030,8 +1040,18 @@
 
                 if (error) throw error;
 
+                const role = data.user.user_metadata?.role;
+                if (role === 'admin') {
+                    await supabaseClient.auth.signOut();
+                    throw new Error("This is an Administrator account. Administrators should use the Admin Portal (admin.html), not the Assistant Schedule.");
+                }
+
                 // Set assistant state
                 const name = data.user.user_metadata?.name || email.split('@')[0];
+                if (name.toLowerCase().includes('osmanbeah') || email.toLowerCase().includes('admin123')) {
+                    await supabaseClient.auth.signOut();
+                    throw new Error("Invalid assistant account.");
+                }
                 currentAssistant = { name, email };
                 const nameEl = document.getElementById('current_assistant_name');
                 if (nameEl) nameEl.textContent = name;
@@ -2244,7 +2264,11 @@
             try {
                 const { data, error } = await supabaseClient.from('shift_requests').select('*');
                 if (!error && data) {
-                    allWeeklyShiftRequests = data || [];
+                    allWeeklyShiftRequests = (data || []).filter(r => {
+                        const name = (r.assistant_name || '').toLowerCase();
+                        const email = (r.assistant_email || '').toLowerCase();
+                        return !name.includes('osmanbeah') && !email.includes('admin123');
+                    });
                     myRequestsMap.clear();
                     data.forEach(r => {
                         const isMe = (currentAssistant.email && r.assistant_email && r.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase()) ||
@@ -2728,7 +2752,7 @@
                     const weeklyApprovedForLecture = (allWeeklyShiftRequests || [])
                         .filter(r => r.schedule_id === item.id && (r.status === `approved#${currentWeek.weekKey}` || r.status === 'approved'))
                         .map(r => r.assistant_name)
-                        .filter(Boolean);
+                        .filter(n => n && !n.toLowerCase().includes('osmanbeah'));
 
                     const effectiveAssistants = Array.from(new Set([
                         ...weeklyApprovedForLecture,
