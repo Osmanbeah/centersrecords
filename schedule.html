@@ -2323,8 +2323,7 @@
                     });
                     myRequestsMap.clear();
                     data.forEach(r => {
-                        const isMe = (currentAssistant.email && r.assistant_email && r.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase()) ||
-                                     (currentAssistant.name && r.assistant_name && r.assistant_name.toLowerCase() === currentAssistant.name.toLowerCase());
+                        const isMe = matchesAssistant(r.assistant_name, r.assistant_email, currentAssistant.name, currentAssistant.email);
                         if (isMe) {
                             const parsed = parseRequestStatus(r);
                             if (parsed.targetWeek) {
@@ -2356,17 +2355,46 @@
             updateWeekUI();
         }
 
+        function getMyAssignedLecturesForCurrentWeek() {
+            const currentWeek = getSelectedWeekInfo();
+            const myName = (currentAssistant.name || '').toLowerCase();
+            const myEmail = (currentAssistant.email || '').toLowerCase();
+
+            return allSchedules.filter(s => {
+                // 1. Check in myRequestsMap
+                const weekStatus = myRequestsMap.get(`${s.id}_${currentWeek.weekKey}`);
+                if (weekStatus === 'approved') return true;
+
+                // 2. Direct check in allWeeklyShiftRequests
+                const isApprovedInWeekly = (allWeeklyShiftRequests || []).some(r => {
+                    if (r.schedule_id !== s.id) return false;
+                    const parsed = parseRequestStatus(r);
+                    if (parsed.targetWeek && parsed.targetWeek !== currentWeek.weekKey) return false;
+                    const isMe = matchesAssistant(r.assistant_name, r.assistant_email, currentAssistant.name, currentAssistant.email);
+                    return isMe && (parsed.status === 'approved' || r.status === `approved#${currentWeek.weekKey}`);
+                });
+                if (isApprovedInWeekly) return true;
+
+                if (weekStatus === 'pending' || weekStatus === 'rejected') return false;
+
+                // 3. Fallback to static roster if present
+                if (myName) {
+                    return (s.assistants || []).some(a => {
+                        const aName = typeof a === 'object' ? a.name : a;
+                        return isSameAssistant(aName, myName);
+                    });
+                }
+                return false;
+            });
+        }
+
         function renderDayPills() {
             const pillsContainer = document.getElementById('date_selector_container');
             if (!pillsContainer) return;
 
-            const myName = (currentAssistant.name || '').toLowerCase();
             let sourceList = allSchedules;
-            if (scheduleScope === 'my' && myName) {
-                sourceList = allSchedules.filter(s => (s.assistants || []).some(a => {
-                    const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                    return isSameAssistant(aName, myName);
-                }));
+            if (scheduleScope === 'my') {
+                sourceList = getMyAssignedLecturesForCurrentWeek();
             }
 
             const daysList = ['all', ...WEEK_DAYS];
@@ -2660,23 +2688,7 @@
             // Calculate assistant's assigned lectures for Hero banner & Next Session highlight
             const currentWeek = getSelectedWeekInfo();
             const myName = (currentAssistant.name || '').toLowerCase();
-
-            // Check if this assistant has approved weekly requests for this week
-            const hasWeeklyApprovals = allSchedules.some(s => myRequestsMap.get(`${s.id}_${currentWeek.weekKey}`) === 'approved');
-
-            const myAssignedLectures = allSchedules.filter(s => {
-                const weekStatus = myRequestsMap.get(`${s.id}_${currentWeek.weekKey}`);
-                if (weekStatus === 'approved') return true;
-                if (weekStatus === 'pending' || weekStatus === 'rejected') return false;
-                // If on current week and no weekly picks exist yet, fallback to static schedule roster
-                if (selectedWeekOffset === 0 && !hasWeeklyApprovals && myName) {
-                    return (s.assistants || []).some(a => {
-                        const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                        return isSameAssistant(aName, myName);
-                    });
-                }
-                return false;
-            });
+            const myAssignedLectures = getMyAssignedLecturesForCurrentWeek();
 
             // Update Hero Banner & Live Target Countdown if in 'my' mode
             if (scheduleScope === 'my') {
