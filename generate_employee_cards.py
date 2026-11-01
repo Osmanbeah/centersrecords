@@ -1,4 +1,3 @@
-import numpy as np
 import os
 import sys
 import json
@@ -71,7 +70,7 @@ def build_card_html(name: str, role: str = "ACADEMIC ASSISTANT", id_code: str = 
             badgeTeal: '#00ccb3',
           }},
           boxShadow: {{
-            'card': '0 25px 50px -12px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+            'card': '0 0 0 1px rgba(226, 232, 240, 0.8)',
           }}
         }}
       }}
@@ -93,8 +92,8 @@ def build_card_html(name: str, role: str = "ACADEMIC ASSISTANT", id_code: str = 
     }}
   </style>
 </head>
-<body class="bg-transparent m-0 p-0 font-sans antialiased text-slate-800 flex items-center justify-center" style="width: 440px; height: 600px;">
-  <article class="id-card bg-white rounded-[32px] overflow-hidden shadow-card flex flex-col relative select-none border border-slate-200/80">
+<body class="bg-white m-0 p-0 font-sans antialiased text-slate-800" style="width: 320px; height: 480px; overflow: hidden;">
+  <article class="id-card bg-white rounded-[32px] overflow-hidden shadow-card flex flex-col relative select-none border border-slate-200/80" style="margin:0;padding:0;">
     <!-- Header (37% height) -->
     <header class="bg-gradient-to-b from-[#060e1d] via-[#09152b] to-[#0c1b35] h-[37%] pt-3 px-4 flex flex-col items-center justify-between pb-3.5 relative border-b border-[#0a182b] overflow-hidden">
       <!-- Coordinate Grid Overlay -->
@@ -175,9 +174,9 @@ def capture_card_photo(html_file: str, output_image: str) -> bool:
         "--headless=new",
         "--disable-gpu",
         "--hide-scrollbars",
-        "--force-device-scale-factor=2",
-        "--default-background-color=00000000",
-        "--window-size=440,600",
+        "--force-device-scale-factor=3",
+        "--default-background-color=ffffffff",
+        "--window-size=320,480",
         f"--screenshot={temp_raw}",
         file_url
     ]
@@ -186,25 +185,9 @@ def capture_card_photo(html_file: str, output_image: str) -> bool:
         subprocess.run(cmd, check=True, capture_output=True, timeout=20)
         if os.path.exists(temp_raw):
             im = Image.open(temp_raw)
-            # Find solid card alpha bounds to guarantee perfect pixel-level centering
-            arr = np.array(im)
-            solid = arr[:, :, 3] == 255
-            ys, xs = np.where(solid)
-            if len(xs) > 0 and len(ys) > 0:
-                center_x = (xs.min() + xs.max()) // 2
-                center_y = (ys.min() + ys.max()) // 2
-            else:
-                center_x, center_y = im.width // 2, im.height // 2
-
-            crop_half_w = 350
-            crop_half_h = 510
-            left = max(0, center_x - crop_half_w)
-            right = min(im.width, center_x + crop_half_w)
-            top = max(0, center_y - crop_half_h)
-            bottom = min(im.height, center_y + crop_half_h)
-
-            cropped = im.crop((left, top, right, bottom))
-            cropped.save(output_image, "PNG", optimize=True)
+            # Screenshot is exactly 320*3 x 480*3 = 960x1440 (scale factor 3)
+            # No crop needed â€” just save directly
+            im.save(output_image, "PNG", optimize=True)
             try:
                 os.remove(temp_raw)
             except:
@@ -275,3 +258,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

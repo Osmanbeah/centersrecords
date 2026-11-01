@@ -1310,10 +1310,56 @@
             }
         });
 
-        // Assistant Helpers
+        // Assistant Helpers & Canonical Name Mapping (Unifies old single names with official full names)
+        const ASSISTANT_NAME_ALIASES = {
+            'khaled': 'Khaled Ashraf',
+            'khaled ashraf': 'Khaled Ashraf',
+            'marwan': 'Marwan Mahmoud',
+            'marwan mahmoud': 'Marwan Mahmoud',
+            'asser': 'Asser Wael',
+            'asser wael': 'Asser Wael',
+            'abdullah': 'Abdullah Mohamed',
+            'abdullah mohamed': 'Abdullah Mohamed',
+            'adham': 'Adham Mohamed',
+            'adham mohamed': 'Adham Mohamed',
+            'hossam': 'Hussam Amr',
+            'hussam': 'Hussam Amr',
+            'hussam amr': 'Hussam Amr',
+            'maher': 'Maher Waleed',
+            'maher waleed': 'Maher Waleed',
+            'osmanbeah': 'Ahmed Osman',
+            'ahmed osman': 'Ahmed Osman',
+            'abdelrahman': 'Abdelrahman Ibrahim',
+            'abdelrahman ibrahim': 'Abdelrahman Ibrahim',
+            'joseph': 'Joseph Emil',
+            'joseph emil': 'Joseph Emil',
+            'mahmoud': 'Mahmoud Ragab',
+            'mahmoud ragab': 'Mahmoud Ragab',
+            'mazen': 'Mazen Tamer',
+            'mazen tamer': 'Mazen Tamer',
+            'moataz': 'Moataz Alalfy',
+            'moataz alalfy': 'Moataz Alalfy',
+            'rodina': 'Rodina Mohamed',
+            'rodina mohamed': 'Rodina Mohamed',
+            'seif': 'Seif Osama',
+            'seif osama': 'Seif Osama',
+            'yassin': 'Yassin Osama',
+            'yassin osama': 'Yassin Osama',
+            'zeyad': 'Zeyad Salah',
+            'zeyad salah': 'Zeyad Salah'
+        };
+
+        function canonicalAssistantName(name) {
+            if (!name) return '';
+            const key = String(name).trim().toLowerCase().replace(/\s+/g, ' ');
+            return ASSISTANT_NAME_ALIASES[key] || String(name).trim();
+        }
+        window.canonicalAssistantName = canonicalAssistantName;
+
         function getAssistantName(a) {
             if (!a) return '';
-            return typeof a === 'object' ? (a.name || '') : a;
+            const raw = typeof a === 'object' ? (a.name || '') : a;
+            return canonicalAssistantName(raw);
         }
 
         function getAssistantEmail(a) {
@@ -1323,7 +1369,7 @@
 
         // --- One-time Cleanup: Reset Test Schedule Assignments, Requests, Attendance, & Adjustments ---
         // (Center definitions and assistant accounts are strictly preserved)
-        const ATTENDANCE_CLEANUP_FLAG = 'v6_purge_osmanbeah_and_clean_requests';
+        const ATTENDANCE_CLEANUP_FLAG = 'v8_unify_marwan_asser_and_all_assistants';
         if (localStorage.getItem('ct_attendance_reset_flag') !== ATTENDANCE_CLEANUP_FLAG) {
             localStorage.removeItem('ct_entries');
             localStorage.removeItem('cached_admin_attendance');
@@ -1340,13 +1386,22 @@
                     }
                 });
                 const rawAssts = localStorage.getItem('ct_assistants');
-                if (rawAssts && rawAssts.toLowerCase().includes('osmanbeah')) {
+                if (rawAssts) {
                     let parsed = JSON.parse(rawAssts) || [];
-                    parsed = parsed.filter(a => {
-                        const name = typeof a === 'object' ? (a.name || '') : a;
-                        return !name.toLowerCase().includes('osmanbeah');
-                    });
-                    localStorage.setItem('ct_assistants', JSON.stringify(parsed));
+                    parsed = parsed.map(a => {
+                        const n = canonicalAssistantName(typeof a === 'object' ? a.name : a);
+                        const em = typeof a === 'object' ? (a.email || '') : '';
+                        return { name: n, email: em };
+                    }).filter(a => a.name && !a.name.toLowerCase().includes('osmanbeah'));
+                    const seenNames = new Set();
+                    const deduped = [];
+                    for (const a of parsed) {
+                        if (!seenNames.has(a.name.toLowerCase())) {
+                            seenNames.add(a.name.toLowerCase());
+                            deduped.push(a);
+                        }
+                    }
+                    localStorage.setItem('ct_assistants', JSON.stringify(deduped));
                 }
             } catch(e) {}
             localStorage.setItem('ct_attendance_reset_flag', ATTENDANCE_CLEANUP_FLAG);
@@ -1507,15 +1562,73 @@
                 } catch(e) { return []; }
             })()
         };
+
+        function sanitizeState() {
+            // Deduplicate and canonicalize State.assistants case-insensitively
+            const seenAssistants = new Map();
+            (State.assistants || []).forEach(a => {
+                const name = canonicalAssistantName(typeof a === 'object' ? a.name : a);
+                const email = typeof a === 'object' ? (a.email || '') : '';
+                if (!name || name.toLowerCase().includes('osmanbeah')) return;
+                const key = name.toLowerCase().trim().replace(/\s+/g, ' ');
+                const existing = seenAssistants.get(key);
+                if (!existing) {
+                    seenAssistants.set(key, { name, email });
+                } else if (!existing.email && email) {
+                    existing.email = email;
+                }
+            });
+            State.assistants = Array.from(seenAssistants.values());
+
+            // Sanitize State.entries
+            (State.entries || []).forEach(entry => {
+                const presentSet = new Set((entry.present || []).map(canonicalAssistantName).filter(n => n && !n.toLowerCase().includes('osmanbeah')));
+                const absentSet = new Set();
+                (entry.absent || []).forEach(name => {
+                    const canon = canonicalAssistantName(name);
+                    // Do NOT mark as absent if they are in present or invalid!
+                    if (canon && !presentSet.has(canon) && !canon.toLowerCase().includes('osmanbeah')) {
+                        absentSet.add(canon);
+                    }
+                });
+                entry.present = Array.from(presentSet);
+                entry.absent = Array.from(absentSet);
+
+                // Sanitize adjustments keys if any
+                if (entry.adjustments && typeof entry.adjustments === 'object') {
+                    const newAdj = {};
+                    Object.entries(entry.adjustments).forEach(([k, v]) => {
+                        const canon = canonicalAssistantName(k);
+                        if (canon && !canon.toLowerCase().includes('osmanbeah')) {
+                            newAdj[canon] = v;
+                        }
+                    });
+                    entry.adjustments = newAdj;
+                }
+            });
+
+            // Sanitize State.attendances if loaded
+            if (Array.isArray(State.attendances)) {
+                State.attendances.forEach(att => {
+                    if (att && att.assistant_name) {
+                        att.assistant_name = canonicalAssistantName(att.assistant_name);
+                    }
+                });
+            }
+        }
+        sanitizeState();
+
         if (State.schedules && State.schedules.length > 0) {
             scheduleHasLoaded = true;
         }
 
         function saveState() {
+            sanitizeState();
             localStorage.setItem('ct_centers', JSON.stringify(State.centers));
             localStorage.setItem('ct_assistants', JSON.stringify(State.assistants));
             localStorage.setItem('ct_entries', JSON.stringify(State.entries));
         }
+        saveState();
 
         function getInitials(name) {
             if (!name) return 'AS';
@@ -2293,8 +2406,10 @@
             // Ensure all known assistants exist in map
             State.assistants.forEach(a => {
                 const name = getAssistantName(a);
-                if (name) {
-                    assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set(), mrPayments: [], deductNotes: [] };
+                if (name && !name.toLowerCase().includes('osmanbeah')) {
+                    if (!assistantStats[name]) {
+                        assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set(), mrPayments: [], deductNotes: [] };
+                    }
                 }
             });
 
@@ -2303,7 +2418,7 @@
                 const entryDate = entry.date || (entry.createdAt ? entry.createdAt.split('T')[0] : '');
                 if (!matchesMonth(entryDate)) return;
 
-                const presentList = entry.present || [];
+                const presentList = (entry.present || []).map(canonicalAssistantName).filter(n => n && !n.toLowerCase().includes('osmanbeah'));
                 const adjustments = entry.adjustments || {};
 
                 presentList.forEach(name => {
@@ -2314,8 +2429,10 @@
                     assistantStats[name].attended++;
                     if (entry.center) assistantStats[name].centers.add(entry.center);
 
+                    const cleanAst = name.trim().toLowerCase();
+                    const altKeyAst = `${entryDate}_${entry.center}_${entry.day || ''}_${cleanAst}`;
                     const altKey = `${entryDate}_${entry.center}_${entry.day || ''}`;
-                    const localNote = localNotesStore[entry.id] || localNotesStore[altKey];
+                    const localNote = localNotesStore[entry.id] || localNotesStore[altKeyAst] || localNotesStore[altKey];
                     if (localNote) {
                         if (localNote.mr_payment && !assistantStats[name].mrPayments.includes(`${entry.center}: ${localNote.mr_payment}`)) {
                             assistantStats[name].mrPayments.push(`${entry.center}: ${localNote.mr_payment}`);
@@ -2326,13 +2443,14 @@
                     }
                 });
 
-                Object.keys(adjustments).forEach(name => {
-                    if (!name) return;
+                Object.keys(adjustments).forEach(rawName => {
+                    const name = canonicalAssistantName(rawName);
+                    if (!name || name.toLowerCase().includes('osmanbeah')) return;
                     if (!assistantStats[name]) {
                         assistantStats[name] = { attended: 0, bonus: 0, deduct: 0, centers: new Set(), mrPayments: [], deductNotes: [] };
                     }
-                    const b = parseFloat(adjustments[name].bonus) || 0;
-                    const d = parseFloat(adjustments[name].deduction) || 0;
+                    const b = parseFloat(adjustments[rawName]?.bonus) || 0;
+                    const d = parseFloat(adjustments[rawName]?.deduction) || 0;
                     assistantStats[name].bonus += b;
                     assistantStats[name].deduct += d;
                 });
@@ -2343,8 +2461,8 @@
                 const scanDate = att.created_at ? att.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
                 if (!matchesMonth(scanDate)) return;
 
-                const name = att.assistant_name;
-                if (!name) return;
+                const name = canonicalAssistantName(att.assistant_name);
+                if (!name || name.toLowerCase().includes('osmanbeah')) return;
 
                 let cleanCenter = att.center ? att.center.replace(/\s*\([^)]*\)/g, '').trim() : '';
                 let attMrPayment = '';
@@ -2371,7 +2489,7 @@
                 // If not already counted in entries for that date and center
                 const inEntry = State.entries.some(e => {
                     const eDate = e.date || (e.createdAt ? e.createdAt.split('T')[0] : '');
-                    return eDate === scanDate && (e.present || []).includes(name);
+                    return eDate === scanDate && (e.present || []).map(canonicalAssistantName).includes(name);
                 });
 
                 if (!inEntry) {
@@ -3146,7 +3264,7 @@
                     // Dynamic weekly assistants: look up assistants approved for this schedule in THIS active week
                     const weeklyApproved = (State.allShiftRequests || [])
                         .filter(r => r.schedule_id === sched.id && (r.status === `approved#${currentWeek.weekKey}` || r.status === 'approved'))
-                        .map(r => r.assistant_name)
+                        .map(r => canonicalAssistantName(r.assistant_name))
                         .filter(n => n && !n.toLowerCase().includes('osmanbeah'));
 
                     const staticAssistants = (Array.isArray(sched.assistants) ? sched.assistants : []).map(getAssistantName).filter(Boolean);
@@ -3181,8 +3299,8 @@
                         return activeRecordsWeekOffset === 0;
                     });
 
-                    // List of unique assistant names that scanned
-                    const scannedAssistantNames = Array.from(new Set(scannedRecordsForCenter.map(att => att.assistant_name).filter(Boolean)));
+                    // List of unique assistant names that scanned (canonicalized)
+                    const scannedAssistantNames = Array.from(new Set(scannedRecordsForCenter.map(att => canonicalAssistantName(att.assistant_name)).filter(Boolean)));
 
                     // Check for existing saved entry for this schedule/center, day, and active week
                     const existingEntry = State.entries.find(e => 
@@ -3191,14 +3309,27 @@
                         (!e.date || (e.date >= currentWeek.startDate && e.date <= currentWeek.endDate))
                     );
 
-                    // Combine assigned assistants, live scanned assistants, and any previously saved attendees
-                    const displayAssistants = Array.from(new Set([
+                    const existingPresent = (existingEntry?.present || []).map(canonicalAssistantName).filter(n => n && !n.toLowerCase().includes('osmanbeah'));
+                    const existingAbsent = (existingEntry?.absent || []).map(canonicalAssistantName).filter(n => n && !n.toLowerCase().includes('osmanbeah'));
+                    const existingAdj = Object.keys(existingEntry?.adjustments || {}).map(canonicalAssistantName).filter(n => n && !n.toLowerCase().includes('osmanbeah'));
+
+                    // Combine assigned assistants, live scanned assistants, and any previously saved attendees (strictly deduplicated case-insensitively)
+                    const displayMap = new Map();
+                    [
                         ...assignedAssistants,
                         ...scannedAssistantNames,
-                        ...(existingEntry?.present || []),
-                        ...(existingEntry?.absent || []),
-                        ...Object.keys(existingEntry?.adjustments || {})
-                    ])).filter(Boolean);
+                        ...existingPresent,
+                        ...existingAbsent,
+                        ...existingAdj
+                    ].forEach(rawName => {
+                        const canon = canonicalAssistantName(rawName);
+                        if (!canon || canon.toLowerCase().includes('osmanbeah')) return;
+                        const key = canon.toLowerCase().trim().replace(/\s+/g, ' ');
+                        if (!displayMap.has(key)) {
+                            displayMap.set(key, canon);
+                        }
+                    });
+                    const displayAssistants = Array.from(displayMap.values());
 
                     let assistantsListHtml = '';
                     if (displayAssistants.length === 0) {
@@ -3213,12 +3344,12 @@
                         `;
                     } else {
                         assistantsListHtml = displayAssistants.map(name => {
-                            const isScanned = scannedAssistantNames.some(s => s.trim().toLowerCase() === name.trim().toLowerCase());
-                            const isAssigned = assignedAssistants.some(a => a.trim().toLowerCase() === name.trim().toLowerCase());
+                            const isScanned = scannedAssistantNames.some(s => s.toLowerCase() === name.toLowerCase());
+                            const isAssigned = assignedAssistants.some(a => a.toLowerCase() === name.toLowerCase());
 
                             let isChecked = false;
                             if (existingEntry) {
-                                isChecked = (existingEntry.present || []).includes(name);
+                                isChecked = isScanned || existingPresent.some(p => p.toLowerCase() === name.toLowerCase());
                             } else {
                                 // Default checked if they scanned ID
                                 isChecked = isScanned;
@@ -3227,7 +3358,7 @@
                             const savedBonus = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.bonus) ? existingEntry.adjustments[name].bonus : '';
                             const savedDeduct = (existingEntry && existingEntry.adjustments && existingEntry.adjustments[name]?.deduction) ? existingEntry.adjustments[name].deduction : '';
 
-                            const assistantScans = scannedRecordsForCenter.filter(att => (att.assistant_name || '').trim().toLowerCase() === name.trim().toLowerCase());
+                            const assistantScans = scannedRecordsForCenter.filter(att => canonicalAssistantName(att.assistant_name).toLowerCase() === name.toLowerCase());
                             const scanRecord = assistantScans[0] || null;
                             let arrivalBadge = '';
                             let isLate = false;
@@ -3504,13 +3635,16 @@
             const adjustments = {};
 
             document.querySelectorAll(`.att-cb-${centerSafeId}`).forEach(cb => {
-                if (cb.checked) present.push(cb.value);
-                else absent.push(cb.value);
+                const canon = canonicalAssistantName(cb.value);
+                if (!canon || canon.toLowerCase().includes('osmanbeah')) return;
+                if (cb.checked) present.push(canon);
+                else absent.push(canon);
             });
 
             // Gather bonuses and deductions
             document.querySelectorAll(`.bonus-input-${centerSafeId}`).forEach(input => {
-                const name = input.getAttribute('data-assistant');
+                const name = canonicalAssistantName(input.getAttribute('data-assistant'));
+                if (!name || name.toLowerCase().includes('osmanbeah')) return;
                 const val = parseFloat(input.value) || 0;
                 if (val > 0) {
                     if (!adjustments[name]) adjustments[name] = { bonus: 0, deduction: 0 };
@@ -3519,13 +3653,17 @@
             });
 
             document.querySelectorAll(`.deduct-input-${centerSafeId}`).forEach(input => {
-                const name = input.getAttribute('data-assistant');
+                const name = canonicalAssistantName(input.getAttribute('data-assistant'));
+                if (!name || name.toLowerCase().includes('osmanbeah')) return;
                 const val = parseFloat(input.value) || 0;
                 if (val > 0) {
                     if (!adjustments[name]) adjustments[name] = { bonus: 0, deduction: 0 };
                     adjustments[name].deduction = val;
                 }
             });
+
+            const uniquePresent = Array.from(new Set(present));
+            const uniqueAbsent = Array.from(new Set(absent.filter(n => !uniquePresent.includes(n))));
 
             const todayStr = new Date().toISOString().split('T')[0];
 
@@ -3548,8 +3686,8 @@
                     day,
                     scheduleId,
                     date: todayStr,
-                    present,
-                    absent,
+                    present: uniquePresent,
+                    absent: uniqueAbsent,
                     adjustments,
                     savedAt: nowTimeStr,
                     createdAt: existingIndex >= 0 ? (State.entries[existingIndex].createdAt || new Date().toISOString()) : new Date().toISOString(),
@@ -3569,8 +3707,8 @@
                 }
 
                 // 2. Sync attended assistants to Supabase attendance table (preserving original scan arrival time)
-                if (supabaseClient && present.length > 0) {
-                    for (const astName of present) {
+                if (supabaseClient && uniquePresent.length > 0) {
+                    for (const astName of uniquePresent) {
                         try {
                             const b = adjustments && adjustments[astName] && parseFloat(adjustments[astName].bonus) || 0;
                             const d = adjustments && adjustments[astName] && parseFloat(adjustments[astName].deduction) || 0;
@@ -3806,6 +3944,9 @@
                     const name = (r.assistant_name || '').toLowerCase();
                     const email = (r.assistant_email || '').toLowerCase();
                     return !name.includes('osmanbeah') && !email.includes('admin123');
+                }).map(r => {
+                    r.assistant_name = canonicalAssistantName(r.assistant_name);
+                    return r;
                 });
                 State.requests = State.allShiftRequests.filter(r => (r.status || '').startsWith('pending'));
                 renderRequestsList();
@@ -4682,6 +4823,7 @@
                 const duplicateIdsToDelete = [];
 
                 for (const att of cloudAttendances) {
+                    att.assistant_name = canonicalAssistantName(att.assistant_name);
                     const meta = parseAttendanceCenterMeta(att.center);
                     const cleanCenter = (meta.cleanCenter || att.center || '').trim().toLowerCase();
                     const day = (meta.day || att.day || '').trim().toLowerCase();
@@ -4945,7 +5087,8 @@
             document.getElementById('reader-container').classList.remove('flex');
         }
         
-        async function processAttendance(assistantName) {
+        async function processAttendance(rawAssistantName) {
+            const assistantName = canonicalAssistantName(rawAssistantName);
             const center = document.getElementById('attendance_center').value;
             const day = document.getElementById('attendance_day').value;
             const now = new Date();
@@ -4953,7 +5096,7 @@
 
             // Guard: Prevent duplicate check-in if assistant is already scanned in today
             const alreadyCheckedIn = (State.attendances || []).find(a => {
-                if (!a.assistant_name || a.assistant_name.trim().toLowerCase() !== assistantName.trim().toLowerCase()) return false;
+                if (!a.assistant_name || canonicalAssistantName(a.assistant_name).toLowerCase() !== assistantName.toLowerCase()) return false;
                 const meta = parseAttendanceCenterMeta(a.center);
                 const aDate = meta.date || (a.created_at ? a.created_at.split('T')[0] : '');
                 if (aDate !== todayStr) return false;
@@ -5163,7 +5306,7 @@
             // Always ensure the attendance records view is rendered after fetches complete
             renderAttendanceRecordsView();
 
-            // Register Service Worker for Offline PWA
+            // Register Service Worker for Offline PWA with automatic update check
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js')
                     .then(reg => {
@@ -5171,6 +5314,14 @@
                         reg.update();
                     })
                     .catch(err => console.log('[PWA Admin] Service Worker registration failed:', err));
+
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        refreshing = true;
+                        window.location.reload();
+                    }
+                });
             }
         });
 

@@ -937,7 +937,55 @@
             }
         }
 
+        // Assistant Name Canonicalization & Aliases (maps old single names to full names)
+        const ASSISTANT_NAME_ALIASES = {
+            'khaled': 'Khaled Ashraf',
+            'khaled ashraf': 'Khaled Ashraf',
+            'marwan': 'Marwan Mahmoud',
+            'marwan mahmoud': 'Marwan Mahmoud',
+            'asser': 'Asser Wael',
+            'asser wael': 'Asser Wael',
+            'abdullah': 'Abdullah Mohamed',
+            'abdullah mohamed': 'Abdullah Mohamed',
+            'adham': 'Adham Mohamed',
+            'adham mohamed': 'Adham Mohamed',
+            'hossam': 'Hussam Amr',
+            'hussam': 'Hussam Amr',
+            'hussam amr': 'Hussam Amr',
+            'maher': 'Maher Waleed',
+            'maher waleed': 'Maher Waleed',
+            'osmanbeah': 'Ahmed Osman',
+            'ahmed osman': 'Ahmed Osman',
+            'abdelrahman': 'Abdelrahman Ibrahim',
+            'abdelrahman ibrahim': 'Abdelrahman Ibrahim',
+            'joseph': 'Joseph Emil',
+            'joseph emil': 'Joseph Emil',
+            'mahmoud': 'Mahmoud Ragab',
+            'mahmoud ragab': 'Mahmoud Ragab',
+            'mazen': 'Mazen Tamer',
+            'mazen tamer': 'Mazen Tamer',
+            'moataz': 'Moataz Alalfy',
+            'moataz alalfy': 'Moataz Alalfy',
+            'rodina': 'Rodina Mohamed',
+            'rodina mohamed': 'Rodina Mohamed',
+            'seif': 'Seif Osama',
+            'seif osama': 'Seif Osama',
+            'yassin': 'Yassin Osama',
+            'yassin osama': 'Yassin Osama',
+            'zeyad': 'Zeyad Salah',
+            'zeyad salah': 'Zeyad Salah'
+        };
+
+        function canonicalAssistantName(n) {
+            if (!n) return '';
+            const key = String(n).trim().toLowerCase().replace(/\s+/g, ' ');
+            return ASSISTANT_NAME_ALIASES[key] || String(n).trim();
+        }
+
         function applyAssistantUser(user) {
+            if (user && user.name) {
+                user.name = canonicalAssistantName(user.name);
+            }
             currentAssistant = user;
             const nameEl = document.getElementById('current_assistant_name');
             if (nameEl) nameEl.textContent = user.name;
@@ -973,7 +1021,8 @@
                         return false;
                     }
                     const email = session.user.email || '';
-                    const name = session.user.user_metadata?.name || email.split('@')[0];
+                    const rawName = session.user.user_metadata?.name || email.split('@')[0];
+                    const name = canonicalAssistantName(rawName);
                     if (name.toLowerCase().includes('osmanbeah') || email.toLowerCase().includes('admin123')) {
                         if (overlay) overlay.classList.remove('hidden');
                         return false;
@@ -1047,12 +1096,14 @@
                 }
 
                 // Set assistant state
-                const name = data.user.user_metadata?.name || email.split('@')[0];
+                const rawName = data.user.user_metadata?.name || email.split('@')[0];
+                const name = canonicalAssistantName(rawName);
                 if (name.toLowerCase().includes('osmanbeah') || email.toLowerCase().includes('admin123')) {
                     await supabaseClient.auth.signOut();
                     throw new Error("Invalid assistant account.");
                 }
                 currentAssistant = { name, email };
+                applyAssistantUser(currentAssistant);
                 const nameEl = document.getElementById('current_assistant_name');
                 if (nameEl) nameEl.textContent = name;
                 const welcomeNameEl = document.getElementById('welcome_assistant_name');
@@ -1129,7 +1180,8 @@
 
         // =================== HELPER & ATTENDED LECTURES LOGIC ===================
         function normalizeAssistantName(n) {
-            return (n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            const canon = canonicalAssistantName(n);
+            return (canon || '').trim().toLowerCase().replace(/\s+/g, ' ');
         }
         function isSameAssistant(name1, name2) {
             const n1 = normalizeAssistantName(name1);
@@ -3096,7 +3148,7 @@
 
             container.innerHTML = '';
             
-            const qrText = currentAssistant.name;
+            const qrText = canonicalAssistantName(currentAssistant.name);
             try {
                 if (typeof QRCode !== 'undefined') {
                     new QRCode(container, {
@@ -3172,8 +3224,19 @@
             // Register Service Worker for PWA & full offline capability
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+                    .then(reg => {
+                        console.log('[PWA] Service Worker registered:', reg.scope);
+                        reg.update();
+                    })
                     .catch(err => console.log('[PWA] Service Worker registration failed:', err));
+
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        refreshing = true;
+                        window.location.reload();
+                    }
+                });
             }
         });
 

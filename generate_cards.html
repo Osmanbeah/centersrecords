@@ -44,6 +44,11 @@
       width: 320px;
       height: 480px;
       aspect-ratio: 2 / 3;
+      box-sizing: border-box;
+    }
+    .qr-holder img, .qr-holder canvas {
+      margin: 0 auto !important;
+      display: block !important;
     }
     .lanyard-slot {
       width: 52px;
@@ -266,7 +271,7 @@
                   <span class="absolute bottom-1 left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-500/80 rounded-bl-sm pointer-events-none"></span>
                   <span class="absolute bottom-1 right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-500/80 rounded-br-sm pointer-events-none"></span>
                   <div class="w-full h-full bg-white rounded-xl p-1.5 border border-slate-100 flex items-center justify-center relative">
-                    <div id="qr_${safeId}" class="flex items-center justify-center"></div>
+                    <div id="qr_${safeId}" class="qr-holder flex items-center justify-center"></div>
                     <div class="absolute w-5 h-5 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center p-0.5 pointer-events-none">
                       <span class="w-2.5 h-2.5 rounded-full bg-[#0a182b] flex items-center justify-center text-[6px] text-cyan-300 font-bold">M</span>
                     </div>
@@ -311,6 +316,31 @@
       });
     }
 
+        async function captureCardToCanvas(el) {
+      const prevTransform = el.style.transform;
+      const prevShadow = el.style.boxShadow;
+      const prevTransition = el.style.transition;
+      el.style.transform = 'none';
+      el.style.boxShadow = 'none';
+      el.style.transition = 'none';
+      try {
+        return await html2canvas(el, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          width: 320,
+          height: 480,
+          scrollX: 0,
+          scrollY: 0
+        });
+      } finally {
+        el.style.transform = prevTransform;
+        el.style.boxShadow = prevShadow;
+        el.style.transition = prevTransition;
+      }
+    }
+
     async function downloadSingleCard(cardId, name) {
       const safeFileName = `${name.replace(/\s+/g, '_')}_id_card.png`;
       const preGeneratedPath = `All_29_Employee_ID_Cards/${safeFileName}`;
@@ -335,7 +365,7 @@
       const cardEl = document.getElementById(cardId);
       if (!cardEl) return;
       try {
-        const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
+        const canvas = await captureCardToCanvas(cardEl);
         const link = document.createElement('a');
         link.download = safeFileName;
         link.href = canvas.toDataURL('image/png');
@@ -400,7 +430,7 @@
             const cardId = 'card_' + i;
             const cardEl = document.getElementById(cardId);
             if (cardEl) {
-              const canvas = await html2canvas(cardEl, { scale: 3, useCORS: true, backgroundColor: null });
+              const canvas = await captureCardToCanvas(cardEl);
               const dataUrl = canvas.toDataURL('image/png');
               const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
               zip.file(fileName, base64Data, { base64: true });
