@@ -1744,7 +1744,7 @@
                                         <span class="material-symbols-outlined text-[14px] text-outline">calendar_today</span>
                                         <span>${escapeHtml(formattedDate)}</span>
                                         ${dayLabel ? `<span class="font-medium text-primary">${escapeHtml(dayLabel)}</span>` : ''}
-                                        ${timeLabel ? `<span class="text-on-surface-variant font-medium">${escapeHtml(timeLabel)}</span>` : ''}
+                                        ${timeLabel || ''}
                                     </div>
                                 </div>
                             </div>
