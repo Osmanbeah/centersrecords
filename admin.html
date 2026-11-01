@@ -1004,13 +1004,29 @@
             </form>
 
             <div>
-                <h3 class="font-headline-md text-on-surface mb-4">Pending Assistant Requests</h3>
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h3 class="font-headline-md text-on-surface">Assistant Shift Requests</h3>
+                    <div class="flex items-center gap-1 p-1 bg-surface-container-low rounded-xl border border-outline-variant/60">
+                        <button type="button" id="tab_req_pending" onclick="switchRequestsFilter('pending')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-surface-container-lowest text-primary shadow-sm flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[15px]">pending_actions</span>
+                            <span>Pending</span>
+                            <span id="badge_total_pending" class="px-1.5 py-0.5 rounded-full text-[10px] bg-primary/10 text-primary">0</span>
+                        </button>
+                        <button type="button" id="tab_req_approved" onclick="switchRequestsFilter('approved')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-on-surface-variant hover:text-on-surface flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[15px]">verified</span>
+                            <span>Approved This Week</span>
+                            <span id="badge_total_approved" class="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-600">0</span>
+                        </button>
+                    </div>
+                </div>
                 <div id="requests_list_loading" class="flex justify-center py-4 hidden">
                     <div class="loading-spinner"></div>
                 </div>
                 <div id="requests_list" class="flex flex-col gap-3 mb-8">
                     <!-- Populated from shift_requests -->
-                    <p class="text-on-surface-variant text-center text-sm py-4 italic">No pending requests.</p>
+                    <p class="text-on-surface-variant text-center text-sm py-4 italic">No requests.</p>
                 </div>
                 
                 <h3 class="font-headline-md text-on-surface mb-4 border-t border-outline-variant/30 pt-6">Upcoming Schedule</h3>
@@ -3515,6 +3531,13 @@
                                                 class="deduct-input-${centerSafeId} w-20 sm:w-24 text-right bg-surface-container-lowest border border-error/30 rounded px-2 py-1 text-xs font-semibold text-error focus:outline-none focus:ring-1 focus:ring-error" title="Deduction (EGP)"/>
                                             <span class="text-[10px] text-error font-medium">EGP</span>
                                         </div>
+                                        <!-- Remove from Session Button -->
+                                        <button type="button" onclick="removeApprovedAssistantFromSession('${escapeHtml(name)}', '${sched.id}', '${day}')"
+                                            title="Remove ${escapeHtml(name)} from this session"
+                                            class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-error/30 text-error hover:bg-error/15 active:scale-95 transition-all flex items-center justify-center shrink-0"
+                                            aria-label="Remove ${escapeHtml(name)} from session">
+                                            <span class="material-symbols-outlined text-[17px] sm:text-[18px]">person_remove</span>
+                                        </button>
                                     </div>
                                 </div>
                             `;
@@ -3623,6 +3646,100 @@
 
             container.innerHTML = html.join('');
         }
+
+        // --- Remove / Revoke Approved Assistant from Session ---
+        window.removeApprovedAssistantFromSession = async function(rawName, scheduleId, day) {
+            const assistantName = canonicalAssistantName(rawName);
+            const currentWeek = getAdminCurrentWeekInfo();
+            const sched = State.schedules.find(s => s.id === scheduleId);
+            const centerName = sched ? sched.center : 'this center';
+
+            if (!confirm(`Are you sure you want to remove ${assistantName} from ${centerName} (${day}) for week ${currentWeek.label}?`)) {
+                return;
+            }
+
+            try {
+                // 1. Find matching approved shift requests for this schedule and target week
+                const matchingRequests = (State.allShiftRequests || []).filter(r => {
+                    const parsed = parseRequestStatus(r);
+                    const isTargetWeek = (!parsed.targetWeek || parsed.targetWeek === currentWeek.weekKey);
+                    const isSchedule = (r.schedule_id === scheduleId);
+                    const isAssistant = canonicalAssistantName(r.assistant_name).toLowerCase() === assistantName.toLowerCase();
+                    return isSchedule && isAssistant && isTargetWeek;
+                });
+
+                // Update shift requests to rejected#<weekKey> so they are no longer approved
+                for (const req of matchingRequests) {
+                    const rejectedStatus = `rejected#${currentWeek.weekKey}`;
+                    req.status = rejectedStatus;
+                    await supabaseClient.from('shift_requests').update({ status: rejectedStatus }).eq('id', req.id);
+                }
+
+                // 2. Also check if assistant was in static sched.assistants (legacy template)
+                if (sched && Array.isArray(sched.assistants)) {
+                    const originalLength = sched.assistants.length;
+                    sched.assistants = sched.assistants.filter(a => {
+                        const aName = typeof a === 'object' ? a.name : a;
+                        return canonicalAssistantName(aName).toLowerCase() !== assistantName.toLowerCase();
+                    });
+                    if (sched.assistants.length !== originalLength) {
+                        await supabaseClient.from('schedule').update({ assistants: sched.assistants }).eq('id', scheduleId);
+                        try {
+                            localStorage.setItem(CACHED_SCHEDULES_KEY, JSON.stringify(State.schedules));
+                        } catch(e) {}
+                    }
+                }
+
+                // 3. Update local state
+                State.allShiftRequests = (State.allShiftRequests || []).map(r => {
+                    const parsed = parseRequestStatus(r);
+                    const isTargetWeek = (!parsed.targetWeek || parsed.targetWeek === currentWeek.weekKey);
+                    const isSchedule = (r.schedule_id === scheduleId);
+                    const isAssistant = canonicalAssistantName(r.assistant_name).toLowerCase() === assistantName.toLowerCase();
+                    if (isSchedule && isAssistant && isTargetWeek) {
+                        return { ...r, status: `rejected#${currentWeek.weekKey}` };
+                    }
+                    return r;
+                });
+
+                // 4. Remove from existing local entry if present
+                const centerKey = sched ? `${sched.center} (${day})` : '';
+                const existingEntryIndex = State.entries.findIndex(e => {
+                    const eCenter = (e.center || '').trim();
+                    const eDate = e.date || '';
+                    const matchCenter = eCenter === centerKey || eCenter === (sched && sched.center);
+                    const inRange = eDate >= currentWeek.startDate && eDate <= currentWeek.endDate;
+                    return matchCenter && inRange;
+                });
+
+                if (existingEntryIndex >= 0) {
+                    const entry = State.entries[existingEntryIndex];
+                    if (entry.present) {
+                        entry.present = entry.present.filter(n => canonicalAssistantName(n).toLowerCase() !== assistantName.toLowerCase());
+                    }
+                    if (entry.absent) {
+                        entry.absent = entry.absent.filter(n => canonicalAssistantName(n).toLowerCase() !== assistantName.toLowerCase());
+                    }
+                    if (entry.adjustments) {
+                        delete entry.adjustments[assistantName];
+                    }
+                    if (entry.records) {
+                        entry.records = entry.records.filter(r => canonicalAssistantName(r.name || r.assistant_name).toLowerCase() !== assistantName.toLowerCase());
+                    }
+                    saveState();
+                }
+
+                renderAttendanceRecordsView();
+                if (typeof renderRequestsList === 'function') {
+                    renderRequestsList();
+                }
+
+                showToast(`Removed ${assistantName} from ${centerName}`, "info");
+            } catch(err) {
+                console.error("Error removing assistant from session:", err);
+                alert("Failed to remove assistant: " + (err.message || "Network error."));
+            }
+        };
 
         async function saveSessionAttendance(day, scheduleId, encodedCenter) {
             const center = decodeURIComponent(encodedCenter);
@@ -4075,10 +4192,65 @@
             }
         }
 
+        let currentRequestsFilter = 'pending'; // 'pending' or 'approved'
+        window.switchRequestsFilter = function(filter) {
+            currentRequestsFilter = filter;
+            const btnPending = document.getElementById('tab_req_pending');
+            const btnApproved = document.getElementById('tab_req_approved');
+            if (btnPending && btnApproved) {
+                if (filter === 'pending') {
+                    btnPending.classList.add('bg-surface-container-lowest', 'text-primary', 'shadow-sm');
+                    btnPending.classList.remove('text-on-surface-variant');
+                    btnApproved.classList.remove('bg-surface-container-lowest', 'text-primary', 'shadow-sm');
+                    btnApproved.classList.add('text-on-surface-variant');
+                } else {
+                    btnApproved.classList.add('bg-surface-container-lowest', 'text-primary', 'shadow-sm');
+                    btnApproved.classList.remove('text-on-surface-variant');
+                    btnPending.classList.remove('bg-surface-container-lowest', 'text-primary', 'shadow-sm');
+                    btnPending.classList.add('text-on-surface-variant');
+                }
+            }
+            renderRequestsList();
+        };
+
         function renderRequestsList() {
             const listContainer = document.getElementById('requests_list');
-            if (!State.requests || State.requests.length === 0) {
-                checkEmptyRequestsState();
+            const currentWeek = getAdminCurrentWeekInfo();
+
+            // Compute counts for filter badges
+            const totalPending = (State.allShiftRequests || []).filter(r => (r.status || '').startsWith('pending')).length;
+            const totalApproved = (State.allShiftRequests || []).filter(r => {
+                const parsed = parseRequestStatus(r);
+                const isTargetWeek = (!parsed.targetWeek || parsed.targetWeek === currentWeek.weekKey);
+                return (r.status === `approved#${currentWeek.weekKey}` || r.status === 'approved') && isTargetWeek;
+            }).length;
+
+            const badgePending = document.getElementById('badge_total_pending');
+            const badgeApproved = document.getElementById('badge_total_approved');
+            if (badgePending) badgePending.textContent = totalPending;
+            if (badgeApproved) badgeApproved.textContent = totalApproved;
+
+            const activeRequestsList = currentRequestsFilter === 'approved'
+                ? (State.allShiftRequests || []).filter(r => {
+                    const parsed = parseRequestStatus(r);
+                    const isTargetWeek = (!parsed.targetWeek || parsed.targetWeek === currentWeek.weekKey);
+                    return (r.status === `approved#${currentWeek.weekKey}` || r.status === 'approved') && isTargetWeek;
+                })
+                : (State.allShiftRequests || []).filter(r => (r.status || '').startsWith('pending'));
+
+            if (!activeRequestsList || activeRequestsList.length === 0) {
+                const emptyMsg = currentRequestsFilter === 'approved'
+                    ? "No approved assistants for this week yet."
+                    : "No pending requests.";
+                listContainer.innerHTML = `
+                    <div class="text-center py-10 px-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-sm">
+                        <div class="w-12 h-12 rounded-2xl bg-surface-container text-on-surface-variant flex items-center justify-center mx-auto mb-2">
+                            <span class="material-symbols-outlined text-[24px]">${currentRequestsFilter === 'approved' ? 'event_available' : 'task_alt'}</span>
+                        </div>
+                        <h4 class="font-bold text-on-surface text-sm sm:text-base">${emptyMsg}</h4>
+                        <p class="text-xs text-on-surface-variant mt-1">${currentRequestsFilter === 'approved' ? 'Approved requests for week ' + currentWeek.label + ' will appear here.' : 'All shift requests have been reviewed.'}</p>
+                    </div>
+                `;
                 return;
             }
 
@@ -4089,7 +4261,7 @@
             WEEK_DAYS.forEach(d => { dayGroups[d] = {}; });
             const otherGroup = {};
 
-            State.requests.forEach(req => {
+            activeRequestsList.forEach(req => {
                 const sched = req.schedule || State.schedules.find(s => s.id === req.schedule_id);
                 const schedDays = (sched && sched.days && sched.days.length > 0) ? sched.days : null;
                 const centerName = sched ? sched.center : (req.center || 'Other Center');
@@ -4119,10 +4291,9 @@
             WEEK_DAYS.forEach(day => {
                 const centersMap = dayGroups[day];
                 const centerKeys = Object.keys(centersMap);
-                if (centerKeys.length === 0) return; // No requests for this day
+                if (centerKeys.length === 0) return;
 
-                // CRITICAL: Stable sort centers deterministically by time, then name
-                // This guarantees center cards NEVER jump or reorder when requests are approved!
+                // Sort centers chronologically by lecture start time, then name
                 centerKeys.sort((k1, k2) => {
                     const c1 = centersMap[k1];
                     const c2 = centersMap[k2];
@@ -4141,24 +4312,40 @@
                     const { centerName, timeFmt, items } = centersMap[k];
                     const centerDomId = `center_card_${day}_${idx}_${k.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
-                    // Stable sort assistants within each center
+                    // Stable sort assistants
                     items.sort((a, b) => {
-                        const pA = parseRequestStatus(a.req);
-                        const pB = parseRequestStatus(b.req);
-                        const wA = pA.targetWeek || '';
-                        const wB = pB.targetWeek || '';
-                        if (wA && wB && wA !== wB) return wA.localeCompare(wB);
                         return (a.req.assistant_name || '').localeCompare(b.req.assistant_name || '');
                     });
 
                     const assistantsHtml = items.map(({ req }) => {
                         const parsed = parseRequestStatus(req);
                         const weekBadge = parsed.targetWeek ? `
-                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
-                                <span class="material-symbols-outlined text-[13px]">date_range</span>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md ${currentRequestsFilter === 'approved' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-primary/10 text-primary border border-primary/20'}">
+                                <span class="material-symbols-outlined text-[13px]">${currentRequestsFilter === 'approved' ? 'verified' : 'date_range'}</span>
                                 <span>Week: ${formatWeekLabel(parsed.targetWeek)}</span>
                             </span>
                         ` : '';
+
+                        let actionButtons = '';
+                        if (currentRequestsFilter === 'approved') {
+                            actionButtons = `
+                                <button id="btn_revoke_${req.id}" onclick="removeApprovedRequest('${req.id}')" 
+                                    class="px-3.5 py-1.5 bg-error/10 text-error rounded-lg text-xs font-semibold hover:bg-error/20 active:scale-95 transition-all flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px]">person_remove</span> Remove Approval
+                                </button>
+                            `;
+                        } else {
+                            actionButtons = `
+                                <button id="btn_approve_${req.id}" onclick="approveRequest('${req.id}')" 
+                                    class="px-3.5 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px]">check_circle</span> Approve
+                                </button>
+                                <button id="btn_reject_${req.id}" onclick="rejectRequest('${req.id}')" 
+                                    class="px-3.5 py-1.5 bg-error/10 text-error rounded-lg text-xs font-semibold hover:bg-error/20 active:scale-95 transition-all flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px]">cancel</span> Reject
+                                </button>
+                            `;
+                        }
 
                         return `
                         <div id="req_row_${req.id}" data-center-id="${centerDomId}" data-day="${day}"
@@ -4172,14 +4359,7 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
-                                <button id="btn_approve_${req.id}" onclick="approveRequest('${req.id}')" 
-                                    class="px-3.5 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold shadow-sm hover:bg-primary/90 active:scale-95 transition-all flex items-center gap-1">
-                                    <span class="material-symbols-outlined text-[16px]">check_circle</span> Approve
-                                </button>
-                                <button id="btn_reject_${req.id}" onclick="rejectRequest('${req.id}')" 
-                                    class="px-3.5 py-1.5 bg-error/10 text-error rounded-lg text-xs font-semibold hover:bg-error/20 active:scale-95 transition-all flex items-center gap-1">
-                                    <span class="material-symbols-outlined text-[16px]">cancel</span> Reject
-                                </button>
+                                ${actionButtons}
                             </div>
                         </div>`;
                     }).join('');
@@ -4197,7 +4377,7 @@
                                 </span>` : ''}
                             </div>
                             <span id="${centerDomId}_badge" class="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded border border-outline-variant/40 font-medium">
-                                ${items.length} requesting
+                                ${items.length} ${currentRequestsFilter === 'approved' ? 'assigned' : 'requesting'}
                             </span>
                         </div>
                         <div class="space-y-2">
@@ -4214,7 +4394,7 @@
                             <h3 class="font-headline-sm font-bold text-on-surface text-base sm:text-lg">${day}</h3>
                         </div>
                         <span id="requests_day_count_${day}" class="bg-primary/10 text-primary text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                            ${totalDayRequests} request${totalDayRequests > 1 ? 's' : ''}
+                            ${totalDayRequests} ${currentRequestsFilter === 'approved' ? 'assigned' : 'request'}${totalDayRequests > 1 ? (currentRequestsFilter === 'approved' ? '' : 's') : ''}
                         </span>
                     </div>
                     <div class="space-y-3">
@@ -4240,6 +4420,21 @@
                             </span>
                         ` : '';
 
+                        let actionButtons = '';
+                        if (currentRequestsFilter === 'approved') {
+                            actionButtons = `
+                                <button id="btn_revoke_${req.id}" onclick="removeApprovedRequest('${req.id}')" 
+                                    class="px-3 py-1 bg-error/10 text-error rounded-lg text-xs font-semibold hover:bg-error/20 active:scale-95 transition-all flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[15px]">person_remove</span> Remove
+                                </button>
+                            `;
+                        } else {
+                            actionButtons = `
+                                <button id="btn_approve_${req.id}" onclick="approveRequest('${req.id}')" class="px-3 py-1 bg-primary text-on-primary rounded-lg text-xs font-semibold">Approve</button>
+                                <button id="btn_reject_${req.id}" onclick="rejectRequest('${req.id}')" class="px-3 py-1 bg-error/10 text-error rounded-lg text-xs font-semibold">Reject</button>
+                            `;
+                        }
+
                         return `
                         <div id="req_row_${req.id}" data-center-id="${centerDomId}" data-day="other"
                             class="req-item-row flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-surface-container-low rounded-xl border border-outline-variant/50 gap-2">
@@ -4248,8 +4443,7 @@
                                 ${weekBadge}
                             </div>
                             <div class="flex items-center gap-2">
-                                <button id="btn_approve_${req.id}" onclick="approveRequest('${req.id}')" class="px-3 py-1 bg-primary text-on-primary rounded-lg text-xs font-semibold">Approve</button>
-                                <button id="btn_reject_${req.id}" onclick="rejectRequest('${req.id}')" class="px-3 py-1 bg-error/10 text-error rounded-lg text-xs font-semibold">Reject</button>
+                                ${actionButtons}
                             </div>
                         </div>`;
                     }).join('');
@@ -4259,7 +4453,7 @@
                         <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40 mb-2">
                             <h4 class="font-bold text-sm text-on-surface">${escapeHtml(centerName)} ${timeFmt ? `(${timeFmt})` : ''}</h4>
                             <span id="${centerDomId}_badge" class="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded border border-outline-variant/40 font-medium">
-                                ${items.length} requesting
+                                ${items.length} ${currentRequestsFilter === 'approved' ? 'assigned' : 'requesting'}
                             </span>
                         </div>
                         <div class="space-y-2">${assistantsHtml}</div>
@@ -4279,9 +4473,9 @@
                 `);
             }
 
-            listContainer.innerHTML = html.length > 0 ? html.join('') : `<p class="text-on-surface-variant text-center text-sm py-4 italic">No pending requests.</p>`;
+            listContainer.innerHTML = html.length > 0 ? html.join('') : `<p class="text-on-surface-variant text-center text-sm py-4 italic">No requests.</p>`;
         }
-        
+
         window.approveRequest = async function(id) {
             const rowEl = document.getElementById(`req_row_${id}`);
             if (rowEl) {
@@ -4372,6 +4566,41 @@
                 alert("Failed to reject request: " + (e.message || "Network error."));
                 State.requests = prevRequests;
                 renderRequestsList();
+            }
+        };
+
+        window.removeApprovedRequest = async function(id) {
+            const req = (State.allShiftRequests || []).find(r => r.id === id);
+            const name = req ? req.assistant_name : 'this assistant';
+            const sched = req ? (req.schedule || State.schedules.find(s => s.id === req.schedule_id)) : null;
+            const centerName = sched ? sched.center : 'the lecture';
+
+            if (!confirm(`Are you sure you want to remove ${name} from ${centerName}?`)) return;
+
+            const rowEl = document.getElementById(`req_row_${id}`);
+            if (rowEl) {
+                const btns = rowEl.querySelectorAll('button');
+                btns.forEach(b => {
+                    b.disabled = true;
+                    b.classList.add('opacity-50', 'pointer-events-none');
+                });
+            }
+
+            const currentWeek = getAdminCurrentWeekInfo();
+            const rejectedStatus = `rejected#${currentWeek.weekKey}`;
+
+            if (req) req.status = rejectedStatus;
+            removeRequestRowFromDOM(id);
+            scheduleAttendanceRecordsRefresh();
+
+            try {
+                const { error } = await supabaseClient.from('shift_requests').update({ status: rejectedStatus }).eq('id', id);
+                if (error) throw error;
+                showToast(`Removed ${name} from ${centerName}`, "info");
+            } catch(e) {
+                console.error("Error revoking request:", e);
+                alert("Failed to remove: " + (e.message || "Network error."));
+                fetchRequests();
             }
         };
         function renderScheduleList() {
