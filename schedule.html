@@ -438,10 +438,10 @@
                         Loading week...
                     </span>
                     <span id="week-assignment-notice" class="text-[10px] text-on-surface-variant font-medium mt-0.5">
-                        Next week assignments open on Friday
+                        ✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday
                     </span>
                 </div>
-                <button type="button" id="btn-next-week" onclick="changeWeekOffset(1)" title="Next week assignments open on Friday" class="w-8 h-8 rounded-xl bg-surface hover:bg-surface-container flex items-center justify-center text-on-surface border border-outline-variant/40 transition-all active:scale-95 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed">
+                <button type="button" id="btn-next-week" onclick="changeWeekOffset(1)" title="✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday" class="w-8 h-8 rounded-xl bg-surface hover:bg-surface-container flex items-center justify-center text-on-surface border border-outline-variant/40 transition-all active:scale-95 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed">
                     <span class="material-symbols-outlined text-[18px]">chevron_right</span>
                 </button>
             </div>
@@ -2272,12 +2272,12 @@
                 if (noticeEl) {
                     noticeEl.textContent = isFriday
                         ? "⚡ It's Friday! Pick all your lectures for the coming week."
-                        : "🔒 Next week assignments open on Friday";
+                        : "🔒 ✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday";
                 }
                 if (nextBtn) {
                     nextBtn.disabled = true;
                     nextBtn.classList.add('opacity-30', 'cursor-not-allowed');
-                    nextBtn.title = "Next week assignments open on Friday";
+                    nextBtn.title = "✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday";
                 }
             } else {
                 if (badgeIndicator) badgeIndicator.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-500/15 text-slate-700";
@@ -2713,7 +2713,7 @@
                         } else if (isFriday) {
                             summaryEl.textContent = `⚡ It's Friday! Pick all your lectures for ${currentWeek.label}. Tap "All Centers" above to choose your sessions.`;
                         } else {
-                            summaryEl.textContent = `You have no lectures assigned for ${currentWeek.label}. Next week assignments open on Friday!`;
+                            summaryEl.textContent = `You have no lectures assigned for ${currentWeek.label}. ✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday!`;
                         }
                     }
                 }
