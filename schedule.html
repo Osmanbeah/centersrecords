@@ -1169,6 +1169,11 @@
         }
 
         // Backward compatibility helpers
+        window.exploreAllCenters = function() {
+            selectedDayFilter = 'all';
+            selectAssistantTab('all');
+        };
+
         window.switchAssistantTab = function(tab) {
             if (tab === 'schedule') selectAssistantTab('my');
             else if (tab === 'attended') selectAssistantTab('attended');
@@ -2746,19 +2751,8 @@
 
                 const cardsHtml = dayLectures.map(item => {
                     const weekStatus = myRequestsMap.get(`${item.id}_${currentWeek.weekKey}`);
-                    let amAssigned = false;
-                    let isPending = false;
-
-                    if (weekStatus === 'approved') {
-                        amAssigned = true;
-                    } else if (weekStatus === 'pending') {
-                        isPending = true;
-                    } else if (!weekStatus && selectedWeekOffset === 0 && !hasWeeklyApprovals && myName) {
-                        amAssigned = (item.assistants || []).some(a => {
-                            const aName = (typeof a === 'object' ? a.name : a || '').toLowerCase();
-                            return isSameAssistant(aName, myName);
-                        });
-                    }
+                    const amAssigned = myAssignedLectures.some(s => s.id === item.id);
+                    const isPending = !amAssigned && weekStatus === 'pending';
 
                     const daysStr = (item.days || []).join(', ');
 
@@ -2920,9 +2914,9 @@
                                 You don't have any lectures assigned for ${selectedDayFilter === 'all' ? 'this week' : selectedDayFilter}. Tap below to browse all center schedules and request open sessions.
                             </p>
                         </div>
-                        <button type="button" onclick="selectAssistantTab('all')" class="mt-2 px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold inline-flex items-center gap-1.5 hover:bg-primary/90 active:scale-95 transition-all shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">explore</span>
-                            <span>Explore All Centers</span>
+                        <button type="button" onclick="exploreAllCenters()" class="mt-2 px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold inline-flex items-center gap-1.5 hover:bg-primary/90 active:scale-95 transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-[16px]">explore</span>
+                        <span>Explore All Centers</span>
                         </button>
                     </div>`;
                 } else {
