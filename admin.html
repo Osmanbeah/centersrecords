@@ -1705,6 +1705,8 @@
             let arr = '';
             let dt = '';
 
+            let verified_by = '';
+            let dist_meters = null;
             if (typeof rawCenterVal === 'string') {
                 const trimmed = rawCenterVal.trim();
                 if (trimmed.startsWith('{')) {
@@ -1719,6 +1721,8 @@
                         lecture = (meta.l || '').trim();
                         arr = (meta.arr || '').trim();
                         dt = (meta.dt || '').trim();
+                        verified_by = (meta.verified_by || '').trim();
+                        if (meta.dist_meters != null) dist_meters = meta.dist_meters;
                     } catch(e) {}
                 } else {
                     const parenMatch = trimmed.match(/^(.*?)\s*\(([^)]+)\)$/);
@@ -1730,7 +1734,7 @@
                     }
                 }
             }
-            return { cleanCenter, day, mrPayment, deductNote, bonus, deduction, lecture, arr, dt, date: dt };
+            return { cleanCenter, day, mrPayment, deductNote, bonus, deduction, lecture, arr, dt, date: dt, verified_by, dist_meters };
         }
 
         // --- Navigation ---
@@ -1816,6 +1820,111 @@
             renderManageAssistantRecords();
         }
 
+        
+        // Master GPS Coordinates for All Educational Centers
+        const ADMIN_MASTER_CENTER_COORDINATES = {
+            'الاوائل (حدايق القبه)': { lat: 30.0854801, lng: 31.2778189, radius: 300 },
+            'الاوائل': { lat: 30.0854801, lng: 31.2778189, radius: 300 },
+            'First Elharam (المجموعه الاولى)': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
+            'First Elharam (المجموعه الثانيه)': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
+            'First Elharam': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
+            'i Learn Helwan': { lat: 29.8450000, lng: 31.3037600, radius: 300 },
+            'i Learn': { lat: 29.8450000, lng: 31.3037600, radius: 300 },
+            'Future soft (زهراء مدينه نصر)': { lat: 30.0465000, lng: 31.3850000, radius: 300 },
+            'Future soft': { lat: 30.0465000, lng: 31.3850000, radius: 300 },
+            'Dar Elsaaada': { lat: 30.1003000, lng: 31.3119000, radius: 300 },
+            'Newstar (المعادي)': { lat: 29.9814000, lng: 31.2748000, radius: 300 },
+            'Newstar': { lat: 29.9814000, lng: 31.2748000, radius: 300 },
+            'Capital (مصر الجديده)': { lat: 30.1135000, lng: 31.3418000, radius: 300 },
+            'Capital': { lat: 30.1135000, lng: 31.3418000, radius: 300 },
+            'Learn ELdokki': { lat: 30.0385000, lng: 31.2115000, radius: 300 },
+            'Learn': { lat: 30.0385000, lng: 31.2115000, radius: 300 },
+            'Top Academy (التجمع الاول )': { lat: 30.0639375, lng: 31.468359375, radius: 300 },
+            'Top Academy (التجمع الاول)': { lat: 30.0639375, lng: 31.468359375, radius: 300 },
+            'Top Academy': { lat: 30.0639375, lng: 31.468359375, radius: 300 }
+        };
+
+        function getAdminCenterCoords(centerName, address) {
+            try {
+                const custom = JSON.parse(localStorage.getItem('custom_center_coords') || '{}');
+                const cKey = (centerName || '').trim().toLowerCase();
+                for (const [k, v] of Object.entries(custom)) {
+                    if (cKey === k.toLowerCase() || cKey.includes(k.toLowerCase()) || k.toLowerCase().includes(cKey)) return v;
+                }
+            } catch(e) {}
+
+            if (address) {
+                const m = address.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+                          address.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+                          address.match(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{1,2}\.\d{4,})/);
+                if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]), radius: 300 };
+            }
+
+            const trimmed = (centerName || '').trim();
+            if (ADMIN_MASTER_CENTER_COORDINATES[trimmed]) return ADMIN_MASTER_CENTER_COORDINATES[trimmed];
+
+            const lower = trimmed.toLowerCase();
+            for (const [k, v] of Object.entries(ADMIN_MASTER_CENTER_COORDINATES)) {
+                if (lower === k.toLowerCase() || lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)) {
+                    return v;
+                }
+            }
+            return null;
+        }
+
+        window.configureCenterGps = function(centerName) {
+            const current = getAdminCenterCoords(centerName, '');
+            const defLat = current ? current.lat : 30.0444;
+            const defLng = current ? current.lng : 31.2357;
+            const defRadius = current ? (current.radius || 300) : 300;
+
+            const input = prompt(
+                `📍 Configure GPS Coordinates for "${centerName}":\n\nEnter Latitude, Longitude, Radius (e.g. 30.08548, 31.27782, 300)\nOr leave blank to detect your current location:`,
+                `${defLat}, ${defLng}, ${defRadius}`
+            );
+
+            if (input === null) return;
+
+            if (input.trim() === '') {
+                if (!navigator.geolocation) {
+                    alert("Geolocation is not supported by your browser.");
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        const newLat = pos.coords.latitude;
+                        const newLng = pos.coords.longitude;
+                        saveCenterGpsCoords(centerName, newLat, newLng, 300);
+                        alert(`GPS set to your current position: ${newLat.toFixed(5)}, ${newLng.toFixed(5)} (Radius: 300m) ✅`);
+                        renderManageCenters();
+                    },
+                    err => alert("GPS lookup failed: " + err.message),
+                    { enableHighAccuracy: true }
+                );
+                return;
+            }
+
+            const parts = input.split(',').map(p => parseFloat(p.trim()));
+            if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                const lat = parts[0];
+                const lng = parts[1];
+                const radius = parts[2] && !isNaN(parts[2]) ? parts[2] : 300;
+                saveCenterGpsCoords(centerName, lat, lng, radius);
+                alert(`GPS updated for ${centerName}: ${lat}, ${lng} (Radius: ${radius}m) ✅`);
+                renderManageCenters();
+            } else {
+                alert("Invalid format. Please enter: Latitude, Longitude, Radius (e.g. 30.08548, 31.27782, 300)");
+            }
+        };
+
+        function saveCenterGpsCoords(centerName, lat, lng, radius) {
+            try {
+                const custom = JSON.parse(localStorage.getItem('custom_center_coords') || '{}');
+                custom[centerName] = { lat, lng, radius };
+                localStorage.setItem('custom_center_coords', JSON.stringify(custom));
+            } catch(e) {}
+        }
+
         function renderManageCenters() {
             const container = document.getElementById('manage_centers_list');
             container.innerHTML = '';
@@ -1824,16 +1933,28 @@
                 return;
             }
             State.centers.forEach((center, index) => {
+                const coords = getAdminCenterCoords(center.name, center.address);
+                const coordsBadge = coords
+                    ? `<span class="inline-flex items-center gap-1 text-[10.5px] font-medium text-emerald-700 dark:text-emerald-400 mt-1"><span class="material-symbols-outlined text-[12px]">my_location</span> GPS: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)} (Radius: ${coords.radius || 300}m)</span>`
+                    : `<span class="inline-flex items-center gap-1 text-[10px] text-outline italic mt-1"><span class="material-symbols-outlined text-[11px]">location_disabled</span> No GPS Coordinates</span>`;
+
                 const div = document.createElement('div');
                 div.className = "flex items-center justify-between p-2.5 rounded-lg bg-surface-container-low border border-outline-variant/60 hover:bg-surface-container transition-colors group";
                 div.innerHTML = `
                     <div class="flex flex-col min-w-0 pr-2">
                         <span class="font-body-md text-on-surface font-semibold truncate text-xs sm:text-sm">${center.name}</span>
-                        ${center.address ? `<span class="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5 truncate"><span class="material-symbols-outlined text-[12px] text-outline">location_on</span>${center.address}</span>` : ''}
+                        ${center.address ? `<span class="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5 truncate"><span class="material-symbols-outlined text-[12px] text-outline">near_me</span>${center.address}</span>` : ''}
+                        ${coordsBadge}
                     </div>
-                    <button type="button" onclick="deleteCenter(${index})" title="Delete ${center.name}" class="text-on-surface-variant hover:text-error hover:bg-error-container/30 transition-colors p-1.5 rounded-full active:scale-95 shrink-0">
-                        <span class="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" onclick="configureCenterGps('${escapeHtml(center.name)}')" title="Configure Center GPS Location" class="text-primary hover:bg-primary/10 transition-colors px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 active:scale-95">
+                            <span class="material-symbols-outlined text-[15px]">edit_location</span>
+                            <span class="hidden sm:inline">GPS</span>
+                        </button>
+                        <button type="button" onclick="deleteCenter(${index})" title="Delete ${center.name}" class="text-on-surface-variant hover:text-error hover:bg-error-container/30 transition-colors p-1.5 rounded-full active:scale-95">
+                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                    </div>
                 `;
                 container.appendChild(div);
             });
@@ -3409,11 +3530,15 @@
                                 }
 
                                 if (bestArrTime) {
+                                    const scanMeta = scanRecord ? parseAttendanceCenterMeta(scanRecord.center) : null;
+                                    const isGpsVerified = (scanMeta && scanMeta.verified_by === 'gps');
+                                    const distStr = (isGpsVerified && scanMeta.dist_meters != null) ? ` (${scanMeta.dist_meters}m)` : '';
+
                                     if (isLate) {
                                         const lateText = formatLateDuration(lateMinutes);
-                                        arrivalBadge = `<span class="text-[11px] text-error font-bold flex items-center gap-1 bg-error/15 px-2.5 py-0.5 rounded-full border border-error/30 shadow-sm"><span class="material-symbols-outlined text-[13px]">alarm</span> Arrived at ${bestArrTime} (${lateText})</span>`;
+                                        arrivalBadge = `<span class="text-[11px] text-error font-bold flex items-center gap-1 bg-error/15 px-2.5 py-0.5 rounded-full border border-error/30 shadow-sm"><span class="material-symbols-outlined text-[13px]">${isGpsVerified ? 'location_on' : 'alarm'}</span> ${isGpsVerified ? 'GPS: ' : ''}Arrived at ${bestArrTime} (${lateText}${distStr})</span>`;
                                     } else {
-                                        arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Arrived at ${bestArrTime}</span>`;
+                                        arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">${isGpsVerified ? 'location_on' : 'verified'}</span> ${isGpsVerified ? 'GPS Checked In' : 'Arrived'} at ${bestArrTime}${distStr}</span>`;
                                     }
                                 } else {
                                     arrivalBadge = `<span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><span class="material-symbols-outlined text-[13px]">verified</span> Scanned ID</span>`;
