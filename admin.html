@@ -1823,25 +1823,25 @@
         
         // Master GPS Coordinates for All Educational Centers
         const ADMIN_MASTER_CENTER_COORDINATES = {
-            'الاوائل (حدايق القبه)': { lat: 30.0854801, lng: 31.2778189, radius: 300 },
-            'الاوائل': { lat: 30.0854801, lng: 31.2778189, radius: 300 },
-            'First Elharam (المجموعه الاولى)': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
-            'First Elharam (المجموعه الثانيه)': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
-            'First Elharam': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
-            'i Learn Helwan': { lat: 29.8450000, lng: 31.3037600, radius: 300 },
-            'i Learn': { lat: 29.8450000, lng: 31.3037600, radius: 300 },
-            'Future soft (زهراء مدينه نصر)': { lat: 30.0465000, lng: 31.3850000, radius: 300 },
-            'Future soft': { lat: 30.0465000, lng: 31.3850000, radius: 300 },
-            'Dar Elsaaada': { lat: 30.1003000, lng: 31.3119000, radius: 300 },
-            'Newstar (المعادي)': { lat: 29.9814000, lng: 31.2748000, radius: 300 },
-            'Newstar': { lat: 29.9814000, lng: 31.2748000, radius: 300 },
-            'Capital (مصر الجديده)': { lat: 30.1135000, lng: 31.3418000, radius: 300 },
-            'Capital': { lat: 30.1135000, lng: 31.3418000, radius: 300 },
-            'Learn ELdokki': { lat: 30.0385000, lng: 31.2115000, radius: 300 },
-            'Learn': { lat: 30.0385000, lng: 31.2115000, radius: 300 },
-            'Top Academy (التجمع الاول )': { lat: 30.0639375, lng: 31.468359375, radius: 300 },
-            'Top Academy (التجمع الاول)': { lat: 30.0639375, lng: 31.468359375, radius: 300 },
-            'Top Academy': { lat: 30.0639375, lng: 31.468359375, radius: 300 }
+            'الاوائل (حدايق القبه)': { lat: 30.0854801, lng: 31.2778189, radius: 1500 },
+            'الاوائل': { lat: 30.0854801, lng: 31.2778189, radius: 1500 },
+            'First Elharam (المجموعه الاولى)': { lat: 29.9926125, lng: 31.156234375, radius: 1500 },
+            'First Elharam (المجموعه الثانيه)': { lat: 29.9926125, lng: 31.156234375, radius: 1500 },
+            'First Elharam': { lat: 29.9926125, lng: 31.156234375, radius: 1500 },
+            'i Learn Helwan': { lat: 29.8450000, lng: 31.3037600, radius: 1500 },
+            'i Learn': { lat: 29.8450000, lng: 31.3037600, radius: 1500 },
+            'Future soft (زهراء مدينه نصر)': { lat: 30.0465000, lng: 31.3850000, radius: 1500 },
+            'Future soft': { lat: 30.0465000, lng: 31.3850000, radius: 1500 },
+            'Dar Elsaaada': { lat: 30.1003000, lng: 31.3119000, radius: 1500 },
+            'Newstar (المعادي)': { lat: 29.9814000, lng: 31.2748000, radius: 1500 },
+            'Newstar': { lat: 29.9814000, lng: 31.2748000, radius: 1500 },
+            'Capital (مصر الجديده)': { lat: 30.1135000, lng: 31.3418000, radius: 1500 },
+            'Capital': { lat: 30.1135000, lng: 31.3418000, radius: 1500 },
+            'Learn ELdokki': { lat: 30.0385000, lng: 31.2115000, radius: 1500 },
+            'Learn': { lat: 30.0385000, lng: 31.2115000, radius: 1500 },
+            'Top Academy (التجمع الاول )': { lat: 30.0639375, lng: 31.468359375, radius: 1500 },
+            'Top Academy (التجمع الاول)': { lat: 30.0639375, lng: 31.468359375, radius: 1500 },
+            'Top Academy': { lat: 30.0639375, lng: 31.468359375, radius: 1500 }
         };
 
         function getAdminCenterCoords(centerName, address) {
@@ -1857,7 +1857,7 @@
                 const m = address.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ||
                           address.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/) ||
                           address.match(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{1,2}\.\d{4,})/);
-                if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]), radius: 300 };
+                if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]), radius: 1500 };
             }
 
             const trimmed = (centerName || '').trim();
@@ -1876,10 +1876,10 @@
             const current = getAdminCenterCoords(centerName, '');
             const defLat = current ? current.lat : 30.0444;
             const defLng = current ? current.lng : 31.2357;
-            const defRadius = current ? (current.radius || 300) : 300;
+            const defRadius = current ? (current.radius || 1500) : 1500;
 
             const input = prompt(
-                `📍 Configure GPS Coordinates for "${centerName}":\n\nEnter Latitude, Longitude, Radius (e.g. 30.08548, 31.27782, 300)\nOr leave blank to detect your current location:`,
+                `📍 Configure GPS Coordinates for "${centerName}":\n\nEnter Latitude, Longitude, Radius (e.g. 30.08548, 31.27782, 1500)\nOr leave blank to detect your current location:`,
                 `${defLat}, ${defLng}, ${defRadius}`
             );
 
@@ -1894,8 +1894,8 @@
                     pos => {
                         const newLat = pos.coords.latitude;
                         const newLng = pos.coords.longitude;
-                        saveCenterGpsCoords(centerName, newLat, newLng, 300);
-                        alert(`GPS set to your current position: ${newLat.toFixed(5)}, ${newLng.toFixed(5)} (Radius: 300m) ✅`);
+                        saveCenterGpsCoords(centerName, newLat, newLng, 1500);
+                        alert(`GPS set to your current position: ${newLat.toFixed(5)}, ${newLng.toFixed(5)} (Radius: 1.5km) ✅`);
                         renderManageCenters();
                     },
                     err => alert("GPS lookup failed: " + err.message),
@@ -1908,12 +1908,12 @@
             if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
                 const lat = parts[0];
                 const lng = parts[1];
-                const radius = parts[2] && !isNaN(parts[2]) ? parts[2] : 300;
+                const radius = parts[2] && !isNaN(parts[2]) ? parts[2] : 1500;
                 saveCenterGpsCoords(centerName, lat, lng, radius);
                 alert(`GPS updated for ${centerName}: ${lat}, ${lng} (Radius: ${radius}m) ✅`);
                 renderManageCenters();
             } else {
-                alert("Invalid format. Please enter: Latitude, Longitude, Radius (e.g. 30.08548, 31.27782, 300)");
+                alert("Invalid format. Please enter: Latitude, Longitude, Radius (e.g. 30.08548, 31.27782, 1500)");
             }
         };
 
@@ -1935,7 +1935,7 @@
             State.centers.forEach((center, index) => {
                 const coords = getAdminCenterCoords(center.name, center.address);
                 const coordsBadge = coords
-                    ? `<span class="inline-flex items-center gap-1 text-[10.5px] font-medium text-emerald-700 dark:text-emerald-400 mt-1"><span class="material-symbols-outlined text-[12px]">my_location</span> GPS: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)} (Radius: ${coords.radius || 300}m)</span>`
+                    ? `<span class="inline-flex items-center gap-1 text-[10.5px] font-medium text-emerald-700 dark:text-emerald-400 mt-1"><span class="material-symbols-outlined text-[12px]">my_location</span> GPS: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)} (Radius: ${coords.radius >= 1000 ? (coords.radius/1000).toFixed(1) + "km" : coords.radius + "m"})</span>`
                     : `<span class="inline-flex items-center gap-1 text-[10px] text-outline italic mt-1"><span class="material-symbols-outlined text-[11px]">location_disabled</span> No GPS Coordinates</span>`;
 
                 const div = document.createElement('div');

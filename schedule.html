@@ -916,7 +916,7 @@
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-on-surface-variant">Required Radius:</span>
-                        <strong class="text-on-surface">Within 300 meters</strong>
+                        <strong id="oor_modal_radius" class="text-on-surface">Within 1.5 km</strong>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 pt-1">
@@ -2748,30 +2748,30 @@
         }
         
         // =========================================================================
-        // ASSISTANT GPS ATTENDANCE ENGINE & GEOFENCING (300m Radius)
+        // ASSISTANT GPS ATTENDANCE ENGINE & GEOFENCING (1.5 km Radius)
         // =========================================================================
-        const DEFAULT_CENTER_GEOFENCE_RADIUS = 300; // meters
+        const DEFAULT_CENTER_GEOFENCE_RADIUS = 1500; // 1.5 km radius // meters
 
         const MASTER_CENTER_COORDINATES = {
-            'الاوائل (حدايق القبه)': { lat: 30.0854801, lng: 31.2778189, radius: 300 },
-            'الاوائل': { lat: 30.0854801, lng: 31.2778189, radius: 300 },
-            'First Elharam (المجموعه الاولى)': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
-            'First Elharam (المجموعه الثانيه)': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
-            'First Elharam': { lat: 29.9926125, lng: 31.156234375, radius: 300 },
-            'i Learn Helwan': { lat: 29.8450000, lng: 31.3037600, radius: 300 },
-            'i Learn': { lat: 29.8450000, lng: 31.3037600, radius: 300 },
-            'Future soft (زهراء مدينه نصر)': { lat: 30.0465000, lng: 31.3850000, radius: 300 },
-            'Future soft': { lat: 30.0465000, lng: 31.3850000, radius: 300 },
-            'Dar Elsaaada': { lat: 30.1003000, lng: 31.3119000, radius: 300 },
-            'Newstar (المعادي)': { lat: 29.9814000, lng: 31.2748000, radius: 300 },
-            'Newstar': { lat: 29.9814000, lng: 31.2748000, radius: 300 },
-            'Capital (مصر الجديده)': { lat: 30.1135000, lng: 31.3418000, radius: 300 },
-            'Capital': { lat: 30.1135000, lng: 31.3418000, radius: 300 },
-            'Learn ELdokki': { lat: 30.0385000, lng: 31.2115000, radius: 300 },
-            'Learn': { lat: 30.0385000, lng: 31.2115000, radius: 300 },
-            'Top Academy (التجمع الاول )': { lat: 30.0639375, lng: 31.468359375, radius: 300 },
-            'Top Academy (التجمع الاول)': { lat: 30.0639375, lng: 31.468359375, radius: 300 },
-            'Top Academy': { lat: 30.0639375, lng: 31.468359375, radius: 300 }
+            'الاوائل (حدايق القبه)': { lat: 30.0854801, lng: 31.2778189, radius: 1500 },
+            'الاوائل': { lat: 30.0854801, lng: 31.2778189, radius: 1500 },
+            'First Elharam (المجموعه الاولى)': { lat: 29.9926125, lng: 31.156234375, radius: 1500 },
+            'First Elharam (المجموعه الثانيه)': { lat: 29.9926125, lng: 31.156234375, radius: 1500 },
+            'First Elharam': { lat: 29.9926125, lng: 31.156234375, radius: 1500 },
+            'i Learn Helwan': { lat: 29.8450000, lng: 31.3037600, radius: 1500 },
+            'i Learn': { lat: 29.8450000, lng: 31.3037600, radius: 1500 },
+            'Future soft (زهراء مدينه نصر)': { lat: 30.0465000, lng: 31.3850000, radius: 1500 },
+            'Future soft': { lat: 30.0465000, lng: 31.3850000, radius: 1500 },
+            'Dar Elsaaada': { lat: 30.1003000, lng: 31.3119000, radius: 1500 },
+            'Newstar (المعادي)': { lat: 29.9814000, lng: 31.2748000, radius: 1500 },
+            'Newstar': { lat: 29.9814000, lng: 31.2748000, radius: 1500 },
+            'Capital (مصر الجديده)': { lat: 30.1135000, lng: 31.3418000, radius: 1500 },
+            'Capital': { lat: 30.1135000, lng: 31.3418000, radius: 1500 },
+            'Learn ELdokki': { lat: 30.0385000, lng: 31.2115000, radius: 1500 },
+            'Learn': { lat: 30.0385000, lng: 31.2115000, radius: 1500 },
+            'Top Academy (التجمع الاول )': { lat: 30.0639375, lng: 31.468359375, radius: 1500 },
+            'Top Academy (التجمع الاول)': { lat: 30.0639375, lng: 31.468359375, radius: 1500 },
+            'Top Academy': { lat: 30.0639375, lng: 31.468359375, radius: 1500 }
         };
 
         window._currentUserLocation = null;
@@ -3017,7 +3017,7 @@
                 btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">how_to_reg</span> <span>Record Attendance (~${dist}m)</span>`;
             } else {
                 // OUTSIDE CENTER: Strictly Locked & Disabled
-                statusEl.innerHTML = `<span class="material-symbols-outlined text-[15px] text-amber-600">distance</span> <span class="text-on-surface-variant font-medium">Out of Range (~${formatDistance(dist)} away • Must be within ${radius}m)</span>`;
+                statusEl.innerHTML = `<span class="material-symbols-outlined text-[15px] text-amber-600">distance</span> <span class="text-on-surface-variant font-medium">Out of Range (~${formatDistance(dist)} away • Must be within ${formatDistance(radius)})</span>`;
                 btn.disabled = false; // Keep clickable to trigger friendly out-of-range explanation modal
                 btn.className = "flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all bg-surface-container text-outline border border-outline-variant/60 opacity-80 cursor-not-allowed hover:bg-surface-container-high";
                 btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">lock</span> <span>Check In Locked (~${formatDistance(dist)})</span>`;
@@ -3054,10 +3054,13 @@
             const centerEl = document.getElementById('oor_modal_center');
             const distEl = document.getElementById('oor_modal_dist');
             const textEl = document.getElementById('oor_modal_text');
+            const radiusEl = document.getElementById('oor_modal_radius');
+            const radStr = formatDistance(radius || DEFAULT_CENTER_GEOFENCE_RADIUS);
             if (centerEl) centerEl.textContent = centerName || 'Center';
             if (distEl) distEl.textContent = `~${formatDistance(dist)} away`;
+            if (radiusEl) radiusEl.textContent = `Within ${radStr}`;
             if (textEl) {
-                textEl.textContent = `You are currently ${formatDistance(dist)} away from ${centerName || 'the center'}. Attendance can only be recorded when you physically arrive inside the center's area (within ${radius || 300}m).`;
+                textEl.textContent = `You are currently ${formatDistance(dist)} away from ${centerName || 'the center'}. Attendance can only be recorded when you physically arrive inside the center's area (within ${radStr}).`;
             }
             if (modal) modal.classList.remove('hidden');
         }
