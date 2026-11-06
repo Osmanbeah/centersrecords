@@ -2308,15 +2308,9 @@
             const day = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
             
             // In our Saturday-Friday week cycle:
-            // Friday (5) is prep/picking day for the upcoming week!
-            let diffToSaturday = 0;
-            if (day === 5) {
-                diffToSaturday = 1; // Upcoming week starts tomorrow (Saturday)
-            } else if (day === 6) {
-                diffToSaturday = 0; // Current week started today (Saturday)
-            } else {
-                diffToSaturday = -(day + 1); // Sunday (0) to Thursday (4)
-            }
+            // Saturday (6) starts the active week (diff = 0).
+            // Sunday (0) through Friday (5) belong to the week that started on the preceding Saturday.
+            const diffToSaturday = (day === 6) ? 0 : -(day + 1);
 
             const sat = new Date(d);
             sat.setDate(d.getDate() + diffToSaturday + (offset * 7));
@@ -2340,11 +2334,17 @@
         }
 
         function changeWeekOffset(delta) {
-            if (delta > 0 && selectedWeekOffset >= 0) {
-                showToast("Future week assignments open on Friday! You cannot pick ahead.", "error");
+            const isFriday = new Date().getDay() === 5;
+            const maxOffset = isFriday ? 1 : 0;
+            if (delta > 0 && selectedWeekOffset >= maxOffset) {
+                if (!isFriday) {
+                    showToast("Future week assignments open on Friday! You cannot pick ahead.", "error");
+                } else {
+                    showToast("You are already viewing the upcoming week.", "info");
+                }
                 return;
             }
-            selectedWeekOffset = Math.min(0, selectedWeekOffset + delta);
+            selectedWeekOffset = Math.min(maxOffset, selectedWeekOffset + delta);
             updateWeekUI();
             renderScheduleList();
             renderDayPills();
@@ -2372,17 +2372,33 @@
 
             if (selectedWeekOffset === 0) {
                 if (badgeIndicator) badgeIndicator.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700";
-                if (badgeText) badgeText.textContent = isFriday ? "🟢 Friday: Week Picks Open" : "🟢 Active Week Assignment";
+                if (badgeText) badgeText.textContent = isFriday ? "🟢 Active Week (Friday)" : "🟢 Active Week Assignment";
                 if (jumpBtn) jumpBtn.classList.add('hidden');
                 if (noticeEl) {
                     noticeEl.textContent = isFriday
-                        ? "⚡ It's Friday! Pick all your lectures for the coming week."
+                        ? "⚡ Active Week ends today! Next week assignments are also open (tap > to view/pick next week)."
                         : "🔒 ✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday";
                 }
                 if (nextBtn) {
+                    if (isFriday) {
+                        nextBtn.disabled = false;
+                        nextBtn.classList.remove('opacity-30', 'cursor-not-allowed');
+                        nextBtn.title = "View / pick upcoming week";
+                    } else {
+                        nextBtn.disabled = true;
+                        nextBtn.classList.add('opacity-30', 'cursor-not-allowed');
+                        nextBtn.title = "✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday";
+                    }
+                }
+            } else if (selectedWeekOffset === 1) {
+                if (badgeIndicator) badgeIndicator.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700";
+                if (badgeText) badgeText.textContent = "⚡ Upcoming Week (Open for Picking)";
+                if (jumpBtn) jumpBtn.classList.remove('hidden');
+                if (noticeEl) noticeEl.textContent = "⚡ Picking for the upcoming week is open! Select your lectures.";
+                if (nextBtn) {
                     nextBtn.disabled = true;
                     nextBtn.classList.add('opacity-30', 'cursor-not-allowed');
-                    nextBtn.title = "✨ Active Week: Pick any session from 'All Centers' • Next week opens Friday";
+                    nextBtn.title = "No further weeks available";
                 }
             } else {
                 if (badgeIndicator) badgeIndicator.className = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-500/15 text-slate-700";
@@ -2409,7 +2425,7 @@
                 // Fallback: derive week from created_at timestamp
                 const d = new Date(req.created_at);
                 const day = d.getDay();
-                let daysToSaturday = (day === 5) ? 1 : (day === 6 ? 0 : -(day + 1));
+                let daysToSaturday = (day === 6) ? 0 : -(day + 1);
                 d.setDate(d.getDate() + daysToSaturday);
                 targetWeek = d.toISOString().split('T')[0];
             }
@@ -3532,7 +3548,7 @@
                                 <span class="material-symbols-outlined text-[15px]">lock</span> Past Week
                             </span>
                         `;
-                    } else if (selectedWeekOffset > 0) {
+                    } else if (selectedWeekOffset > 0 && !(selectedWeekOffset === 1 && new Date().getDay() === 5)) {
                         actionButton = `
                             <span class="inline-flex items-center gap-1.5 bg-surface-container text-outline px-3 py-1.5 rounded-xl text-xs font-medium border border-outline-variant/40 shrink-0">
                                 <span class="material-symbols-outlined text-[15px]">lock_clock</span> Locked
@@ -3721,11 +3737,12 @@
         }
 
         window.pickLecture = function(scheduleId) {
+            const isFriday = new Date().getDay() === 5;
             if (selectedWeekOffset < 0) {
                 showToast("Past weeks are closed and read-only.", "error");
                 return;
             }
-            if (selectedWeekOffset > 0) {
+            if (selectedWeekOffset > 1 || (selectedWeekOffset === 1 && !isFriday)) {
                 showToast("Future week assignments open on Friday! You cannot pick ahead.", "error");
                 return;
             }
@@ -3753,8 +3770,10 @@
 
         window.confirmPickLecture = async function() {
             if (!pendingPickScheduleId) return;
-            if (selectedWeekOffset !== 0) {
-                showToast("Lecture picking is only open for the active week cycle (Fridays).", "error");
+            const isFriday = new Date().getDay() === 5;
+            const canPick = selectedWeekOffset === 0 || (selectedWeekOffset === 1 && isFriday);
+            if (!canPick) {
+                showToast("Lecture picking is only open for the active week cycle or upcoming week on Fridays.", "error");
                 return;
             }
 
