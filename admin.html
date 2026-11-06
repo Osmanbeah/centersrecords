@@ -1599,9 +1599,15 @@
             const day = d.getDay(); // 0: Sun, 1: Mon, ..., 5: Fri, 6: Sat
             
             // In our Saturday-Friday week cycle:
-            // Saturday (6) starts the active week (diff = 0).
-            // Sunday (0) through Friday (5) belong to the week that started on the preceding Saturday.
-            let diffToSaturday = (day === 6) ? 0 : -(day + 1);
+            // Friday (5) is prep/picking day for upcoming week!
+            let diffToSaturday = 0;
+            if (day === 5) {
+                diffToSaturday = 1;
+            } else if (day === 6) {
+                diffToSaturday = 0;
+            } else {
+                diffToSaturday = -(day + 1);
+            }
 
             const sat = new Date(d);
             sat.setDate(d.getDate() + diffToSaturday + (offset * 7));
@@ -4582,7 +4588,7 @@
             if (!targetWeek && req && req.created_at) {
                 const d = new Date(req.created_at);
                 const day = d.getDay();
-                let daysToSat = (day === 6) ? 0 : -(day + 1);
+                let daysToSat = (day === 5) ? 1 : (day === 6 ? 0 : -(day + 1));
                 d.setDate(d.getDate() + daysToSat);
                 targetWeek = d.toISOString().split('T')[0];
             }
