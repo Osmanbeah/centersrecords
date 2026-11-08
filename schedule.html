@@ -1044,6 +1044,19 @@
                         }
                     }
                 });
+                arrivalsChannel.on('broadcast', { event: 'time_updated' }, ({ payload }) => {
+                    if (payload && currentAssistant && currentAssistant.name) {
+                        const myName = currentAssistant.name.trim().toLowerCase();
+                        const pName = (payload.assistant_name || '').trim().toLowerCase();
+                        if (isSameAssistant(pName, myName) || (payload.assistant_email && currentAssistant && currentAssistant.email && payload.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase())) {
+                            if (typeof fetchAttendedLectures === 'function') {
+                                fetchAttendedLectures(true).then(() => {
+                                    if (typeof renderScheduleList === 'function') renderScheduleList();
+                                });
+                            }
+                        }
+                    }
+                });
                 arrivalsChannel.subscribe();
                 window._arrivalsRealtimeChannel = arrivalsChannel;
             } catch(e) {

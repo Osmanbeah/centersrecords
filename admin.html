@@ -907,6 +907,110 @@
             </div>
         </div>
 
+        <!-- ================= MODAL: EDIT / OVERRIDE ASSISTANT ARRIVAL TIME ================= -->
+        <div id="edit-arrival-time-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm animate-fade-in">
+            <div class="bg-surface rounded-2xl sm:rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col border border-outline-variant/80 animate-scale-up">
+                <!-- Header -->
+                <div class="p-4 sm:p-5 bg-surface-container-low border-b border-outline-variant/60 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[22px]">schedule</span>
+                        </div>
+                        <div>
+                            <h3 class="font-headline-sm font-bold text-on-surface text-base">Edit Arrival Time</h3>
+                            <p id="edit_modal_time_subtitle" class="text-xs text-on-surface-variant">Assistant &amp; Session info</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeEditArrivalTimeModal()" class="w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center text-outline hover:text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                    <input type="hidden" id="edit_time_assistant_name" value=""/>
+                    <input type="hidden" id="edit_time_center" value=""/>
+                    <input type="hidden" id="edit_time_day" value=""/>
+                    <input type="hidden" id="edit_time_sched_time" value=""/>
+                    <input type="hidden" id="edit_time_session_date" value=""/>
+                    <input type="hidden" id="edit_time_record_id" value=""/>
+
+                    <!-- Session Info Pill -->
+                    <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/70 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary text-[20px]">event_seat</span>
+                            <div>
+                                <div id="edit_modal_session_center" class="font-bold text-xs text-on-surface">Center Name</div>
+                                <div id="edit_modal_session_day_time" class="text-[11px] text-on-surface-variant">Sunday &bull; Scheduled: 12:30 PM</div>
+                            </div>
+                        </div>
+                        <span id="edit_modal_current_badge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-surface-container text-on-surface-variant border border-outline-variant/50">
+                            Current: 01:23 PM
+                        </span>
+                    </div>
+
+                    <!-- Time Input -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-on-surface flex items-center justify-between">
+                            <span class="flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-primary text-[16px]">alarm</span>
+                                <span>New Arrival Time:</span>
+                            </span>
+                            <span id="edit_modal_lateness_preview" class="text-[11px] font-semibold text-emerald-600">On Time</span>
+                        </label>
+
+                        <!-- Quick Presets -->
+                        <div class="flex flex-wrap gap-1.5 mb-2">
+                            <button type="button" id="btn_preset_sched_time" onclick="setEditTimePreset('scheduled')" class="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 transition-colors flex items-center gap-1 font-semibold">
+                                <span class="material-symbols-outlined text-[13px]">check_circle</span>
+                                <span id="preset_sched_label">On Time (12:30 PM)</span>
+                            </button>
+                            <button type="button" onclick="setEditTimePreset('now')" class="text-[11px] px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors flex items-center gap-1 font-semibold">
+                                <span class="material-symbols-outlined text-[13px]">schedule</span>
+                                <span>Current Time</span>
+                            </button>
+                            <button type="button" onclick="adjustEditTimeMinutes(-15)" class="text-[11px] px-2 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors font-medium">
+                                -15m
+                            </button>
+                            <button type="button" onclick="adjustEditTimeMinutes(15)" class="text-[11px] px-2 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/50 transition-colors font-medium">
+                                +15m
+                            </button>
+                        </div>
+
+                        <!-- 24h & 12h inputs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] font-semibold text-on-surface-variant block mb-1">Time Picker (24h)</label>
+                                <input type="time" id="edit_time_picker" oninput="onEditTimePickerChanged(this.value)"
+                                    class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-sm font-mono font-bold text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"/>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-semibold text-on-surface-variant block mb-1">Formatted Time (12h)</label>
+                                <input type="text" id="edit_time_formatted_display" readonly
+                                    class="w-full bg-surface-container border border-outline-variant/60 rounded-xl p-2.5 text-sm font-mono font-bold text-primary focus:outline-none cursor-default"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-on-surface-variant flex items-start gap-2">
+                        <span class="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">sync</span>
+                        <span>Saving will update the arrival time in <strong>Supabase</strong>, recalculate punctuality/lateness automatically, and immediately update the assistant's phone portal in real time.</span>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="p-4 bg-surface-container-low border-t border-outline-variant/60 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeEditArrivalTimeModal()" class="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-colors border border-outline-variant">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-save-edited-time" onclick="saveEditedArrivalTime()" class="px-5 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span>Save &amp; Sync Time</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- ================= MODAL: ADD ASSISTANT / SUBSTITUTE TO SESSION ================= -->
         <div id="modal_add_assistant_to_session" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm animate-fade-in">
             <div class="bg-surface rounded-2xl sm:rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col border border-outline-variant/80 animate-scale-up">
@@ -2554,6 +2658,9 @@ function getAdminCenterCoords(centerName, address) {
                                         <span>&bull;</span>
                                         <span>${r.date}</span>
                                         ${r.time ? `<span>&bull;</span><span>${r.time}</span>` : ''}
+                                        <button type="button" onclick="openEditArrivalTimeModal('${escapeHtml(r.assistant)}', '${escapeHtml(r.center)}', '${escapeHtml(r.day || '')}', '', '${escapeHtml(r.date)}', '${escapeHtml(r.entryId || '')}', '${escapeHtml(r.time || '')}')" class="text-on-surface-variant hover:text-primary transition-colors p-0.5 rounded ml-0.5" title="Edit arrival time">
+                                            <span class="material-symbols-outlined text-[13px] align-middle">edit_calendar</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -3034,6 +3141,380 @@ function getAdminCenterCoords(centerName, address) {
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">check_circle</span> <span>Save Notes</span>`;
+                }
+            }
+        };
+
+        // ================= EDIT ARRIVAL TIME LOGIC =================
+        function minutesTo24Hour(mins) {
+            if (mins === null || mins === undefined || isNaN(mins)) return '12:00';
+            mins = ((mins % 1440) + 1440) % 1440;
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+        }
+
+        function twentyFourTo12Hour(hhmm) {
+            if (!hhmm) return '';
+            const parts = hhmm.split(':');
+            if (parts.length < 2) return hhmm;
+            let h = parseInt(parts[0], 10) || 0;
+            const m = parseInt(parts[1], 10) || 0;
+            const period = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            if (h === 0) h = 12;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+        }
+
+        function timeStringTo24Hour(timeStr) {
+            if (!timeStr) return '';
+            const clean = String(timeStr).trim().toUpperCase();
+            const isPM = clean.includes('PM');
+            const isAM = clean.includes('AM');
+            const numPart = clean.replace(/AM|PM/g, '').trim();
+            const parts = numPart.split(':');
+            if (parts.length < 2) return '';
+            let h = parseInt(parts[0], 10) || 0;
+            const m = parseInt(parts[1], 10) || 0;
+            if (isPM && h < 12) h += 12;
+            else if (isAM && h === 12) h = 0;
+            return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+        }
+
+        function updateEditTimeLatenessPreview() {
+            const pickerVal = document.getElementById('edit_time_picker')?.value;
+            const schedTimeVal = document.getElementById('edit_time_sched_time')?.value;
+            const previewEl = document.getElementById('edit_modal_lateness_preview');
+            const formattedDisplay = document.getElementById('edit_time_formatted_display');
+            if (formattedDisplay && pickerVal) {
+                formattedDisplay.value = twentyFourTo12Hour(pickerVal);
+            }
+            if (!previewEl) return;
+
+            if (!pickerVal) {
+                previewEl.textContent = 'Enter time';
+                previewEl.className = 'text-[11px] font-semibold text-on-surface-variant';
+                return;
+            }
+
+            const arrM = parseTimeToMinutes(pickerVal);
+            const schedM = schedTimeVal ? parseTimeToMinutes(schedTimeVal) : null;
+
+            if (schedM === null || arrM === null) {
+                previewEl.textContent = 'Time Selected';
+                previewEl.className = 'text-[11px] font-semibold text-primary';
+                return;
+            }
+
+            if (arrM <= schedM) {
+                previewEl.textContent = 'On Time ✅';
+                previewEl.className = 'text-[11px] font-bold text-emerald-600 dark:text-emerald-400';
+            } else {
+                const lateMin = arrM - schedM;
+                previewEl.textContent = `Late by ${formatLateDuration(lateMin)} ⏰`;
+                previewEl.className = 'text-[11px] font-bold text-error';
+            }
+        }
+
+        window.onEditTimePickerChanged = function(val) {
+            updateEditTimeLatenessPreview();
+        };
+
+        window.setEditTimePreset = function(type) {
+            const picker = document.getElementById('edit_time_picker');
+            if (!picker) return;
+
+            if (type === 'scheduled') {
+                const schedVal = document.getElementById('edit_time_sched_time')?.value;
+                if (schedVal) {
+                    picker.value = timeStringTo24Hour(schedVal);
+                }
+            } else if (type === 'now') {
+                const now = new Date();
+                picker.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            }
+            updateEditTimeLatenessPreview();
+        };
+
+        window.adjustEditTimeMinutes = function(delta) {
+            const picker = document.getElementById('edit_time_picker');
+            if (!picker) return;
+            let curM = parseTimeToMinutes(picker.value || '12:00') || 720;
+            curM += delta;
+            picker.value = minutesTo24Hour(curM);
+            updateEditTimeLatenessPreview();
+        };
+
+        window.openEditArrivalTimeModal = function(assistantName, center, day, schedTime, sessionDate, recordId, currentTime) {
+            document.getElementById('edit_time_assistant_name').value = assistantName || '';
+            document.getElementById('edit_time_center').value = center || '';
+            document.getElementById('edit_time_day').value = day || '';
+            document.getElementById('edit_time_record_id').value = recordId || '';
+
+            // Derive scheduled start time if not provided
+            if (!schedTime && typeof allSchedules !== 'undefined') {
+                const foundSched = (allSchedules || []).find(s => {
+                    const c = (s.center || '').toLowerCase().trim();
+                    const targetC = (center || '').toLowerCase().trim();
+                    const cMatch = c === targetC || c.includes(targetC) || targetC.includes(c);
+                    if (!cMatch) return false;
+                    if (day && Array.isArray(s.days)) {
+                        return s.days.some(d => d.toLowerCase().trim() === day.toLowerCase().trim());
+                    }
+                    return true;
+                });
+                if (foundSched) schedTime = foundSched.time || '';
+            }
+            document.getElementById('edit_time_sched_time').value = schedTime || '';
+
+            // Derive sessionDate if not provided
+            if (!sessionDate) {
+                const curWeek = typeof getAdminCurrentWeekInfo === 'function' ? getAdminCurrentWeekInfo() : { startDate: new Date().toISOString().split('T')[0] };
+                sessionDate = typeof getSessionDateForDay === 'function' ? getSessionDateForDay(day, curWeek) : curWeek.startDate;
+            }
+            document.getElementById('edit_time_session_date').value = sessionDate || '';
+
+            // Update UI elements in modal
+            const subEl = document.getElementById('edit_modal_time_subtitle');
+            if (subEl) subEl.textContent = `${assistantName} • ${center} (${day || 'Session'})`;
+
+            const centerTitle = document.getElementById('edit_modal_session_center');
+            if (centerTitle) centerTitle.textContent = center || 'Lecture Session';
+
+            const dayTimeEl = document.getElementById('edit_modal_session_day_time');
+            if (dayTimeEl) {
+                const formattedSched = schedTime ? formatTime(schedTime) : 'Session';
+                dayTimeEl.textContent = `${day || ''} • Scheduled: ${formattedSched} • Date: ${sessionDate}`;
+            }
+
+            const currentBadge = document.getElementById('edit_modal_current_badge');
+            if (currentBadge) {
+                currentBadge.textContent = currentTime ? `Current: ${currentTime}` : 'Not scanned';
+            }
+
+            const presetSchedBtn = document.getElementById('btn_preset_sched_time');
+            const presetSchedLabel = document.getElementById('preset_sched_label');
+            if (schedTime) {
+                if (presetSchedLabel) presetSchedLabel.textContent = `On Time (${formatTime(schedTime)})`;
+                if (presetSchedBtn) presetSchedBtn.classList.remove('hidden');
+            } else {
+                if (presetSchedBtn) presetSchedBtn.classList.add('hidden');
+            }
+
+            // Determine initial time value for picker
+            let initial24 = '';
+            if (currentTime) {
+                initial24 = timeStringTo24Hour(currentTime);
+            }
+            if (!initial24 && schedTime) {
+                initial24 = timeStringTo24Hour(schedTime);
+            }
+            if (!initial24) {
+                const now = new Date();
+                initial24 = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            }
+
+            const picker = document.getElementById('edit_time_picker');
+            if (picker) picker.value = initial24;
+
+            updateEditTimeLatenessPreview();
+
+            const modal = document.getElementById('edit-arrival-time-modal');
+            if (modal) modal.classList.remove('hidden');
+        };
+
+        window.closeEditArrivalTimeModal = function() {
+            const modal = document.getElementById('edit-arrival-time-modal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.saveEditedArrivalTime = async function() {
+            const assistantName = document.getElementById('edit_time_assistant_name').value;
+            const center = document.getElementById('edit_time_center').value;
+            const day = document.getElementById('edit_time_day').value;
+            const schedTime = document.getElementById('edit_time_sched_time').value;
+            const sessionDate = document.getElementById('edit_time_session_date').value;
+            let recordId = document.getElementById('edit_time_record_id').value;
+            const pickerVal = document.getElementById('edit_time_picker')?.value;
+
+            if (!pickerVal) {
+                showToast("Please choose an arrival time.", "warning");
+                return;
+            }
+
+            const formattedTime = twentyFourTo12Hour(pickerVal);
+
+            const btn = document.getElementById('btn-save-edited-time');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<div class="loading-spinner w-3.5 h-3.5 border-2"></div> <span>Updating...</span>`;
+            }
+
+            try {
+                // 1. Locate matching record in State.attendances
+                const cleanAst = canonicalAssistantName(assistantName).toLowerCase().trim();
+                let match = (State.attendances || []).find(a => {
+                    if (recordId && a.id === recordId) return true;
+                    if (canonicalAssistantName(a.assistant_name).toLowerCase().trim() !== cleanAst) return false;
+                    const meta = parseAttendanceCenterMeta(a.center);
+                    const attCenter = (meta.cleanCenter || a.center || '').trim().toLowerCase();
+                    const targetCenter = (center || '').trim().toLowerCase();
+                    const centerMatch = attCenter === targetCenter || attCenter.includes(targetCenter) || targetCenter.includes(attCenter);
+                    if (!centerMatch) return false;
+                    const attDay = (a.day || meta.day || '').trim().toLowerCase();
+                    if (day && attDay && attDay !== day.trim().toLowerCase()) return false;
+                    const attDate = meta.dt || meta.date || (a.created_at ? a.created_at.split('T')[0] : '');
+                    if (sessionDate && attDate && attDate !== sessionDate) return false;
+                    return true;
+                });
+
+                if (!match && recordId) {
+                    match = (State.attendances || []).find(a => a.id === recordId);
+                }
+
+                const currentMeta = match ? parseAttendanceCenterMeta(match.center) : {};
+                const centerPayloadObj = {
+                    c: currentMeta.cleanCenter || center,
+                    d: currentMeta.day || day,
+                    dt: sessionDate || currentMeta.dt || (match?.created_at ? match.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+                    b: currentMeta.bonus || 0,
+                    ded: currentMeta.deduction || 0,
+                    l: currentMeta.lecture || 'Regular Lecture',
+                    arr: formattedTime,
+                    mr_payment: currentMeta.mrPayment || '',
+                    deduct_note: currentMeta.deductNote || '',
+                    verified_by: 'admin_edit'
+                };
+                const centerPayloadStr = JSON.stringify(centerPayloadObj);
+
+                // 2. Persist to Supabase
+                if (supabaseClient) {
+                    if (match && match.id && !String(match.id).startsWith('local_')) {
+                        const { error: updErr } = await supabaseClient
+                            .from('attendance')
+                            .update({
+                                center: centerPayloadStr,
+                                day: day,
+                                time: formattedTime,
+                                arrival_time: formattedTime
+                            })
+                            .eq('id', match.id);
+
+                        if (updErr) {
+                            console.warn("Supabase arrival time update error:", updErr);
+                        } else {
+                            match.center = centerPayloadStr;
+                            match.day = day;
+                            match.time = formattedTime;
+                            match.arrival_time = formattedTime;
+                        }
+                    } else {
+                        // Insert new attendance record in Supabase
+                        const insertObj = {
+                            assistant_name: canonicalAssistantName(assistantName),
+                            center: centerPayloadStr,
+                            day: day,
+                            time: formattedTime,
+                            arrival_time: formattedTime,
+                            created_at: new Date(sessionDate + 'T12:00:00').toISOString()
+                        };
+                        const { data: insData, error: insErr } = await supabaseClient
+                            .from('attendance')
+                            .insert([insertObj])
+                            .select();
+
+                        if (!insErr && insData && insData[0]) {
+                            State.attendances.unshift(insData[0]);
+                        } else {
+                            // Offline fallback
+                            State.attendances.unshift({
+                                id: 'local_' + Date.now(),
+                                assistant_name: canonicalAssistantName(assistantName),
+                                center: centerPayloadStr,
+                                day: day,
+                                time: formattedTime,
+                                arrival_time: formattedTime,
+                                created_at: new Date(sessionDate + 'T12:00:00').toISOString()
+                            });
+                        }
+                    }
+                } else if (match) {
+                    match.center = centerPayloadStr;
+                    match.day = day;
+                    match.time = formattedTime;
+                    match.arrival_time = formattedTime;
+                }
+
+                // 3. Update State.entries if an entry exists for this session
+                const currentWeek = typeof getAdminCurrentWeekInfo === 'function' ? getAdminCurrentWeekInfo() : { startDate: sessionDate, endDate: sessionDate };
+                const entry = (State.entries || []).find(e => 
+                    (e.center === center || (e.center || '').includes(center) || center.includes(e.center || '')) &&
+                    e.day && e.day.toLowerCase() === day.toLowerCase() &&
+                    (e.date === sessionDate || (!e.date && e.createdAt && e.createdAt.startsWith(sessionDate)) || (e.date >= currentWeek.startDate && e.date <= currentWeek.endDate))
+                );
+
+                if (entry) {
+                    if (!entry.present) entry.present = [];
+                    if (!entry.present.some(p => p.toLowerCase() === assistantName.toLowerCase())) {
+                        entry.present.push(assistantName);
+                    }
+                    if (entry.absent) {
+                        entry.absent = entry.absent.filter(a => a.toLowerCase() !== assistantName.toLowerCase());
+                    }
+                    if (!entry.adjustments) entry.adjustments = {};
+                    if (!entry.adjustments[assistantName]) entry.adjustments[assistantName] = {};
+                    entry.adjustments[assistantName].arr = formattedTime;
+                    entry.updatedAt = new Date().toISOString();
+                }
+                saveState();
+
+                // 4. Broadcast instant update to Assistant in Real Time (<50ms)
+                if (window.adminArrivalsChannel) {
+                    try {
+                        window.adminArrivalsChannel.send({
+                            type: 'broadcast',
+                            event: 'arrival',
+                            payload: {
+                                assistant_name: assistantName,
+                                center: center,
+                                day: day,
+                                time: formattedTime,
+                                timestamp: new Date(sessionDate + 'T12:00:00').toISOString(),
+                                verified_by: 'admin_edit'
+                            }
+                        });
+                        window.adminArrivalsChannel.send({
+                            type: 'broadcast',
+                            event: 'time_updated',
+                            payload: {
+                                assistant_name: assistantName,
+                                center: center,
+                                day: day,
+                                time: formattedTime
+                            }
+                        });
+                    } catch(bcErr) {
+                        console.warn("Broadcast time error:", bcErr);
+                    }
+                }
+
+                closeEditArrivalTimeModal();
+
+                if (typeof renderAttendanceRecordsView === 'function') {
+                    renderAttendanceRecordsView();
+                }
+                if (typeof renderManageAssistantRecords === 'function') {
+                    renderManageAssistantRecords();
+                }
+
+                showToast(`Arrival time for ${assistantName} set to ${formattedTime}! ✅`, "success");
+            } catch(err) {
+                console.error("Error saving edited arrival time:", err);
+                showToast("Failed to update arrival time: " + (err.message || "Unknown error"), "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">check_circle</span> <span>Save &amp; Sync Time</span>`;
                 }
             }
         };
@@ -3757,6 +4238,12 @@ function getAdminCenterCoords(centerName, address) {
                                             </span>
                                             <div class="flex items-center gap-2 flex-wrap mt-0.5">
                                                 ${arrivalBadge}
+                                                <button type="button" onclick="openEditArrivalTimeModal('${escapeHtml(name)}', '${escapeHtml(sched.center)}', '${day}', '${escapeHtml(sched.time || '')}', '${sessionDate}', '${scanRecId}', '${escapeHtml(bestArrTime || '')}')" 
+                                                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/90 bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-lg border border-primary/25 transition-all shadow-sm"
+                                                    title="Edit arrival time for ${escapeHtml(name)}">
+                                                    <span class="material-symbols-outlined text-[13px]">schedule</span>
+                                                    <span>Edit Time</span>
+                                                </button>
                                             </div>
                                             ${notesBadge}
                                         </div>
@@ -4431,7 +4918,9 @@ function getAdminCenterCoords(centerName, address) {
                                     .from('attendance')
                                     .update({ 
                                         center: JSON.stringify(centerPayloadObj),
-                                        day: day
+                                        day: day,
+                                        time: originalArr,
+                                        arrival_time: originalArr
                                     })
                                     .eq('id', existingAtt.id);
                                 if (!updErr) {
@@ -6315,17 +6804,19 @@ function getAdminCenterCoords(centerName, address) {
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") {
                 if (typeof closeAdminNotesModal === "function") closeAdminNotesModal();
+                if (typeof closeEditArrivalTimeModal === "function") closeEditArrivalTimeModal();
                 if (typeof closeMonthlySheetModal === "function") closeMonthlySheetModal();
                 if (typeof closeAddAssistantToSessionModal === "function") closeAddAssistantToSessionModal();
             }
         });
 
-        ["admin-notes-modal", "monthly-sheet-modal", "modal_add_assistant_to_session"].forEach(id => {
+        ["admin-notes-modal", "edit-arrival-time-modal", "monthly-sheet-modal", "modal_add_assistant_to_session"].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
                 el.addEventListener("click", (e) => {
                     if (e.target === el) {
                         if (id === "admin-notes-modal" && typeof closeAdminNotesModal === "function") closeAdminNotesModal();
+                        else if (id === "edit-arrival-time-modal" && typeof closeEditArrivalTimeModal === "function") closeEditArrivalTimeModal();
                         else if (id === "monthly-sheet-modal" && typeof closeMonthlySheetModal === "function") closeMonthlySheetModal();
                         else if (id === "modal_add_assistant_to_session" && typeof closeAddAssistantToSessionModal === "function") closeAddAssistantToSessionModal();
                         else el.classList.add("hidden");
