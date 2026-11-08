@@ -1010,6 +1010,24 @@
                             if (typeof markArrivedOnPhone === 'function') {
                                 markArrivedOnPhone(payload.time, payload.center);
                             }
+                            if (typeof fetchAttendedLectures === 'function') {
+                                fetchAttendedLectures(true).then(() => {
+                                    if (typeof renderScheduleList === 'function') renderScheduleList();
+                                });
+                            }
+                        }
+                    }
+                });
+                arrivalsChannel.on('broadcast', { event: 'attendance_removed' }, ({ payload }) => {
+                    if (payload && currentAssistant && currentAssistant.name) {
+                        const myName = currentAssistant.name.trim().toLowerCase();
+                        const pName = (payload.assistant_name || '').trim().toLowerCase();
+                        if (pName && (isSameAssistant(pName, myName) || (payload.assistant_email && currentAssistant && currentAssistant.email && payload.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase()))) {
+                            if (typeof fetchAttendedLectures === 'function') {
+                                fetchAttendedLectures(true).then(() => {
+                                    if (typeof renderScheduleList === 'function') renderScheduleList();
+                                });
+                            }
                         }
                     }
                 });
@@ -1018,7 +1036,11 @@
                         const myName = currentAssistant.name.trim().toLowerCase();
                         const pName = (payload.assistant_name || '').trim().toLowerCase();
                         if (isSameAssistant(pName, myName) || (payload.assistant_email && currentAssistant && currentAssistant.email && payload.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase())) {
-                            if (typeof fetchAttendedLectures === 'function') fetchAttendedLectures(true);
+                            if (typeof fetchAttendedLectures === 'function') {
+                                fetchAttendedLectures(true).then(() => {
+                                    if (typeof renderScheduleList === 'function') renderScheduleList();
+                                });
+                            }
                         }
                     }
                 });
@@ -1578,6 +1600,9 @@
                 updateAttendedMonthOptions();
                 renderAttendedList();
                 renderHomeAttendedPreview();
+                if (typeof renderScheduleList === 'function') {
+                    renderScheduleList();
+                }
             } finally {
                 if (loading) loading.classList.add('hidden');
             }
@@ -2336,6 +2361,16 @@
             return getWeekInfo(new Date(), selectedWeekOffset);
         }
 
+        function getSessionDateForDay(dayName, weekInfo = getSelectedWeekInfo()) {
+            if (!dayName) return weekInfo.startDate;
+            const daysOrder = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+            const targetIdx = daysOrder.findIndex(d => d.toLowerCase() === dayName.toLowerCase());
+            if (targetIdx === -1) return weekInfo.startDate;
+            const sat = new Date(weekInfo.startDate + 'T12:00:00');
+            sat.setDate(sat.getDate() + targetIdx);
+            return sat.toISOString().split('T')[0];
+        }
+
         function changeWeekOffset(delta) {
             if (delta > 0 && selectedWeekOffset >= 0) {
                 showToast("You are already viewing the active assignment week.", "info");
@@ -2406,7 +2441,7 @@
                 // Fallback: derive week from created_at timestamp
                 const d = new Date(req.created_at);
                 const day = d.getDay();
-                let daysToSaturday = (day === 5) ? 1 : (day === 6 ? 0 : -(day + 1));
+                let daysToSaturday = (day === 6 ? 0 : -(day + 1));
                 d.setDate(d.getDate() + daysToSaturday);
                 targetWeek = d.toISOString().split('T')[0];
             }
@@ -2482,9 +2517,25 @@
                 });
                 if (isApprovedInWeekly) return true;
 
+                // 3. Check if assistant has a verified attendance record for this lecture in the selected week
+                const hasAttendedThisWeek = (allAttendedLectures || []).some(rec => {
+                    const rCenter = (rec.center || '').toLowerCase().trim();
+                    const sCenter = (s.center || '').toLowerCase().trim();
+                    const centerMatches = rCenter.includes(sCenter) || sCenter.includes(rCenter);
+                    if (!centerMatches) return false;
+
+                    const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
+                    if (rDate && rDate >= currentWeek.startDate && rDate <= currentWeek.endDate) return true;
+                    if (rec.day && (s.days || []).some(d => d.toLowerCase() === rec.day.toLowerCase())) {
+                        if (!rDate || (rDate >= currentWeek.startDate && rDate <= currentWeek.endDate)) return true;
+                    }
+                    return false;
+                });
+                if (hasAttendedThisWeek) return true;
+
                 if (weekStatus === 'pending' || weekStatus === 'rejected') return false;
 
-                // 3. Fallback to static roster if present
+                // 4. Fallback to static roster if present
                 if (myName) {
                     return (s.assistants || []).some(a => {
                         const aName = typeof a === 'object' ? a.name : a;
@@ -2643,7 +2694,7 @@
                 if (hintBox) hintBox.classList.add('hidden');
                 if (successBox) successBox.classList.remove('hidden');
 
-                const recTime = alreadyCheckedIn.arrival_time || (alreadyCheckedIn.rawDate ? new Date(alreadyCheckedIn.rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today');
+                const recTime = alreadyCheckedIn.arrivalTime || alreadyCheckedIn.arrival_time || (alreadyCheckedIn.rawDate ? new Date(alreadyCheckedIn.rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today');
                 const timeEl = document.getElementById('arrived_exact_time');
                 if (timeEl) timeEl.textContent = recTime;
 
@@ -3517,63 +3568,77 @@
                         `;
                     }
 
+                    // Check if this specific lecture session in currentWeek has an attendance record for this assistant
+                    const sessionDate = getSessionDateForDay(day, currentWeek);
+                    const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                    const todayDateStr = new Date().toISOString().split('T')[0];
+                    const isTodaySession = (day === todayDayName || (item.days || []).includes(todayDayName)) && selectedWeekOffset === 0;
+
+                    const matchingAttendanceRecord = (allAttendedLectures || []).find(rec => {
+                        const rCenter = (rec.center || '').toLowerCase().trim();
+                        const sCenter = (item.center || '').toLowerCase().trim();
+                        const centerMatches = rCenter.includes(sCenter) || sCenter.includes(rCenter);
+                        if (!centerMatches) return false;
+
+                        const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
+                        if (rDate && sessionDate && rDate === sessionDate) return true;
+                        if (isTodaySession && rDate === todayDateStr) return true;
+                        if (rec.day && day && rec.day.toLowerCase() === day.toLowerCase()) {
+                            if (!rDate || (rDate >= currentWeek.startDate && rDate <= currentWeek.endDate)) return true;
+                        }
+                        return false;
+                    });
+
                     let actionButton = '';
-                    if (amAssigned) {
-                        const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-                        const todayDateStr = new Date().toISOString().split('T')[0];
-                        const isTodaySession = (day === todayDayName || (item.days || []).includes(todayDayName)) && selectedWeekOffset === 0;
-
+                    if (matchingAttendanceRecord) {
+                        const arrTime = matchingAttendanceRecord.arrivalTime || matchingAttendanceRecord.arrival_time || (matchingAttendanceRecord.rawDate ? new Date(matchingAttendanceRecord.rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Verified');
+                        const bonusBadge = matchingAttendanceRecord.bonus > 0 ? `<span class="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 px-1.5 py-0.5 rounded text-[10px] font-bold">+${matchingAttendanceRecord.bonus}</span>` : '';
+                        const deductBadge = matchingAttendanceRecord.deduction > 0 ? `<span class="bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 px-1.5 py-0.5 rounded text-[10px] font-bold">-${matchingAttendanceRecord.deduction}</span>` : '';
+                        actionButton = `
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm">
+                                    <span class="material-symbols-outlined text-[16px]">check_circle</span> Attended (${arrTime})
+                                </span>
+                                ${bonusBadge}
+                                ${deductBadge}
+                            </div>
+                        `;
+                    } else if (amAssigned) {
                         if (isTodaySession) {
-                            const alreadyCheckedInToday = allAttendedLectures.find(rec => {
-                                const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
-                                const rCenter = (rec.center || '').toLowerCase();
-                                const sCenter = (item.center || '').toLowerCase();
-                                return rDate === todayDateStr && (rCenter.includes(sCenter) || sCenter.includes(rCenter));
-                            });
-
-                            if (alreadyCheckedInToday) {
-                                const arrTime = alreadyCheckedInToday.arrivalTime || (alreadyCheckedInToday.rawDate ? new Date(alreadyCheckedInToday.rawDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today');
-                                actionButton = `
-                                    <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm shrink-0">
-                                        <span class="material-symbols-outlined text-[16px]">check_circle</span> Checked In (${arrTime})
-                                    </span>
-                                `;
-                            } else {
-                                const coords = getCenterCoords(item.center, item.address);
-                                if (coords && window._currentUserLocation) {
-                                    const dist = calculateDistanceMeters(
-                                        window._currentUserLocation.lat,
-                                        window._currentUserLocation.lng,
-                                        coords.lat,
-                                        coords.lng
-                                    );
-                                    const radius = coords.radius || DEFAULT_CENTER_GEOFENCE_RADIUS;
-                                    const userAcc = window._currentUserLocation.accuracy || 0;
-                                    const effectiveDist = Math.max(0, dist - Math.min(userAcc, 1200));
-                                    if (dist <= radius || effectiveDist <= radius) {
-                                        actionButton = `
-                                            <button type="button" onclick="recordSelfAttendance('${item.id}')" 
-                                                class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 shrink-0 animate-pulse">
-                                                <span class="material-symbols-outlined text-[16px]">how_to_reg</span> Check In (~${dist}m)
-                                            </button>
-                                        `;
-                                    } else {
-                                        actionButton = `
-                                            <button type="button" onclick="showDistanceAlert('${escapeHtml(item.center)}', ${dist}, ${radius}, ${userAcc})" 
-                                                class="bg-surface-container text-outline border border-outline-variant/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 opacity-80 cursor-not-allowed hover:bg-surface-container-high transition-all"
-                                                title="Must be at center to check in">
-                                                <span class="material-symbols-outlined text-[15px]">lock</span> Check In (~${formatDistance(dist)})
-                                            </button>
-                                        `;
-                                    }
+                            const coords = getCenterCoords(item.center, item.address);
+                            if (coords && window._currentUserLocation) {
+                                const dist = calculateDistanceMeters(
+                                    window._currentUserLocation.lat,
+                                    window._currentUserLocation.lng,
+                                    coords.lat,
+                                    coords.lng
+                                );
+                                const radius = coords.radius || DEFAULT_CENTER_GEOFENCE_RADIUS;
+                                const userAcc = window._currentUserLocation.accuracy || 0;
+                                const effectiveDist = Math.max(0, dist - Math.min(userAcc, 1200));
+                                if (dist <= radius || effectiveDist <= radius) {
+                                    actionButton = `
+                                        <button type="button" onclick="recordSelfAttendance('${item.id}')" 
+                                            class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 shrink-0 animate-pulse">
+                                            <span class="material-symbols-outlined text-[16px]">how_to_reg</span> Check In (~${dist}m)
+                                        </button>
+                                    `;
                                 } else {
                                     actionButton = `
-                                        <button type="button" onclick="requestGpsCheckIn('${item.id}')" 
-                                            class="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 active:scale-95 transition-all">
-                                            <span class="material-symbols-outlined text-[16px]">near_me</span> Check In (Get GPS)
+                                        <button type="button" onclick="showDistanceAlert('${escapeHtml(item.center)}', ${dist}, ${radius}, ${userAcc})" 
+                                            class="bg-surface-container text-outline border border-outline-variant/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 opacity-80 cursor-not-allowed hover:bg-surface-container-high transition-all"
+                                            title="Must be at center to check in">
+                                            <span class="material-symbols-outlined text-[15px]">lock</span> Check In (~${formatDistance(dist)})
                                         </button>
                                     `;
                                 }
+                            } else {
+                                actionButton = `
+                                    <button type="button" onclick="requestGpsCheckIn('${item.id}')" 
+                                        class="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 active:scale-95 transition-all">
+                                        <span class="material-symbols-outlined text-[16px]">near_me</span> Check In (Get GPS)
+                                    </button>
+                                `;
                             }
                         } else {
                             actionButton = `
@@ -3933,16 +3998,33 @@
 
             supabaseClient
                 .channel('public:attendance')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance' }, payload => {
-                    if (payload && payload.new && currentAssistant && currentAssistant.name) {
-                        const myName = currentAssistant.name.trim().toLowerCase();
-                        const pName = (payload.new.assistant_name || '').trim().toLowerCase();
-                        if (pName && (isSameAssistant(pName, myName) || (payload.new && payload.new.assistant_email && currentAssistant && currentAssistant.email && payload.new.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase()))) {
-                            let centerName = payload.new.center || 'Center';
-                            let timeStr = new Date(payload.new.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            if (typeof markArrivedOnPhone === 'function') {
-                                markArrivedOnPhone(timeStr, centerName);
-                            }
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, payload => {
+                    if (!currentAssistant || !currentAssistant.name) return;
+                    const myName = currentAssistant.name.trim().toLowerCase();
+                    const record = payload.new || payload.old;
+                    if (!record) return;
+                    const pName = (record.assistant_name || '').trim().toLowerCase();
+                    const pEmail = (record.assistant_email || '').trim().toLowerCase();
+                    const myEmail = (currentAssistant.email || '').trim().toLowerCase();
+
+                    if (pName && (isSameAssistant(pName, myName) || (pEmail && myEmail && pEmail === myEmail))) {
+                        let centerName = record.center || 'Center';
+                        let timeStr = new Date(record.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        if (typeof record.center === 'string' && record.center.trim().startsWith('{')) {
+                            try {
+                                const meta = JSON.parse(record.center.trim());
+                                if (meta.c) centerName = meta.c;
+                                if (meta.arr) timeStr = meta.arr;
+                            } catch(e) {}
+                        }
+
+                        if (payload.eventType === 'INSERT' && typeof markArrivedOnPhone === 'function') {
+                            markArrivedOnPhone(timeStr, centerName);
+                        }
+                        if (typeof fetchAttendedLectures === 'function') {
+                            fetchAttendedLectures(true).then(() => {
+                                if (typeof renderScheduleList === 'function') renderScheduleList();
+                            });
                         }
                     }
                 })

@@ -4465,6 +4465,24 @@ function getAdminCenterCoords(centerName, address) {
                                     State.attendances.unshift(insData[0]);
                                 }
                             }
+
+                            // Broadcast instant arrival notification to assistant
+                            if (window.adminArrivalsChannel) {
+                                try {
+                                    window.adminArrivalsChannel.send({
+                                        type: 'broadcast',
+                                        event: 'arrival',
+                                        payload: {
+                                            assistant_name: astName,
+                                            center: center,
+                                            day: day,
+                                            time: originalArr,
+                                            timestamp: new Date(sessionDate + 'T12:00:00').toISOString(),
+                                            verified_by: 'admin_manual'
+                                        }
+                                    });
+                                } catch(bcErr) {}
+                            }
                         } catch(syncErr) {
                             console.warn("Error syncing attendance for", astName, syncErr);
                         }
@@ -4486,6 +4504,22 @@ function getAdminCenterCoords(centerName, address) {
                             if (existingAbsentAtt && existingAbsentAtt.id && !String(existingAbsentAtt.id).startsWith('local_')) {
                                 await supabaseClient.from('attendance').delete().eq('id', existingAbsentAtt.id);
                                 State.attendances = State.attendances.filter(a => a.id !== existingAbsentAtt.id);
+                            }
+
+                            // Broadcast attendance removed to assistant
+                            if (window.adminArrivalsChannel) {
+                                try {
+                                    window.adminArrivalsChannel.send({
+                                        type: 'broadcast',
+                                        event: 'attendance_removed',
+                                        payload: {
+                                            assistant_name: absentName,
+                                            center: center,
+                                            day: day,
+                                            date: sessionDate
+                                        }
+                                    });
+                                } catch(bcErr) {}
                             }
                         } catch(delErr) {
                             console.warn("Error clearing absent attendance record:", delErr);
@@ -4633,7 +4667,7 @@ function getAdminCenterCoords(centerName, address) {
             if (!targetWeek && req && req.created_at) {
                 const d = new Date(req.created_at);
                 const day = d.getDay();
-                let daysToSat = (day === 5) ? 1 : (day === 6 ? 0 : -(day + 1));
+                let daysToSat = (day === 6 ? 0 : -(day + 1));
                 d.setDate(d.getDate() + daysToSat);
                 targetWeek = d.toISOString().split('T')[0];
             }
