@@ -2517,19 +2517,26 @@
                 });
                 if (isApprovedInWeekly) return true;
 
-                // 3. Check if assistant has a verified attendance record for this lecture in the selected week
+                // 3. Check if assistant has a verified attendance record for THIS SPECIFIC lecture session
                 const hasAttendedThisWeek = (allAttendedLectures || []).some(rec => {
                     const rCenter = (rec.center || '').toLowerCase().trim();
                     const sCenter = (s.center || '').toLowerCase().trim();
                     const centerMatches = rCenter.includes(sCenter) || sCenter.includes(rCenter);
                     if (!centerMatches) return false;
 
+                    // The attendance record must strictly match the day of this schedule 's'
                     const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
-                    if (rDate && rDate >= currentWeek.startDate && rDate <= currentWeek.endDate) return true;
-                    if (rec.day && (s.days || []).some(d => d.toLowerCase() === rec.day.toLowerCase())) {
-                        if (!rDate || (rDate >= currentWeek.startDate && rDate <= currentWeek.endDate)) return true;
-                    }
-                    return false;
+                    const dateDay = rDate ? new Date(rDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() : '';
+                    const recDay = (rec.day || dateDay || '').toLowerCase().trim();
+
+                    const sDays = (s.days || []).map(d => String(d).toLowerCase().trim());
+                    const dayMatches = recDay && sDays.includes(recDay);
+                    if (!dayMatches) return false;
+
+                    // And the attendance date must fall within the active week range
+                    if (rDate && (rDate < currentWeek.startDate || rDate > currentWeek.endDate)) return false;
+
+                    return true;
                 });
                 if (hasAttendedThisWeek) return true;
 
@@ -2666,16 +2673,24 @@
 
             // Check if already checked in today or for this target session
             const todayStr = new Date().toISOString().split('T')[0];
+            const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
             const alreadyCheckedIn = allAttendedLectures.find(rec => {
-                const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
                 const rCenter = (rec.center || '').toLowerCase();
                 const sCenter = (session.center || '').toLowerCase();
                 const centerMatches = rCenter.includes(sCenter) || sCenter.includes(rCenter);
                 if (!centerMatches) return false;
 
-                // Checked in today OR for this session day in current week
-                if (rDate === todayStr) return true;
-                if (rec.day && dayName && rec.day.toLowerCase() === dayName.toLowerCase()) {
+                const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
+                const recDay = (rec.day || (rDate ? new Date(rDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }) : '')).toLowerCase();
+
+                // Cross-day check: do not match a record from a different weekday
+                if (dayName && recDay && recDay !== dayName.toLowerCase()) return false;
+
+                // Checked in today for today's target session
+                if (dayName && dayName.toLowerCase() === todayDay && rDate === todayStr) return true;
+
+                // Or checked in for this target session day in current week
+                if (recDay && dayName && recDay === dayName.toLowerCase()) {
                     const currentWeek = getSelectedWeekInfo();
                     if (rDate >= currentWeek.startDate && rDate <= currentWeek.endDate) return true;
                 }
@@ -3581,9 +3596,16 @@
                         if (!centerMatches) return false;
 
                         const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
+                        const dateDay = rDate ? new Date(rDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() : '';
+                        const recDay = (rec.day || dateDay || '').toLowerCase().trim();
+                        const targetDay = (day || '').toLowerCase().trim();
+
+                        // Day MUST match the current section day strictly
+                        if (recDay && targetDay && recDay !== targetDay) return false;
+
                         if (rDate && sessionDate && rDate === sessionDate) return true;
-                        if (isTodaySession && rDate === todayDateStr) return true;
-                        if (rec.day && day && rec.day.toLowerCase() === day.toLowerCase()) {
+                        if (isTodaySession && rDate === todayDateStr && recDay === targetDay) return true;
+                        if (recDay === targetDay) {
                             if (!rDate || (rDate >= currentWeek.startDate && rDate <= currentWeek.endDate)) return true;
                         }
                         return false;
