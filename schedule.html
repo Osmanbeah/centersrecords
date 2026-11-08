@@ -2310,14 +2310,10 @@
             // In our Saturday-Friday week cycle:
             // Friday (5) is prep/picking day for the upcoming week!
             // When Friday arrives, the previous week has ended and next week picks open!
-            let diffToSaturday = 0;
-            if (day === 5) {
-                diffToSaturday = 1; // Upcoming week starts tomorrow (Saturday)
-            } else if (day === 6) {
-                diffToSaturday = 0; // Current week started today (Saturday)
-            } else {
-                diffToSaturday = -(day + 1); // Sunday (0) to Thursday (4)
-            }
+            // In our Saturday-Friday week cycle:
+            // Saturday is day 6 (diff = 0)
+            // Sunday (0) to Friday (5): diff = -(day + 1)
+            let diffToSaturday = day === 6 ? 0 : -(day + 1);
 
             const sat = new Date(d);
             sat.setDate(d.getDate() + diffToSaturday + (offset * 7));
@@ -2617,13 +2613,22 @@
                 }
             }
 
-            // Check if already checked in today for this center
+            // Check if already checked in today or for this target session
             const todayStr = new Date().toISOString().split('T')[0];
             const alreadyCheckedIn = allAttendedLectures.find(rec => {
                 const rDate = rec.date || (rec.rawDate ? rec.rawDate.split('T')[0] : '');
                 const rCenter = (rec.center || '').toLowerCase();
                 const sCenter = (session.center || '').toLowerCase();
-                return rDate === todayStr && (rCenter.includes(sCenter) || sCenter.includes(rCenter));
+                const centerMatches = rCenter.includes(sCenter) || sCenter.includes(rCenter);
+                if (!centerMatches) return false;
+
+                // Checked in today OR for this session day in current week
+                if (rDate === todayStr) return true;
+                if (rec.day && dayName && rec.day.toLowerCase() === dayName.toLowerCase()) {
+                    const currentWeek = getSelectedWeekInfo();
+                    if (rDate >= currentWeek.startDate && rDate <= currentWeek.endDate) return true;
+                }
+                return false;
             });
 
             const digitsBox = document.getElementById('target_countdown_digits_box');

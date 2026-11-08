@@ -1600,14 +1600,10 @@
             
             // In our Saturday-Friday week cycle:
             // Friday (5) is prep/picking day for upcoming week!
-            let diffToSaturday = 0;
-            if (day === 5) {
-                diffToSaturday = 1;
-            } else if (day === 6) {
-                diffToSaturday = 0;
-            } else {
-                diffToSaturday = -(day + 1);
-            }
+            // In our Saturday-Friday week cycle:
+            // Saturday is day 6 (diff = 0)
+            // Sunday (0) to Friday (5): diff = -(day + 1)
+            let diffToSaturday = day === 6 ? 0 : -(day + 1);
 
             const sat = new Date(d);
             sat.setDate(d.getDate() + diffToSaturday + (offset * 7));
@@ -1626,6 +1622,16 @@
             };
         }
         window.getWeekInfo = getWeekInfo;
+
+        function getSessionDateForDay(dayName, weekInfo = getAdminCurrentWeekInfo()) {
+            if (!dayName) return weekInfo.startDate;
+            const daysOrder = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+            const targetIdx = daysOrder.findIndex(d => d.toLowerCase() === dayName.toLowerCase());
+            if (targetIdx === -1) return weekInfo.startDate;
+            const sat = new Date(weekInfo.startDate + 'T12:00:00');
+            sat.setDate(sat.getDate() + targetIdx);
+            return sat.toISOString().split('T')[0];
+        }
 
         function getAdminCurrentWeekInfo() {
             return getWeekInfo(new Date(), activeRecordsWeekOffset);
@@ -4305,7 +4311,7 @@
             }
         };
 
-        async function saveSessionAttendance(day, scheduleId, encodedCenter) {
+                async function saveSessionAttendance(day, scheduleId, encodedCenter) {
             const center = decodeURIComponent(encodedCenter);
             const centerSafeId = `${day}_${scheduleId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
             const btn = document.getElementById(`btn_save_${centerSafeId}`);
@@ -4346,7 +4352,10 @@
             const uniquePresent = Array.from(new Set(present));
             const uniqueAbsent = Array.from(new Set(absent.filter(n => !uniquePresent.includes(n))));
 
-            const todayStr = new Date().toISOString().split('T')[0];
+            // Determine exact date for this session based on the active week cycle being viewed
+            const currentWeek = getAdminCurrentWeekInfo();
+            const sessionDate = getSessionDateForDay(day, currentWeek);
+            const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             if (btn) {
                 btn.disabled = true;
@@ -4354,24 +4363,24 @@
             }
 
             try {
-                // 1. Save entry to local state (update if already exists for this session, else unshift)
+                // 1. Save entry to local state (matched by center/scheduleId, day, AND session date/week so past/future weeks are never clobbered)
                 const existingIndex = State.entries.findIndex(e => 
                     ((e.scheduleId && e.scheduleId === scheduleId) || (e.center === center)) &&
-                    e.day && e.day.toLowerCase() === day.toLowerCase()
+                    e.day && e.day.toLowerCase() === day.toLowerCase() &&
+                    (e.date === sessionDate || (!e.date && e.createdAt && e.createdAt.startsWith(sessionDate)) || (e.date >= currentWeek.startDate && e.date <= currentWeek.endDate))
                 );
 
-                const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const entryRecord = {
                     id: existingIndex >= 0 ? State.entries[existingIndex].id : generateId(),
                     center,
                     day,
                     scheduleId,
-                    date: todayStr,
+                    date: sessionDate,
                     present: uniquePresent,
                     absent: uniqueAbsent,
                     adjustments,
                     savedAt: nowTimeStr,
-                    createdAt: existingIndex >= 0 ? (State.entries[existingIndex].createdAt || new Date().toISOString()) : new Date().toISOString(),
+                    createdAt: existingIndex >= 0 ? (State.entries[existingIndex].createdAt || new Date(sessionDate + 'T12:00:00').toISOString()) : new Date(sessionDate + 'T12:00:00').toISOString(),
                     updatedAt: new Date().toISOString()
                 };
 
@@ -4382,25 +4391,23 @@
                 }
                 saveState();
 
-                // Refresh Manage Assistant Records
-                if (typeof renderManageAssistantRecords === 'function') {
-                    renderManageAssistantRecords();
-                }
-
-                // 2. Sync attended assistants to Supabase attendance table (preserving original scan arrival time)
-                if (supabaseClient && uniquePresent.length > 0) {
+                // 2. Sync attended assistants to Supabase attendance table (preserving original scan arrival time & stamping correct sessionDate)
+                if (supabaseClient) {
+                    // A. Process PRESENT assistants
                     for (const astName of uniquePresent) {
                         try {
                             const b = adjustments && adjustments[astName] && parseFloat(adjustments[astName].bonus) || 0;
                             const d = adjustments && adjustments[astName] && parseFloat(adjustments[astName].deduction) || 0;
                             
-                            // Check if an existing attendance record exists for this assistant, center and day
+                            // Check if an existing attendance record exists for this assistant, center, day, and THIS session/week
                             const existingAtt = (State.attendances || []).find(att => {
                                 if ((att.assistant_name || '').trim().toLowerCase() !== astName.trim().toLowerCase()) return false;
                                 const m = parseAttendanceCenterMeta(att.center);
                                 const cMatch = (m.cleanCenter || att.center || '').toLowerCase().includes(center.toLowerCase()) || center.toLowerCase().includes((m.cleanCenter || att.center || '').toLowerCase());
                                 const dMatch = !day || !att.day || (att.day || m.day || '').toLowerCase() === day.toLowerCase();
-                                return cMatch && dMatch;
+                                if (!cMatch || !dMatch) return false;
+                                const attDate = m.dt || m.date || (att.created_at ? att.created_at.split('T')[0] : '');
+                                return attDate === sessionDate || (attDate >= currentWeek.startDate && attDate <= currentWeek.endDate);
                             });
 
                             const existingMeta = existingAtt ? parseAttendanceCenterMeta(existingAtt.center) : {};
@@ -4411,7 +4418,7 @@
                             const centerPayloadObj = {
                                 c: center,
                                 d: day,
-                                dt: existingMeta.dt || todayStr,
+                                dt: sessionDate,
                                 b: b,
                                 ded: d,
                                 arr: originalArr,
@@ -4423,28 +4430,37 @@
                             if (existingAtt && existingAtt.id && !String(existingAtt.id).startsWith('local_')) {
                                 const { error: updErr } = await supabaseClient
                                     .from('attendance')
-                                    .update({ center: JSON.stringify(centerPayloadObj) })
+                                    .update({ 
+                                        center: JSON.stringify(centerPayloadObj),
+                                        day: day
+                                    })
                                     .eq('id', existingAtt.id);
                                 if (!updErr) {
                                     updated = true;
                                     existingAtt.center = JSON.stringify(centerPayloadObj);
+                                    existingAtt.day = day;
                                 }
                             }
 
                             if (!updated) {
+                                const insertObj = {
+                                    assistant_name: astName,
+                                    center: JSON.stringify(centerPayloadObj),
+                                    day: day,
+                                    created_at: new Date(sessionDate + 'T12:00:00').toISOString()
+                                };
                                 let { data: insData, error: insErr } = await supabaseClient
                                     .from('attendance')
-                                    .insert([{
-                                        assistant_name: astName,
-                                        center: JSON.stringify(centerPayloadObj)
-                                    }])
+                                    .insert([insertObj])
                                     .select();
                                 if (insErr) {
                                     await supabaseClient
                                         .from('attendance')
                                         .insert([{
                                             assistant_name: astName,
-                                            center: `${center} (${day})`
+                                            center: `${center} (${day})`,
+                                            day: day,
+                                            created_at: new Date(sessionDate + 'T12:00:00').toISOString()
                                         }]);
                                 } else if (insData && insData[0]) {
                                     State.attendances.unshift(insData[0]);
@@ -4454,6 +4470,36 @@
                             console.warn("Error syncing attendance for", astName, syncErr);
                         }
                     }
+
+                    // B. Process ABSENT assistants: if any assistant was unmarked, delete their attendance record for THIS session so it doesn't reappear
+                    for (const absentName of uniqueAbsent) {
+                        try {
+                            const existingAbsentAtt = (State.attendances || []).find(att => {
+                                if ((att.assistant_name || '').trim().toLowerCase() !== absentName.trim().toLowerCase()) return false;
+                                const m = parseAttendanceCenterMeta(att.center);
+                                const cMatch = (m.cleanCenter || att.center || '').toLowerCase().includes(center.toLowerCase()) || center.toLowerCase().includes((m.cleanCenter || att.center || '').toLowerCase());
+                                const dMatch = !day || !att.day || (att.day || m.day || '').toLowerCase() === day.toLowerCase();
+                                if (!cMatch || !dMatch) return false;
+                                const attDate = m.dt || m.date || (att.created_at ? att.created_at.split('T')[0] : '');
+                                return attDate === sessionDate || (attDate >= currentWeek.startDate && attDate <= currentWeek.endDate);
+                            });
+
+                            if (existingAbsentAtt && existingAbsentAtt.id && !String(existingAbsentAtt.id).startsWith('local_')) {
+                                await supabaseClient.from('attendance').delete().eq('id', existingAbsentAtt.id);
+                                State.attendances = State.attendances.filter(a => a.id !== existingAbsentAtt.id);
+                            }
+                        } catch(delErr) {
+                            console.warn("Error clearing absent attendance record:", delErr);
+                        }
+                    }
+                }
+
+                // Refresh views immediately
+                if (typeof renderAttendanceRecordsView === 'function') {
+                    renderAttendanceRecordsView();
+                }
+                if (typeof renderManageAssistantRecords === 'function') {
+                    renderManageAssistantRecords();
                 }
 
                 // 3. UI feedback
@@ -4462,7 +4508,7 @@
                     setTimeout(() => statusLabel.classList.add('hidden'), 4000);
                 }
 
-                alert(`Attendance and adjustments for ${center} (${day}) saved successfully! ✅`);
+                alert(`Attendance and adjustments for ${center} (${day} - ${sessionDate}) saved successfully! ✅`);
             } catch(err) {
                 console.error("Error saving attendance:", err);
                 alert("Failed to save: " + (err.message || "Unknown error"));
