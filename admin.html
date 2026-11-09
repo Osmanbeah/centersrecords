@@ -3928,8 +3928,9 @@ function getAdminCenterCoords(centerName, address) {
         function renderAttendanceRecordsView() {
             const container = document.getElementById('attendance_records_container');
             if (!container) return;
-            if (typeof updateAdminWeekUI === 'function') updateAdminWeekUI();
-            const currentWeek = getAdminCurrentWeekInfo();
+            try {
+                if (typeof updateAdminWeekUI === 'function') updateAdminWeekUI();
+                const currentWeek = getAdminCurrentWeekInfo();
 
             if (!State.schedules || State.schedules.length === 0) {
                 if (!scheduleHasLoaded || fetchingSchedule) {
@@ -3966,6 +3967,10 @@ function getAdminCenterCoords(centerName, address) {
             let totalSessionsCount = 0;
 
             daysToDisplay.forEach(day => {
+                const sessionDate = typeof getSessionDateForDay === 'function' 
+                    ? getSessionDateForDay(day, currentWeek) 
+                    : (currentWeek?.startDate || '');
+
                 // Find all schedules that include this day
                 const daySchedules = State.schedules.filter(s => Array.isArray(s.days) && s.days.includes(day));
 
@@ -4103,9 +4108,9 @@ function getAdminCenterCoords(centerName, address) {
                             let arrivalBadge = '';
                             let isLate = false;
                             let lateMinutes = 0;
+                            let bestArrTime = '';
 
                             if (assistantScans.length > 0) {
-                                let bestArrTime = '';
                                 for (const att of assistantScans) {
                                     const meta = parseAttendanceCenterMeta(att.center);
                                     if (meta.arr) { bestArrTime = meta.arr; break; }
@@ -4386,7 +4391,20 @@ function getAdminCenterCoords(centerName, address) {
                 return;
             }
 
-            container.innerHTML = html.join('');
+                container.innerHTML = html.join('');
+            } catch (renderErr) {
+                console.error('Failed to render attendance records view:', renderErr);
+                container.innerHTML = `
+                    <div class="bg-surface-container-lowest border border-error/40 rounded-2xl p-6 text-center space-y-3">
+                        <span class="material-symbols-outlined text-error text-[32px]">error</span>
+                        <h3 class="font-headline-sm font-bold text-on-surface">Unable to load attendance records</h3>
+                        <p class="text-xs text-on-surface-variant max-w-md mx-auto">${escapeHtml(renderErr?.message || 'An unexpected error occurred while displaying records.')}</p>
+                        <button type="button" onclick="fetchSchedule().then(renderAttendanceRecordsView)" class="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-semibold hover:bg-primary/90 transition-all shadow-sm">
+                            <span class="material-symbols-outlined text-[16px]">refresh</span> Retry
+                        </button>
+                    </div>
+                `;
+            }
         }
 
         // --- Manual Add Assistant / Substitute to Session Modal Functions ---
