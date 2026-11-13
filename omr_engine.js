@@ -92,7 +92,7 @@
             const attendLabel = cfg.attend_center_label || 'بتحضر فين :';
             const examCenterLabel = cfg.exam_center_label || 'بتمتحن فين :';
             const showParentPhone = cfg.show_parent_phone !== false;
-            const showCenterQuestions = cfg.show_center_questions !== false;
+            const showCenterQuestions = cfg.show_center_questions === true; // Default hidden / removed
             const showWrittenBox = cfg.show_written_box !== false;
             const writtenBoxTitle = cfg.written_box_title || 'خاص بالمصحح';
             const writtenBoxSub = cfg.written_box_sub || 'درجة السؤال المقالي';
@@ -640,8 +640,6 @@
                     <div class="exam-subtitle">${escapeHtml(academyName)} &bull; ${escapeHtml(subject).toUpperCase()}</div>
                 </div>
                 <div class="sheet-meta-badges">
-                    <span class="meta-badge">Date: <strong>${date}</strong></span>
-                    <span class="meta-badge">Center: <strong>${escapeHtml(center)}</strong></span>
                     <span class="meta-badge">Total: <strong>${totalScore} Marks</strong></span>
                 </div>
             </div>
@@ -925,6 +923,9 @@
         }
     };
 
-    global.OMREngine = OMR;
+        global.OMREngine = OMR;
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = OMR;
+    }
 
 })(typeof window !== 'undefined' ? window : this);
