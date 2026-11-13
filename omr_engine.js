@@ -10,6 +10,13 @@
     const SHEET_WIDTH = 1000;
     const SHEET_HEIGHT = 1414; // A4 aspect ratio 1 : 1.4142
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    }
+
     const OMR = {
         WIDTH: SHEET_WIDTH,
         HEIGHT: SHEET_HEIGHT,
@@ -19,46 +26,34 @@
          */
         getLayout(questionCount = 30) {
             const qCount = Math.max(10, Math.min(60, questionCount));
-            const cols = qCount > 25 ? 2 : 1;
+            const cols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
             const qPerCol = Math.ceil(qCount / cols);
 
             return {
                 width: SHEET_WIDTH,
                 height: SHEET_HEIGHT,
-                cornerSize: 40,
-                cornerMargin: 30,
-                // Model selection
-                modelBox: {
-                    x: 620,
-                    y: 190,
-                    options: ['A', 'B', 'C', 'D'],
-                    spacingX: 60
+                cols: cols,
+                qPerCol: qPerCol,
+                qCount: qCount,
+                model: {
+                    baseY: 0.205,
+                    baseX: 0.26,
+                    stepX: 0.065
                 },
-                // Student Code (4 Digits)
                 studentCode: {
-                    x: 120,
-                    y: 190,
-                    digits: 4,
-                    spacingX: 45,
-                    spacingY: 28,
-                    bubbleRadius: 10
+                    digits: 5,
+                    baseX: 0.145,
+                    stepX: 0.026,
+                    baseY: 0.44,
+                    stepY: 0.038
                 },
-                // MCQ Questions
                 mcq: {
                     cols: cols,
                     qPerCol: qPerCol,
-                    colX: cols === 1 ? [320] : [110, 560],
-                    startY: 550,
-                    rowHeight: qCount > 40 ? 27 : 33,
-                    optSpacingX: 48,
-                    bubbleRadius: 10
-                },
-                // Written Score Box
-                writtenBox: {
-                    x: 600,
-                    y: 360,
-                    w: 280,
-                    h: 110
+                    colBaseX: cols === 1 ? [0.55] : (cols === 2 ? [0.44, 0.73] : [0.38, 0.59, 0.80]),
+                    optStepX: cols === 1 ? 0.055 : (cols === 2 ? 0.048 : 0.040),
+                    baseY: 0.42,
+                    totalHeight: 0.50
                 }
             };
         },
@@ -66,344 +61,730 @@
         /**
          * Generates high-resolution printable HTML/SVG Bubble Sheet
          */
-        generatePrintableSheetHtml(exam) {
-            const title = exam.title || 'Examination Sheet';
+        /**
+         * Generates high-resolution printable HTML/SVG Bubble Sheet
+         * Reorganized to match professional exam sheets:
+         * - Structured student info table widget with phone, parent phone, ID, Model, center
+         * - Dedicated teacher written score widget
+         * - Aligned Roll No digit boxes + vertical 0-9 bubble columns
+         * - 5-question grouped MCQ bubble sections with column headers A B C D
+         * - Black square registration anchor dots (fiducials) framing every column
+         * - Calibrated A4 printable dimensions (with dual-sheet A5 option) with zero overflow
+         */
+        generatePrintableSheetHtml(exam = {}) {
+            const title = exam.title || 'Comprehensive Examination';
             const subject = exam.subject || 'Chemistry';
             const center = exam.center || 'All Centers';
-            const date = exam.date || new Date().toISOString().split('T')[0];
-            const qCount = exam.question_count || 30;
-            const writtenMax = exam.written_max_score || 20;
+            const date = exam.exam_date || exam.date || new Date().toISOString().split('T')[0];
+            const qCount = Math.max(10, Math.min(60, exam.question_count || 30));
             const mcqPerQ = exam.mcq_score_per_q || 1;
-            const totalScore = (qCount * mcqPerQ) + parseFloat(writtenMax);
+            const writtenMax = exam.written_max_score != null ? exam.written_max_score : 20;
+            const totalScore = exam.total_score || ((qCount * mcqPerQ) + parseFloat(writtenMax));
 
-            const layout = this.getLayout(qCount);
+            // Determine MCQ columns (1 col for <=20, 2 cols for 21-40, 3 cols for 41-60)
+            const numCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
+            const qPerCol = Math.ceil(qCount / numCols);
 
-            let qRowsHtml = '';
-            const opts = ['A', 'B', 'C', 'D'];
+            function buildMcqCol(colIdx) {
+                const startQ = (colIdx * qPerCol) + 1;
+                const endQ = Math.min(qCount, (colIdx + 1) * qPerCol);
+                if (startQ > qCount) return '';
 
-            if (layout.mcq.cols === 1) {
-                for (let i = 1; i <= qCount; i++) {
-                    qRowsHtml += `
-                        <div class="omr-q-row" style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 6px; font-size:12px;">
-                            <span style="font-weight:700; width:30px; text-align:right;">${i}.</span>
-                            <div style="display:flex; gap:16px;">
-                                ${opts.map(o => `<div class="omr-bubble" data-q="${i}" data-opt="${o}">${o}</div>`).join('')}
+                let html = '';
+                const blockSize = 5;
+
+                for (let q = startQ; q <= endQ; q++) {
+                    const posInBlock = (q - startQ) % blockSize;
+
+                    // Repeat header A B C D at the start of each 5-question block
+                    if (posInBlock === 0) {
+                        html += `
+                            <div class="omr-q-header-row">
+                                <span class="q-num-spacer"></span>
+                                <div class="opt-labels">
+                                    <span>A</span>
+                                    <span>B</span>
+                                    <span>C</span>
+                                    <span>D</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    html += `
+                        <div class="omr-q-row">
+                            <span class="q-num">${q}</span>
+                            <div class="opt-bubbles">
+                                <span class="bubble" data-q="${q}" data-opt="A"></span>
+                                <span class="bubble" data-q="${q}" data-opt="B"></span>
+                                <span class="bubble" data-q="${q}" data-opt="C"></span>
+                                <span class="bubble" data-q="${q}" data-opt="D"></span>
                             </div>
                         </div>
                     `;
+
+                    // Add spacer after each 5th question (except the last question in the column)
+                    if (posInBlock === blockSize - 1 && q !== endQ) {
+                        html += `<div class="q-block-spacer"></div>`;
+                    }
                 }
-            } else {
-                let leftColHtml = '';
-                let rightColHtml = '';
-                for (let i = 1; i <= layout.mcq.qPerCol; i++) {
-                    leftColHtml += `
-                        <div class="omr-q-row" style="display:flex; align-items:center; justify-content:space-between; margin-bottom: ${qCount > 40 ? '4px' : '7px'}; font-size:12px;">
-                            <span style="font-weight:700; width:28px; text-align:right;">${i}.</span>
-                            <div style="display:flex; gap:14px;">
-                                ${opts.map(o => `<div class="omr-bubble" data-q="${i}" data-opt="${o}">${o}</div>`).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                for (let i = layout.mcq.qPerCol + 1; i <= qCount; i++) {
-                    rightColHtml += `
-                        <div class="omr-q-row" style="display:flex; align-items:center; justify-content:space-between; margin-bottom: ${qCount > 40 ? '4px' : '7px'}; font-size:12px;">
-                            <span style="font-weight:700; width:28px; text-align:right;">${i}.</span>
-                            <div style="display:flex; gap:14px;">
-                                ${opts.map(o => `<div class="omr-bubble" data-q="${i}" data-opt="${o}">${o}</div>`).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                qRowsHtml = `
-                    <div style="display:flex; gap:36px; width:100%;">
-                        <div style="flex:1;">${leftColHtml}</div>
-                        <div style="width:1px; background:#cbd5e1;"></div>
-                        <div style="flex:1;">${rightColHtml}</div>
+
+                return `
+                    <div class="mcq-column">
+                        <div class="mcq-col-title">${subject} (${startQ} - ${endQ})</div>
+                        <div class="mcq-col-body">${html}</div>
                     </div>
                 `;
             }
 
-            return `
-<!DOCTYPE html>
-<html lang="en">
+            let mcqColumnsHtml = '';
+            for (let c = 0; c < numCols; c++) {
+                mcqColumnsHtml += buildMcqCol(c);
+                // Middle registration dots column between MCQ columns
+                if (c < numCols - 1) {
+                    mcqColumnsHtml += `
+                        <div class="reg-dot-col">
+                            <div class="reg-dot"></div>
+                            <div class="reg-dot"></div>
+                            <div class="reg-dot"></div>
+                            <div class="reg-dot"></div>
+                            <div class="reg-dot"></div>
+                        </div>
+                    `;
+                }
+            }
+
+            return `<!DOCTYPE html>
+<html lang="ar" dir="ltr">
 <head>
     <meta charset="utf-8"/>
-    <title>Bubble Sheet - ${title}</title>
+    <title>Bubble Sheet - ${escapeHtml(title)}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet"/>
     <style>
         @page {
             size: A4 portrait;
-            margin: 0;
+            margin: 8mm;
         }
-        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
         body {
             margin: 0;
             padding: 0;
-            background: #fff;
+            background: #e2e8f0;
             color: #0f172a;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', 'Cairo', system-ui, -apple-system, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
-        .page-container {
-            width: 210mm;
-            height: 297mm;
-            position: relative;
-            padding: 16mm 14mm;
-            margin: 0 auto;
-            background: #ffffff;
-            display: flex;
-            flex-col;
-            justify-content: space-between;
-        }
-        /* Corner Fiducials (Black Squares for Auto-Alignment) */
-        .fiducial {
-            position: absolute;
-            width: 14mm;
-            height: 14mm;
-            background: #000000;
-        }
-        .fid-tl { top: 7mm; left: 7mm; }
-        .fid-tr { top: 7mm; right: 7mm; }
-        .fid-bl { bottom: 7mm; left: 7mm; }
-        .fid-br { bottom: 7mm; right: 7mm; }
 
-        .sheet-header {
-            border-bottom: 2px solid #0f172a;
-            padding-bottom: 8px;
-            margin-bottom: 12px;
+        /* Top Bar (Excluded from Print) */
+        .preview-toolbar {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 10px 20px;
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            align-items: flex-end;
+            gap: 12px;
+            font-size: 13px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
         }
-        .sheet-title {
-            font-size: 20px;
+        .btn-print {
+            background: #10b981;
+            color: #ffffff;
             font-weight: 800;
-            margin: 0;
-            text-transform: uppercase;
-            letter-spacing: -0.01em;
+            font-size: 13px;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
         }
-        .sheet-sub {
-            font-size: 11px;
-            color: #475569;
-            margin-top: 3px;
+        .btn-print:hover { background: #059669; transform: translateY(-1px); }
+        .mode-toggle-btn {
+            background: #334155;
+            color: #f8fafc;
+            border: 1px solid #475569;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
         }
-        .meta-box {
-            display: flex;
-            gap: 16px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .meta-item {
-            border: 1px solid #94a3b8;
-            padding: 4px 8px;
-            border-radius: 4px;
+        .mode-toggle-btn.active {
+            background: #2563eb;
+            border-color: #3b82f6;
         }
 
-        .student-info-grid {
-            display: grid;
-            grid-template-columns: 1.2fr 1fr;
-            gap: 16px;
-            margin-bottom: 14px;
-            padding: 10px;
-            border: 1.5px solid #0f172a;
-            border-radius: 6px;
+        /* Sheet Page Container */
+        .sheet-wrapper {
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+        .bubble-sheet-page {
+            width: 194mm;
+            min-height: 275mm;
+            max-height: 280mm;
+            background: #ffffff;
+            padding: 8mm 9mm;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        /* Two-Up A5 Mode */
+        body.mode-dual .bubble-sheet-page {
+            width: 194mm;
+            height: auto;
+            min-height: 135mm;
+            max-height: 138mm;
+            padding: 4mm 6mm;
+            page-break-inside: avoid;
+            margin-bottom: 4mm;
+            border-bottom: 1px dashed #94a3b8;
+        }
+
+        /* Top Header */
+        .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #000000;
+            margin-bottom: 8px;
+        }
+        .exam-title-group h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 900;
+            color: #000000;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+        .exam-subtitle {
+            font-size: 11px;
+            font-weight: 800;
+            color: #334155;
+            margin-top: 2px;
+            letter-spacing: 0.04em;
+        }
+        .sheet-meta-badges {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 10.5px;
+            font-weight: 700;
+        }
+        .meta-badge {
+            border: 1.2px solid #000000;
+            padding: 3px 7px;
+            border-radius: 4px;
             background: #f8fafc;
         }
 
-        .input-line {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .input-line .line {
-            flex: 1;
-            border-bottom: 1px dashed #64748b;
-            margin-left: 8px;
-            height: 18px;
-        }
-
-        /* Bubble styles */
-        .omr-bubble {
-            width: 22px;
-            height: 22px;
-            border: 1.8px solid #0f172a;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            font-weight: 700;
-            color: #0f172a;
-            user-select: none;
-        }
-
-        .code-grid {
+        /* Student Info Table & Written Score Row */
+        .top-info-section {
             display: flex;
             gap: 10px;
+            margin-bottom: 12px;
+            align-items: stretch;
         }
-        .code-col {
+
+        /* Student Info Table (Boxed Widget matching user's image) */
+        .student-table {
+            flex: 1;
+            border: 1.6px solid #000000;
+            border-collapse: collapse;
+            font-size: 11.5px;
+            font-weight: 700;
+            width: 100%;
+        }
+        .student-table td {
+            border: 1.2px solid #000000;
+            padding: 4px 8px;
+            height: 25px;
+            vertical-align: middle;
+        }
+        .student-table .td-label {
+            width: 120px;
+            background: #ffffff;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        .student-table .td-fill {
+            background: #ffffff;
+        }
+        .model-bubbles-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .model-bubble-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .model-bubble-item .bubble {
+            width: 17px;
+            height: 17px;
+            border: 1.5px solid #000000;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9.5px;
+            font-weight: 800;
+        }
+
+        /* Teacher's Written Score Box */
+        .teacher-written-box {
+            width: 130px;
+            border: 1.6px solid #000000;
+            border-radius: 4px;
+            background: #ffffff;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            text-align: center;
+        }
+        .twb-header {
+            font-size: 11px;
+            font-weight: 900;
+            color: #b91c1c;
+            line-height: 1.2;
+        }
+        .twb-sub {
+            font-size: 9px;
+            font-weight: 700;
+            color: #475569;
+        }
+        .twb-score-area {
+            height: 38px;
+            border-bottom: 2px solid #000000;
+            margin: 4px 10px;
+        }
+        .twb-max {
+            font-size: 10px;
+            font-weight: 800;
+            color: #0f172a;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 3px;
+        }
+
+        /* Registration Dots & OMR Grid Layout */
+        .omr-main-grid {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            flex: 1;
+            padding: 6px 0;
+        }
+
+        /* Solid Black Square Registration Dots */
+        .reg-dot-col {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            align-self: stretch;
+            width: 14px;
+            padding: 2px 0;
+        }
+        .reg-dot {
+            width: 12px;
+            height: 12px;
+            background: #000000;
+            border-radius: 1px;
+            margin: 3px 0;
+        }
+
+        /* Roll No Section (Student Code Matrix) */
+        .roll-section {
+            width: 145px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
         }
-        .code-col-header {
+        .roll-title {
+            font-size: 11px;
+            font-weight: 900;
+            text-align: center;
+            margin-bottom: 4px;
+            letter-spacing: -0.01em;
+        }
+        .roll-boxes-row {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+        .roll-box {
             width: 20px;
             height: 20px;
-            border-bottom: 1.5px solid #0f172a;
-            margin-bottom: 3px;
+            border: 1.4px solid #000000;
+            background: #ffffff;
         }
-
-        .instruction-box {
+        .roll-matrix {
+            display: flex;
+            flex-direction: column;
+            gap: 3.5px;
+        }
+        .roll-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .roll-digit-label {
+            width: 12px;
+            text-align: right;
             font-size: 10px;
-            line-height: 1.35;
+            font-weight: 700;
             color: #334155;
-            border: 1px dashed #94a3b8;
-            padding: 6px 10px;
-            border-radius: 4px;
-            margin-bottom: 12px;
+        }
+        .roll-bubbles {
+            display: flex;
+            gap: 5px;
         }
 
-        .written-score-box {
-            border: 2px solid #0f172a;
-            border-radius: 6px;
-            padding: 8px;
-            text-align: center;
-            background: #fff;
+        /* MCQ Columns */
+        .mcq-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .written-score-box .score-fill {
-            font-size: 26px;
+        .mcq-col-title {
+            font-size: 11px;
             font-weight: 900;
+            text-align: center;
+            margin-bottom: 4px;
+            letter-spacing: -0.01em;
+            text-transform: uppercase;
+        }
+        .mcq-col-body {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 5-Question Block Header (A B C D) */
+        .omr-q-header-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            max-width: 155px;
+            margin-bottom: 2px;
+        }
+        .q-num-spacer {
+            width: 26px;
+            display: inline-block;
+        }
+        .opt-labels {
+            display: flex;
+            justify-content: space-between;
+            flex: 1;
+            padding: 0 5px;
+        }
+        .opt-labels span {
+            width: 18px;
+            text-align: center;
+            font-size: 10.5px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        /* Question Row */
+        .omr-q-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            max-width: 155px;
+            margin-bottom: 3.5px;
+        }
+        .q-num {
+            width: 26px;
+            font-size: 11px;
+            font-weight: 800;
             color: #0f172a;
-            height: 40px;
-            border-bottom: 2px solid #000;
-            margin: 6px 20px;
+            text-align: right;
+            padding-right: 6px;
+        }
+        .opt-bubbles {
+            display: flex;
+            justify-content: space-between;
+            flex: 1;
+            padding: 0 4px;
+        }
+
+        /* Hollow Circular Bubbles (Matching image) */
+        .bubble {
+            width: 18px;
+            height: 18px;
+            border: 1.5px solid #000000;
+            border-radius: 50%;
+            display: inline-block;
+            background: #ffffff;
+            cursor: pointer;
+        }
+
+        /* Gap between 5-question groups */
+        .q-block-spacer {
+            height: 8px;
+            width: 100%;
+        }
+
+        /* Footer Instructions */
+        .sheet-footer {
+            border-top: 1.4px solid #000000;
+            padding-top: 5px;
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 9px;
+            font-weight: 600;
+            color: #334155;
+        }
+        .inst-icons {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+        }
+        .inst-icons span {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
         }
 
         @media print {
-            .no-print { display: none !important; }
-            body { padding: 0; }
+            .preview-toolbar { display: none !important; }
+            body { background: #ffffff !important; padding: 0 !important; }
+            .sheet-wrapper { padding: 0 !important; }
+            .bubble-sheet-page {
+                box-shadow: none !important;
+                padding: 6mm 7mm !important;
+                page-break-inside: avoid;
+                page-break-after: avoid;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="no-print" style="background:#0f172a; color:#fff; padding:12px 20px; display:flex; justify-content:space-between; align-items:center;">
-        <div><strong>Print Preview:</strong> ${title} (${qCount} Questions)</div>
-        <button onclick="window.print()" style="background:#10b981; color:#fff; font-weight:700; border:none; padding:8px 18px; border-radius:6px; cursor:pointer;">
-            🖨️ Print Now (Ctrl + P)
-        </button>
+    <!-- Top Preview Toolbar (Hidden in Print) -->
+    <div class="preview-toolbar">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <strong style="font-size:14px;">🖨️ Bubble Sheet Preview: ${escapeHtml(title)}</strong>
+            <span style="color:#94a3b8; font-size:12px;">(${qCount} Questions &bull; Total: ${totalScore} Marks)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button class="mode-toggle-btn active" id="btn_mode_a4" onclick="setSheetMode('a4')">A4 Single Page</button>
+            <button class="mode-toggle-btn" id="btn_mode_dual" onclick="setSheetMode('dual')">A5 Dual-Sheet (2 per A4)</button>
+            <button class="btn-print" onclick="window.print()">
+                <span>Print Bubble Sheet (Ctrl+P)</span>
+            </button>
+        </div>
     </div>
 
-    <div class="page-container">
-        <!-- 4 Black Square Corner Alignment Markers -->
-        <div class="fiducial fid-tl"></div>
-        <div class="fiducial fid-tr"></div>
-        <div class="fiducial fid-bl"></div>
-        <div class="fiducial fid-br"></div>
-
-        <div>
-            <!-- Header -->
+    <!-- Sheet Container -->
+    <div class="sheet-wrapper" id="sheet_container">
+        <div class="bubble-sheet-page" id="sheet_page_1">
+            <!-- 1. Header Row -->
             <div class="sheet-header">
-                <div>
-                    <h1 class="sheet-title">${title}</h1>
-                    <div class="sheet-sub">MR. KELANY ACADEMY • ${subject.toUpperCase()}</div>
+                <div class="exam-title-group">
+                    <h1>${escapeHtml(title)}</h1>
+                    <div class="exam-subtitle">MR. KELANY ACADEMY &bull; ${escapeHtml(subject).toUpperCase()}</div>
                 </div>
-                <div class="meta-box">
-                    <div class="meta-item">Date: ${date}</div>
-                    <div class="meta-item">Center: ${center}</div>
-                    <div class="meta-item">Total: ${totalScore} Marks</div>
+                <div class="sheet-meta-badges">
+                    <span class="meta-badge">Date: <strong>${date}</strong></span>
+                    <span class="meta-badge">Center: <strong>${escapeHtml(center)}</strong></span>
+                    <span class="meta-badge">Total: <strong>${totalScore} Marks</strong></span>
                 </div>
             </div>
 
-            <!-- Student Info & Code Block -->
-            <div class="student-info-grid">
-                <div>
-                    <div class="input-line">
-                        <span>Student Name:</span>
-                        <div class="line"></div>
-                    </div>
-                    <div class="input-line">
-                        <span>Center:</span>
-                        <div class="line"></div>
-                    </div>
+            <!-- 2. Student Info Table & Written Score Box (Exact requested widget) -->
+            <div class="top-info-section">
+                <table class="student-table">
+                    <tr>
+                        <td class="td-label">Full NAME :</td>
+                        <td class="td-fill"></td>
+                    </tr>
+                    <tr>
+                        <td class="td-label">Phone Number :</td>
+                        <td class="td-fill"></td>
+                    </tr>
+                    <tr>
+                        <td class="td-label">Parent Number :</td>
+                        <td class="td-fill"></td>
+                    </tr>
+                    <tr>
+                        <td class="td-label">ID :</td>
+                        <td class="td-fill"></td>
+                    </tr>
+                    <tr>
+                        <td class="td-label">Model :</td>
+                        <td class="td-fill">
+                            <div class="model-bubbles-row">
+                                <span class="model-bubble-item"><span class="bubble"></span> A</span>
+                                <span class="model-bubble-item"><span class="bubble"></span> B</span>
+                                <span class="model-bubble-item"><span class="bubble"></span> C</span>
+                                <span class="model-bubble-item"><span class="bubble"></span> D</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="padding:0;">
+                            <table style="width:100%; border-collapse:collapse; height:24px;">
+                                <tr>
+                                    <td style="width:50%; border-right:1.4px solid #000; direction:rtl; text-align:right; font-weight:800; padding:2px 8px; font-size:11px;">
+                                        بتحضر فين :
+                                    </td>
+                                    <td style="width:50%; direction:rtl; text-align:right; font-weight:800; padding:2px 8px; font-size:11px;">
+                                        بتمتحن فين :
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
 
-                    <!-- Exam Model Selection -->
-                    <div style="margin-top:12px; display:flex; align-items:center; gap:12px;">
-                        <span style="font-size:11px; font-weight:800;">EXAM FORM / النموذج:</span>
-                        <div style="display:flex; gap:10px;">
-                            <div style="display:flex; align-items:center; gap:4px;">
-                                <div class="omr-bubble" style="width:20px; height:20px;">A</div>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:4px;">
-                                <div class="omr-bubble" style="width:20px; height:20px;">B</div>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:4px;">
-                                <div class="omr-bubble" style="width:20px; height:20px;">C</div>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:4px;">
-                                <div class="omr-bubble" style="width:20px; height:20px;">D</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="instruction-box" style="margin-top:10px;">
-                        • Fill bubbles completely using a dark pen or pencil: <strong>●</strong> (Not <strong>✓</strong> or <strong>✗</strong>)<br/>
-                        • Do not fold, crease, or write in the margins or over the corner black squares.
-                    </div>
-                </div>
-
-                <!-- Right Side: Student Code Grid & Teacher Score Box -->
-                <div style="display:flex; gap:14px; justify-content:flex-end;">
-                    <!-- Student Code 4-Digits -->
+                <!-- Teacher's Written Score Box -->
+                <div class="teacher-written-box">
                     <div>
-                        <div style="font-size:10px; font-weight:800; text-align:center; margin-bottom:2px;">STUDENT ID (الكود)</div>
-                        <div class="code-grid">
-                            ${[0, 1, 2, 3].map(col => `
-                                <div class="code-col">
-                                    <div class="code-col-header"></div>
-                                    ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => `
-                                        <div class="omr-bubble" style="width:16px; height:16px; font-size:8px;">${num}</div>
-                                    `).join('')}
+                        <div class="twb-header">خاص بالمصحح</div>
+                        <div class="twb-sub">درجة السؤال المقالي</div>
+                    </div>
+                    <div class="twb-score-area"></div>
+                    <div class="twb-max">من <strong>${writtenMax}</strong> درجات</div>
+                </div>
+            </div>
+
+            <!-- 3. OMR Grid: Framed with Black Registration Dots -->
+            <div class="omr-main-grid">
+                <!-- Left Registration Dots -->
+                <div class="reg-dot-col">
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                </div>
+
+                <!-- Roll No Matrix -->
+                <div class="roll-section">
+                    <div class="roll-title">Roll No (كود الطالب)</div>
+                    <div class="roll-boxes-row">
+                        <span class="roll-box"></span>
+                        <span class="roll-box"></span>
+                        <span class="roll-box"></span>
+                        <span class="roll-box"></span>
+                        <span class="roll-box"></span>
+                    </div>
+                    <div class="roll-matrix">
+                        ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => `
+                            <div class="roll-row">
+                                <span class="roll-digit-label">${d}</span>
+                                <div class="roll-bubbles">
+                                    <span class="bubble" data-col="0" data-val="${d}"></span>
+                                    <span class="bubble" data-col="1" data-val="${d}"></span>
+                                    <span class="bubble" data-col="2" data-val="${d}"></span>
+                                    <span class="bubble" data-col="3" data-val="${d}"></span>
+                                    <span class="bubble" data-col="4" data-val="${d}"></span>
                                 </div>
-                            `).join('')}
-                        </div>
+                            </div>
+                        `).join('')}
                     </div>
+                </div>
 
-                    <!-- Written Grade / Essay Box -->
-                    <div class="written-score-box" style="width:130px; display:flex; flex-direction:column; justify-content:space-between;">
-                        <div>
-                            <div style="font-size:11px; font-weight:800; color:#ba1a1a;">خاص بالمصحح</div>
-                            <div style="font-size:9px; font-weight:700; color:#475569;">درجة السؤال المقالي</div>
-                        </div>
-                        <div class="score-fill"></div>
-                        <div style="font-size:10px; font-weight:800; border-top:1px solid #cbd5e1; padding-top:4px;">
-                            من ${writtenMax} درجات
-                        </div>
-                    </div>
+                <!-- Middle Registration Dots -->
+                <div class="reg-dot-col">
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                </div>
+
+                <!-- MCQ Columns -->
+                ${mcqColumnsHtml}
+
+                <!-- Right Registration Dots -->
+                <div class="reg-dot-col">
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
+                    <div class="reg-dot"></div>
                 </div>
             </div>
 
-            <!-- MCQ Questions Grid -->
-            <div style="border: 1.5px solid #0f172a; border-radius:6px; padding: 12px 16px;">
-                <div style="font-size:11px; font-weight:800; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:4px; display:flex; justify-content:space-between;">
-                    <span>MULTIPLE CHOICE QUESTIONS (اختر الإجابة الصحيحة)</span>
-                    <span style="color:#64748b;">(${qCount} Questions • ${qCount * mcqPerQ} Marks)</span>
+            <!-- 4. Footer & Scanner Guide -->
+            <div class="sheet-footer">
+                <div class="inst-icons">
+                    <span>تعليمات التظليل:</span>
+                    <span>● تظليل كامل (صحيح)</span>
+                    <span style="color:#ba1a1a;">✕ ✗ غير صحيح</span>
                 </div>
-                ${qRowsHtml}
+                <div>OMR Serial: <strong>${exam.id ? exam.id.substring(0, 12).toUpperCase() : 'KELANY-OMR'}</strong></div>
+                <div>لا تطوِ الورقة أو تكتب في الهوامش</div>
             </div>
-        </div>
-
-        <!-- Footer -->
-        <div style="font-size:9px; color:#64748b; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e2e8f0; padding-top:6px; margin-top:8px;">
-            <span>OMR Barcode / Serial ID: ${exam.id ? exam.id.substring(0, 13) : 'TEST-SHEET'}</span>
-            <span>Do not mark the 4 black square alignment markers at sheet corners.</span>
-            <span>Page 1 of 1</span>
         </div>
     </div>
+
+    <script>
+        function setSheetMode(mode) {
+            const body = document.body;
+            const btnA4 = document.getElementById('btn_mode_a4');
+            const btnDual = document.getElementById('btn_mode_dual');
+            const container = document.getElementById('sheet_container');
+            const page1 = document.getElementById('sheet_page_1');
+
+            if (mode === 'dual') {
+                body.classList.add('mode-dual');
+                btnA4.classList.remove('active');
+                btnDual.classList.add('active');
+
+                // Duplicate sheet for 2-up per A4 page if not already present
+                if (!document.getElementById('sheet_page_2')) {
+                    const page2 = page1.cloneNode(true);
+                    page2.id = 'sheet_page_2';
+                    container.appendChild(page2);
+                }
+            } else {
+                body.classList.remove('mode-dual');
+                btnA4.classList.add('active');
+                btnDual.classList.remove('active');
+
+                const page2 = document.getElementById('sheet_page_2');
+                if (page2) page2.remove();
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+            });
+        }
+    </script>
 </body>
-</html>
-            `;
+</html>`;
         },
 
         /**
@@ -423,18 +804,13 @@
             const gray = new Uint8Array(w * h);
             let sumLum = 0;
             for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-                // ITU-R BT.601 standard luminance
                 const lum = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
                 gray[j] = lum;
                 sumLum += lum;
             }
             const avgLum = sumLum / (w * h);
-            const darkThreshold = avgLum * 0.72; // pixels significantly darker than paper
+            const darkThreshold = avgLum * 0.70;
 
-            /**
-             * Samples a circular bubble at normalized ratios (rx, ry)
-             * Returns darkness fill ratio [0.0 - 1.0]
-             */
             function sampleBubbleDarkness(normX, normY, radiusPx = 10) {
                 const cx = Math.round(normX * w);
                 const cy = Math.round(normY * h);
@@ -458,91 +834,73 @@
                 return totalCount > 0 ? (darkCount / totalCount) : 0;
             }
 
-            // Estimate sheet bounds / offsets (or fallback to standard normalized layout)
             const layout = this.getLayout(questionCount);
+            const modelOpts = ['A', 'B', 'C', 'D'];
 
             // 2. Read Exam Model (A, B, C, D)
-            // Model row is in the upper right header area
-            const modelOpts = ['A', 'B', 'C', 'D'];
-            const modelDarkness = [];
-            // Approximate normalized position for Model bubbles
-            const modelBaseY = 0.175;
-            const modelBaseX = 0.35;
-            const modelSpacingX = 0.055;
-
+            const modelScores = [];
             for (let i = 0; i < 4; i++) {
-                const dark = sampleBubbleDarkness(modelBaseX + (i * modelSpacingX), modelBaseY, Math.round(w * 0.012));
-                modelDarkness.push({ opt: modelOpts[i], dark });
+                const x = layout.model.baseX + (i * layout.model.stepX);
+                const dark = sampleBubbleDarkness(x, layout.model.baseY, Math.round(w * 0.012));
+                modelScores.push({ opt: modelOpts[i], dark });
             }
-            modelDarkness.sort((a, b) => b.dark - a.dark);
-            const detectedModel = (modelDarkness[0].dark > 0.35) ? modelDarkness[0].opt : 'A';
+            modelScores.sort((a, b) => b.dark - a.dark);
+            const detectedModel = (modelScores[0].dark > 0.30) ? modelScores[0].opt : 'A';
 
-            // 3. Read Student ID (4 Digits)
-            const studentCodeDigits = [];
-            const idBaseX = 0.73;
-            const idStepX = 0.045;
-            const idBaseY = 0.165;
-            const idStepY = 0.021;
-
-            for (let col = 0; col < 4; col++) {
-                let colResults = [];
+            // 3. Read Student ID (5 Digits)
+            const idDigits = [];
+            for (let col = 0; col < layout.studentCode.digits; col++) {
+                const colScores = [];
                 for (let digit = 0; digit <= 9; digit++) {
-                    const dark = sampleBubbleDarkness(idBaseX + (col * idStepX), idBaseY + (digit * idStepY), Math.round(w * 0.010));
-                    colResults.push({ digit, dark });
+                    const x = layout.studentCode.baseX + (col * layout.studentCode.stepX);
+                    const y = layout.studentCode.baseY + (digit * layout.studentCode.stepY);
+                    const dark = sampleBubbleDarkness(x, y, Math.round(w * 0.010));
+                    colScores.push({ digit, dark });
                 }
-                colResults.sort((a, b) => b.dark - a.dark);
-                if (colResults[0].dark > 0.32) {
-                    studentCodeDigits.push(colResults[0].digit);
+                colScores.sort((a, b) => b.dark - a.dark);
+                if (colScores[0].dark > 0.28) {
+                    idDigits.push(colScores[0].digit);
                 } else {
-                    studentCodeDigits.push('?');
+                    idDigits.push('?');
                 }
             }
-            const detectedStudentCode = studentCodeDigits.join('');
+            const detectedStudentCode = idDigits.join('');
 
             // 4. Read MCQ Questions
             const detectedAnswers = {};
-            const qCount = Math.max(10, Math.min(60, questionCount));
-            const cols = qCount > 25 ? 2 : 1;
-            const qPerCol = Math.ceil(qCount / cols);
-
-            const mcqBaseY = 0.44;
-            const mcqRowH = (0.92 - mcqBaseY) / qPerCol;
-
-            // Options A, B, C, D
-            const col1X = cols === 1 ? 0.38 : 0.15;
-            const col2X = 0.62;
-            const optStepX = 0.055;
+            const qCount = layout.qCount;
+            const cols = layout.cols;
+            const qPerCol = layout.qPerCol;
+            const rowH = layout.mcq.totalHeight / Math.max(15, qPerCol);
 
             for (let q = 1; q <= qCount; q++) {
-                const isCol2 = q > qPerCol;
-                const rowIdx = isCol2 ? (q - qPerCol - 1) : (q - 1);
-                const baseX = isCol2 ? col2X : col1X;
-                const cy = mcqBaseY + (rowIdx * mcqRowH);
+                const colIdx = Math.floor((q - 1) / qPerCol);
+                const inColIdx = (q - 1) % qPerCol;
+                const baseX = layout.mcq.colBaseX[colIdx] || layout.mcq.colBaseX[0];
+                const optStepX = layout.mcq.optStepX;
+
+                // Account for 5-question block spacers
+                const blockIdx = Math.floor(inColIdx / 5);
+                const cy = layout.mcq.baseY + (inColIdx * rowH) + (blockIdx * 0.014);
 
                 const optScores = [];
                 for (let optIdx = 0; optIdx < 4; optIdx++) {
                     const cx = baseX + (optIdx * optStepX);
-                    const dark = sampleBubbleDarkness(cx, cy, Math.round(w * 0.011));
+                    const dark = sampleBubbleDarkness(cx, cy, Math.round(w * 0.010));
                     optScores.push({ opt: modelOpts[optIdx], dark });
                 }
 
-                // Sort by darkness
                 optScores.sort((a, b) => b.dark - a.dark);
-
-                // Verification logic:
-                // Marked bubble should have fill > 0.35 AND be significantly darker than 2nd place
                 const best = optScores[0];
                 const runnerUp = optScores[1];
 
-                if (best.dark > 0.35) {
-                    if (runnerUp.dark > 0.35 && (best.dark - runnerUp.dark) < 0.15) {
-                        // Double marked!
+                if (best.dark > 0.30) {
+                    if (runnerUp.dark > 0.28 && (best.dark - runnerUp.dark) < 0.12) {
                         detectedAnswers[q] = { selected: best.opt, ambiguous: true, second: runnerUp.opt };
                     } else {
                         detectedAnswers[q] = { selected: best.opt, ambiguous: false };
                     }
                 } else {
-                    // Blank / Unanswered
                     detectedAnswers[q] = { selected: null, ambiguous: false };
                 }
             }
