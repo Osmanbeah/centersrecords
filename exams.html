@@ -482,52 +482,50 @@
 
 
 
-            <!-- Student Code & Model Row -->
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
-                <div>
-
-                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student ID (كود الطالب):</label>
-
-                    <input type="text" id="review_student_code" placeholder="e.g. 1042" 
-
-                        class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-base font-extrabold tracking-wider p-2 text-center focus:border-secondary focus:ring-1 focus:ring-secondary"/>
-
-                </div>
-
-
-
-                <div>
-
-                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student Name (اسم الطالب):</label>
-
-                    <input type="text" id="review_student_name" placeholder="Optional / اختياري" 
-
-                        class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-sm font-semibold p-2 focus:border-secondary focus:ring-1 focus:ring-secondary"/>
-
-                </div>
-
-
-
-                <div>
-
-                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Exam Model (النموذج):</label>
-
-                    <div class="flex items-center gap-1.5" id="model_toggle_container">
-
-                        <button type="button" onclick="selectReviewModel('A')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="A">A</button>
-
-                        <button type="button" onclick="selectReviewModel('B')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="B">B</button>
-
-                        <button type="button" onclick="selectReviewModel('C')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="C">C</button>
-
-                        <button type="button" onclick="selectReviewModel('D')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="D">D</button>
-
+            <!-- 1. Detected Exam Model (أولاً: نموذج الامتحان المكتشف) -->
+            <div class="bg-surface-container-low/70 border border-secondary/30 rounded-xl p-3.5 space-y-2">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-md bg-secondary/10 text-secondary text-[11px] font-extrabold">1️⃣ أولاً: النموذج</span>
+                        <span class="font-bold text-xs text-on-surface">Exam Model (نموذج الامتحان المكتشف)</span>
                     </div>
-
+                    <span id="review_detected_model_badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[13px]">check_circle</span>
+                        <span>مكتشف تلقائياً</span>
+                    </span>
                 </div>
+                <div class="flex items-center gap-2" id="model_toggle_container">
+                    <button type="button" onclick="selectReviewModel('A')" class="model-opt-btn flex-1 py-2.5 rounded-xl text-sm font-extrabold border border-outline-variant bg-surface-container transition-all" data-model="A">Model A</button>
+                    <button type="button" onclick="selectReviewModel('B')" class="model-opt-btn flex-1 py-2.5 rounded-xl text-sm font-extrabold border border-outline-variant bg-surface-container transition-all" data-model="B">Model B</button>
+                    <button type="button" onclick="selectReviewModel('C')" class="model-opt-btn flex-1 py-2.5 rounded-xl text-sm font-extrabold border border-outline-variant bg-surface-container transition-all" data-model="C">Model C</button>
+                    <button type="button" onclick="selectReviewModel('D')" class="model-opt-btn flex-1 py-2.5 rounded-xl text-sm font-extrabold border border-outline-variant bg-surface-container transition-all" data-model="D">Model D</button>
+                </div>
+            </div>
 
+            <!-- 2. Student ID & Name Row (ثانياً: كود الطالب المستخرج من التظليل) -->
+            <div class="bg-surface-container-low/70 border border-outline-variant/60 rounded-xl p-3.5 space-y-2">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 font-extrabold text-[11px]">2️⃣ ثانياً: كود الطالب</span>
+                        <span class="font-bold text-xs text-on-surface">Student ID & Details (بيانات الطالب)</span>
+                    </div>
+                    <span id="review_id_badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[13px]">verified</span>
+                        <span>مستخرج من التظليل</span>
+                    </span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student ID (كود الطالب - 5 أرقام):</label>
+                        <input type="text" id="review_student_code" placeholder="e.g. 20417" oninput="updateIdBadge()"
+                            class="w-full bg-surface-container border border-outline-variant rounded-xl text-base font-black tracking-widest p-2.5 text-center focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student Name (اسم الطالب):</label>
+                        <input type="text" id="review_student_name" placeholder="Optional / اختياري" 
+                            class="w-full bg-surface-container border border-outline-variant rounded-xl text-sm font-semibold p-2.5 focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+                    </div>
+                </div>
             </div>
 
 
@@ -2024,27 +2022,35 @@
         // --- Review Card Interaction ---
 
         function populateReviewCard() {
-
             const card = document.getElementById('review_card');
-
             card.classList.remove('hidden');
-
             card.scrollIntoView({ behavior: 'smooth' });
 
-
-
             document.getElementById('review_student_code').value = scannedData.studentCode || '';
-
             document.getElementById('review_student_name').value = '';
-
             document.getElementById('input_written_score').value = scannedData.writtenScore || 0;
 
-
+            updateIdBadge();
+            const modelBadge = document.getElementById('review_detected_model_badge');
+            if (modelBadge) {
+                modelBadge.innerHTML = `<span class="material-symbols-outlined text-[13px]">check_circle</span> تم كشف النموذج (${scannedData.model || 'A'})`;
+            }
 
             selectReviewModel(scannedData.model || 'A');
-
             renderQuestionsGrid();
+        }
 
+        function updateIdBadge() {
+            const code = (document.getElementById('review_student_code')?.value || '').trim();
+            const badge = document.getElementById('review_id_badge');
+            if (!badge) return;
+            if (code.includes('?') || code.length === 0) {
+                badge.className = 'px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-bold text-[11px] flex items-center gap-1';
+                badge.innerHTML = `<span class="material-symbols-outlined text-[13px]">warning</span> يرجى تأكيد الرقم`;
+            } else {
+                badge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-[11px] flex items-center gap-1';
+                badge.innerHTML = `<span class="material-symbols-outlined text-[13px]">verified</span> تم استخراج الكود (${code})`;
+            }
         }
 
 

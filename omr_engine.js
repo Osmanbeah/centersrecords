@@ -2202,31 +2202,23 @@
 
 
 
-            // Compute grayscale
-
+            // Compute grayscale & mean luminance
             const gray = new Uint8Array(srcW * srcH);
-
+            let sumLum = 0;
             for (let i = 0, j = 0; i < srcData.length; i += 4, j++) {
-
-                gray[j] = Math.round((srcData[i] * 299 + srcData[i + 1] * 587 + srcData[i + 2] * 114) / 1000);
-
+                const lum = Math.round((srcData[i] * 299 + srcData[i + 1] * 587 + srcData[i + 2] * 114) / 1000);
+                gray[j] = lum;
+                sumLum += lum;
             }
-
-
+            const meanLum = sumLum / (srcW * srcH);
 
             // Find candidate black fiducial squares
-
             const minBlob = Math.max(6, Math.round(srcW * 0.006));
-
             const maxBlob = Math.max(50, Math.round(srcW * 0.050));
-
             const visited = new Uint8Array(srcW * srcH);
-
             const candidateDots = [];
-
             const step = Math.max(3, Math.floor(minBlob / 2));
-
-            const darkThresh = 80;
+            const darkThresh = Math.min(95, Math.max(65, Math.round(meanLum * 0.45)));
 
 
 
@@ -2917,118 +2909,90 @@
 
 
             const rCtx = rectifiedCanvas.getContext('2d');
-
             const rData = rCtx.getImageData(0, 0, TARGET_W, TARGET_H).data;
-
             const gray = new Uint8Array(TARGET_W * TARGET_H);
-
             for (let i = 0, j = 0; i < rData.length; i += 4, j++) {
-
-                gray[j] = Math.round((rData[i] * 299 + rData[i + 1] * 587 + rData[i + 2] * 114) / 1000);
-
+                // Enhanced ink darkness: heavily weights red and green so blue ballpoint ink and pencil graphite both produce deep contrast
+                gray[j] = Math.round((rData[i] * 500 + rData[i + 1] * 400 + rData[i + 2] * 100) / 1000);
             }
-
-
 
             // Step 3: Compute Calibrated Coordinates on Rectified Canvas
-
             const qCount = Math.max(1, Math.min(100, parseInt(questionCount, 10) || 30));
-
             const numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
-
             const qPerCol = Math.ceil(qCount / numMcqCols);
 
-
-
             const gridTopY = 480;
-
             const gridBotY = 1550;
 
-            const gridH = gridBotY - gridTopY;
-
-
-
             // Step 4: Read Model (A, B, C, D)
+            // Supports standard table Model row (y=265), tall table (y=340), wide & narrow layouts
+            let detectedModel = 'A';
+            let bestModelScore = -1.0;
+            let detectedModelCoord = null;
 
-            const modelY = 340;
+            const candidateModelConfigs = [
+                { y: 265, xs: { 'A': 360, 'B': 440, 'C': 520, 'D': 600 } },
+                { y: 340, xs: { 'A': 360, 'B': 440, 'C': 520, 'D': 600 } },
+                { y: 265, xs: { 'A': 250, 'B': 290, 'C': 330, 'D': 370 } },
+                { y: 340, xs: { 'A': 250, 'B': 290, 'C': 330, 'D': 370 } }
+            ];
 
-            const modelStartX = 250;
-
-            const modelStepX = 40;
-
-            const modelCoords = {
-
-                'A': { x: modelStartX, y: modelY },
-
-                'B': { x: modelStartX + modelStepX, y: modelY },
-
-                'C': { x: modelStartX + modelStepX * 2, y: modelY },
-
-                'D': { x: modelStartX + modelStepX * 3, y: modelY }
-
-            };
-
-            const modelRes = this.classifyQuestion(gray, modelCoords, TARGET_W, TARGET_H);
-
-            const detectedModel = (modelRes.state === 'SELECTED') ? modelRes.selected : 'A';
-
-
-
-            // Step 5: Read Student Roll No (5 Digits)
-
-            const rollDigits = 5;
-
-            const rollStartX = 145;
-
-            const rollStepX = 35;
-
-            const rollStartY = gridTopY + Math.round(gridH * 0.16);
-
-            const rollStepY = (gridH * 0.76) / 9.0;
-
-
-
-            const idDigits = [];
-
-            for (let c = 0; c < rollDigits; c++) {
-
-                const cx = rollStartX + c * rollStepX;
-
-                const digitScores = [];
-
-                for (let d = 0; d <= 9; d++) {
-
-                    const cy = Math.round(rollStartY + d * rollStepY);
-
-                    const res = this.analyzeBubbleCore(gray, cx, cy, TARGET_W, TARGET_H, 6);
-
-                    const s = (res.fillRatio * 0.6) + (Math.min(1.0, res.netContrast / 100.0) * 0.4);
-
-                    digitScores.push({ digit: d, score: s });
-
+            for (const cfg of candidateModelConfigs) {
+                const my = cfg.y;
+                const xs = cfg.xs;
+                const modelCoords = {
+                    'A': { x: xs['A'], y: my },
+                    'B': { x: xs['B'], y: my },
+                    'C': { x: xs['C'], y: my },
+                    'D': { x: xs['D'], y: my }
+                };
+                const res = this.classifyQuestion(gray, modelCoords, TARGET_W, TARGET_H);
+                if (res.state === 'SELECTED' && res.selected && res.confidence > bestModelScore) {
+                    bestModelScore = res.confidence;
+                    detectedModel = res.selected;
+                    detectedModelCoord = { x: xs[res.selected], y: my };
                 }
-
-                digitScores.sort((a, b) => b.score - a.score);
-
-                if (digitScores[0].score > 0.28 && (digitScores[0].score - digitScores[1].score) > 0.12) {
-
-                    idDigits.push(digitScores[0].digit);
-
-                } else {
-
-                    idDigits.push('?');
-
-                }
-
             }
 
+            // Step 5: Read Student Roll No (5 Digits)
+            // Calibrated against printable template layout (10 rows: 0 to 9)
+            const rollRowYs = [604, 657, 708, 763, 817, 872, 924, 974, 1028, 1080];
+            const rollColXs = [268, 326, 385, 443, 502]; // 5 digits
+            const detectedRollCoords = [];
+
+            const idDigits = [];
+            for (let c = 0; c < rollColXs.length; c++) {
+                const cx = rollColXs[c];
+                const digitScores = [];
+                for (let d = 0; d <= 9; d++) {
+                    const cy = rollRowYs[d];
+                    const res = this.analyzeBubbleCore(gray, cx, cy, TARGET_W, TARGET_H, 6);
+                    const s = (res.fillRatio * 0.6) + (Math.min(1.0, res.netContrast / 100.0) * 0.4);
+                    digitScores.push({ digit: d, score: s, x: cx, y: cy });
+                }
+                digitScores.sort((a, b) => b.score - a.score);
+                const best = digitScores[0];
+                const second = digitScores[1];
+                if (best.score > 0.25 && (best.score - second.score) > 0.08) {
+                    idDigits.push(best.digit);
+                    detectedRollCoords.push({ x: best.x, y: best.y, digit: best.digit });
+                } else {
+                    idDigits.push('?');
+                }
+            }
             const detectedStudentCode = idDigits.join('');
 
-
-
-            // Step 6: Read MCQ Questions with 4-State Classifier
+            // Step 6: Read MCQ Questions with Calibrated Coordinates & 4-State Classifier
             const detectedAnswers = {};
             const optOffsets = [0.32, 0.49, 0.66, 0.83];
+
+            // Calibrated coordinates for 15-question single-column exams
+            const qYs15 = [
+                656, 708, 764, 817, 869,     // Block 1: Q1..5
+                978, 1030, 1082, 1139, 1191, // Block 2: Q6..10
+                1300, 1352, 1404, 1456, 1509 // Block 3: Q11..15
+            ];
+            const optXs15 = { 'A': 796, 'B': 852, 'C': 910, 'D': 971 };
 
             // Calibrated column X boundaries for 1, 2, 3, or 4 columns
             let regX;
@@ -3051,149 +3015,111 @@
             let totalConfidence = 0;
 
             for (let q = 1; q <= qCount; q++) {
-                const colIdx = Math.floor((q - 1) / qPerCol);
-                const inCol = (q - 1) % qPerCol;
-                const blockIdx = Math.floor(inCol / 5);
-                const posInBlock = inCol % 5;
+                let qCoords;
+                let qy;
+                let effColLeft, effColW;
 
-                const xLeft = regX[colIdx + 1] || regX[1];
-                const xRight = regX[colIdx + 2] || (xLeft + 300);
-                const rawColW = xRight - xLeft;
-                const effColW = Math.min(rawColW, (numMcqCols === 1 ? 320 : 340));
-                const colCenterX = (xLeft + xRight) / 2;
-                const effColLeft = (numMcqCols === 1) ? (colCenterX - effColW / 2) : xLeft;
+                if (numMcqCols === 1 && qCount <= 15 && (q - 1) < qYs15.length) {
+                    qy = qYs15[q - 1];
+                    effColLeft = 750;
+                    effColW = 260;
+                    qCoords = {
+                        'A': { x: optXs15['A'], y: qy },
+                        'B': { x: optXs15['B'], y: qy },
+                        'C': { x: optXs15['C'], y: qy },
+                        'D': { x: optXs15['D'], y: qy }
+                    };
+                } else {
+                    const colIdx = Math.floor((q - 1) / qPerCol);
+                    const inCol = (q - 1) % qPerCol;
+                    const blockIdx = Math.floor(inCol / 5);
+                    const posInBlock = inCol % 5;
 
-                const qy = Math.round(colStartY + (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) + blockHeaderH + (posInBlock * rowStepY));
+                    const xLeft = regX[colIdx + 1] || regX[1];
+                    const xRight = regX[colIdx + 2] || (xLeft + 300);
+                    const rawColW = xRight - xLeft;
+                    effColW = Math.min(rawColW, (numMcqCols === 1 ? 320 : 340));
+                    const colCenterX = (xLeft + xRight) / 2;
+                    effColLeft = (numMcqCols === 1) ? (colCenterX - effColW / 2) : xLeft;
 
-                const qCoords = {
-
-                    'A': { x: Math.round(effColLeft + effColW * optOffsets[0]), y: qy },
-
-                    'B': { x: Math.round(effColLeft + effColW * optOffsets[1]), y: qy },
-
-                    'C': { x: Math.round(effColLeft + effColW * optOffsets[2]), y: qy },
-
-                    'D': { x: Math.round(effColLeft + effColW * optOffsets[3]), y: qy }
-
-                };
-
-
+                    qy = Math.round(colStartY + (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) + blockHeaderH + (posInBlock * rowStepY));
+                    qCoords = {
+                        'A': { x: Math.round(effColLeft + effColW * optOffsets[0]), y: qy },
+                        'B': { x: Math.round(effColLeft + effColW * optOffsets[1]), y: qy },
+                        'C': { x: Math.round(effColLeft + effColW * optOffsets[2]), y: qy },
+                        'D': { x: Math.round(effColLeft + effColW * optOffsets[3]), y: qy }
+                    };
+                }
 
                 const classRes = this.classifyQuestion(gray, qCoords, TARGET_W, TARGET_H);
-
+                classRes.coords = qCoords;
+                classRes.effColLeft = effColLeft;
+                classRes.effColW = effColW;
+                classRes.qy = qy;
                 detectedAnswers[q] = classRes;
 
-
-
                 totalConfidence += classRes.confidence;
-
                 if (classRes.state === 'UNCERTAIN') uncertainCount++;
-
                 else if (classRes.state === 'MULTIPLE') multipleCount++;
-
                 else if (classRes.state === 'EMPTY') emptyCount++;
-
             }
-
-
 
             const overallConfidence = Math.round((totalConfidence / qCount) * 100);
 
-
-
             // Step 7: Create Annotated Human Review Overlay Canvas
-
             const overlayCanvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
-
             if (overlayCanvas) {
-
                 overlayCanvas.width = TARGET_W;
-
                 overlayCanvas.height = TARGET_H;
-
                 const octx = overlayCanvas.getContext('2d');
-
                 octx.drawImage(rectifiedCanvas, 0, 0);
 
-
-
-                // Draw highlighted boxes and overlays
-
-                for (let q = 1; q <= qCount; q++) {
-
-                    const ans = detectedAnswers[q];
-
-                    const colIdx = Math.floor((q - 1) / qPerCol);
-
-                    const inCol = (q - 1) % qPerCol;
-
-                    const blockIdx = Math.floor(inCol / 5);
-
-                    const posInBlock = inCol % 5;
-
-                    const xLeft = regX[colIdx + 1];
-
-                    const xRight = regX[colIdx + 2];
-
-                    const rawColW = xRight - xLeft;
-
-                    const effColW = Math.min(rawColW, (numMcqCols === 1 ? 320 : 340));
-
-                    const colCenterX = (xLeft + xRight) / 2;
-
-                    const effColLeft = (numMcqCols === 1) ? (colCenterX - effColW / 2) : xLeft;
-
-                    const qy = Math.round(colStartY + (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) + blockHeaderH + (posInBlock * rowStepY));
-
-
-
-                    if (ans.state === 'SELECTED') {
-
-                        const optIdx = ['A', 'B', 'C', 'D'].indexOf(ans.selected);
-
-                        if (optIdx >= 0) {
-
-                            const bx = Math.round(effColLeft + effColW * optOffsets[optIdx]);
-
-                            octx.strokeStyle = '#10b981';
-
-                            octx.lineWidth = 3;
-
-                            octx.beginPath();
-
-                            octx.arc(bx, qy, 14, 0, 2 * Math.PI);
-
-                            octx.stroke();
-
-                        }
-
-                    } else if (ans.state === 'UNCERTAIN') {
-
-                        octx.strokeStyle = '#f59e0b';
-
-                        octx.lineWidth = 2.5;
-
-                        octx.setLineDash([4, 4]);
-
-                        octx.strokeRect(effColLeft - 10, qy - 12, effColW + 20, 24);
-
-                        octx.setLineDash([]);
-
-                    } else if (ans.state === 'MULTIPLE') {
-
-                        octx.strokeStyle = '#ef4444';
-
-                        octx.lineWidth = 2.5;
-
-                        octx.strokeRect(effColLeft - 10, qy - 12, effColW + 20, 24);
-
-                    }
-
+                // 1. Draw green circle on detected Model bubble
+                if (detectedModelCoord) {
+                    octx.strokeStyle = '#10b981';
+                    octx.lineWidth = 4;
+                    octx.beginPath();
+                    octx.arc(detectedModelCoord.x, detectedModelCoord.y, 16, 0, 2 * Math.PI);
+                    octx.stroke();
                 }
 
+                // 2. Draw green circles on detected Roll No bubbles
+                for (const rc of detectedRollCoords) {
+                    octx.strokeStyle = '#10b981';
+                    octx.lineWidth = 3;
+                    octx.beginPath();
+                    octx.arc(rc.x, rc.y, 14, 0, 2 * Math.PI);
+                    octx.stroke();
+                }
+
+                // 3. Draw highlighted circles/boxes on MCQ questions
+                for (let q = 1; q <= qCount; q++) {
+                    const ans = detectedAnswers[q];
+                    const qy = ans.qy;
+                    const effColLeft = ans.effColLeft;
+                    const effColW = ans.effColW;
+
+                    if (ans.state === 'SELECTED' && ans.selected && ans.coords && ans.coords[ans.selected]) {
+                        const bx = ans.coords[ans.selected].x;
+                        const by = ans.coords[ans.selected].y;
+                        octx.strokeStyle = '#10b981';
+                        octx.lineWidth = 3.5;
+                        octx.beginPath();
+                        octx.arc(bx, by, 14, 0, 2 * Math.PI);
+                        octx.stroke();
+                    } else if (ans.state === 'UNCERTAIN') {
+                        octx.strokeStyle = '#f59e0b';
+                        octx.lineWidth = 2.5;
+                        octx.setLineDash([4, 4]);
+                        octx.strokeRect(effColLeft - 10, qy - 12, effColW + 20, 24);
+                        octx.setLineDash([]);
+                    } else if (ans.state === 'MULTIPLE') {
+                        octx.strokeStyle = '#ef4444';
+                        octx.lineWidth = 2.5;
+                        octx.strokeRect(effColLeft - 10, qy - 12, effColW + 20, 24);
+                    }
+                }
             }
-
-
 
             return {
 

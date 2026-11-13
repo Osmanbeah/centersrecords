@@ -247,19 +247,23 @@ class OMREngine {
 
     // Convert to grayscale array for fast candidate blob search
     final gray = Uint8List(srcW * srcH);
+    double sumLum = 0;
     for (int y = 0; y < srcH; y++) {
       for (int x = 0; x < srcW; x++) {
         final p = source.getPixel(x, y);
-        gray[y * srcW + x] = (p.r * 299 + p.g * 587 + p.b * 114) ~/ 1000;
+        final lum = (p.r * 299 + p.g * 587 + p.b * 114) ~/ 1000;
+        gray[y * srcW + x] = lum;
+        sumLum += lum;
       }
     }
+    final meanLum = sumLum / (srcW * srcH);
 
     final minBlob = math.max(6, (srcW * 0.006).round());
     final maxBlob = math.max(50, (srcW * 0.050).round());
     final visited = Uint8List(srcW * srcH);
     final candidateDots = <math.Point<double>>[];
     final step = math.max(3, minBlob ~/ 2);
-    const darkThresh = 80;
+    final darkThresh = math.min(95, math.max(65, (meanLum * 0.45).toInt()));
 
     for (int y = step; y < srcH - step; y += step) {
       for (int x = step; x < srcW - step; x += step) {
@@ -583,7 +587,9 @@ class OMREngine {
     for (int y = 0; y < targetH; y++) {
       for (int x = 0; x < targetW; x++) {
         final p = rectified.getPixel(x, y);
-        gray[y * targetW + x] = (p.r * 299 + p.g * 587 + p.b * 114) ~/ 1000;
+        // Enhanced ink darkness: heavily weights red and green so blue ink and pencil graphite both produce deep contrast
+        final lum = (p.r * 500 + p.g * 400 + p.b * 100) ~/ 1000;
+        gray[y * targetW + x] = lum;
       }
     }
 
@@ -591,51 +597,78 @@ class OMREngine {
     final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
     final qPerCol = (qCount / numMcqCols).ceil();
 
-    const gridTopY = 480;
+    // 1. Read Model (A, B, C, D)
+    // Supports both standard table Model row (y=265) and tall table (y=340)
+    String detectedModel = 'A';
+    double bestModelScore = -1.0;
+    int detectedModelY = 265;
+    int detectedModelX = 360;
 
-    // Read Model (A, B, C, D)
-    const modelY = 340;
-    const modelStartX = 250;
-    const modelStepX = 40;
-    final modelCoords = {
-      'A': const math.Point(modelStartX, modelY),
-      'B': const math.Point(modelStartX + modelStepX, modelY),
-      'C': const math.Point(modelStartX + modelStepX * 2, modelY),
-      'D': const math.Point(modelStartX + modelStepX * 3, modelY),
-    };
-    final modelRes = classifyQuestion(gray, modelCoords, targetW, targetH);
-    final detectedModel = (modelRes.state == QuestionState.selected) ? modelRes.selected! : 'A';
+    final candidateModelConfigs = [
+      {'y': 265, 'xs': {'A': 360, 'B': 440, 'C': 520, 'D': 600}},
+      {'y': 340, 'xs': {'A': 360, 'B': 440, 'C': 520, 'D': 600}},
+      {'y': 265, 'xs': {'A': 250, 'B': 290, 'C': 330, 'D': 370}},
+      {'y': 340, 'xs': {'A': 250, 'B': 290, 'C': 330, 'D': 370}},
+    ];
 
-    // Read Student Roll No (5 Digits)
-    const rollDigits = 5;
-    const rollStartX = 145;
-    const rollStepX = 35;
-    const rollStartY = gridTopY + (1070 * 0.16);
-    const rollStepY = (1070 * 0.76) / 9.0;
+    for (final cfg in candidateModelConfigs) {
+      final my = cfg['y'] as int;
+      final xs = cfg['xs'] as Map<String, int>;
+      final modelCoords = {
+        'A': math.Point(xs['A']!, my),
+        'B': math.Point(xs['B']!, my),
+        'C': math.Point(xs['C']!, my),
+        'D': math.Point(xs['D']!, my),
+      };
+      final res = classifyQuestion(gray, modelCoords, targetW, targetH);
+      if (res.state == QuestionState.selected && res.selected != null && res.confidence > bestModelScore) {
+        bestModelScore = res.confidence;
+        detectedModel = res.selected!;
+        detectedModelY = my;
+        detectedModelX = xs[res.selected!]!;
+      }
+    }
+
+    // 2. Read Student Roll No (5 Digits)
+    // Calibrated against printable template layout (10 rows: 0 to 9)
+    final rollRowYs = [604, 657, 708, 763, 817, 872, 924, 974, 1028, 1080];
+    final rollColXs = [268, 326, 385, 443, 502]; // 5 digits
+    final detectedRollCoords = <math.Point<int>>[];
 
     final idDigits = <String>[];
-    for (int c = 0; c < rollDigits; c++) {
-      final cx = rollStartX + c * rollStepX;
+    for (int c = 0; c < rollColXs.length; c++) {
+      final cx = rollColXs[c];
       final digitScores = <Map<String, dynamic>>[];
       for (int d = 0; d <= 9; d++) {
-        final cy = (rollStartY + d * rollStepY).round();
+        final cy = rollRowYs[d];
         final res = analyzeBubbleCore(gray, cx, cy, targetW, targetH, 6);
         final score = (res.fillRatio * 0.6) + (math.min(1.0, res.netContrast / 100.0) * 0.4);
-        digitScores.add({'digit': d, 'score': score});
+        digitScores.add({'digit': d, 'score': score, 'x': cx, 'y': cy});
       }
       digitScores.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
-      if ((digitScores[0]['score'] as double) > 0.28 &&
-          ((digitScores[0]['score'] as double) - (digitScores[1]['score'] as double)) > 0.12) {
-        idDigits.add(digitScores[0]['digit'].toString());
+      final best = digitScores[0];
+      final second = digitScores[1];
+      if ((best['score'] as double) > 0.25 &&
+          ((best['score'] as double) - (second['score'] as double)) > 0.08) {
+        idDigits.add(best['digit'].toString());
+        detectedRollCoords.add(math.Point(best['x'] as int, best['y'] as int));
       } else {
         idDigits.add('?');
       }
     }
     final detectedCode = idDigits.join();
 
-    // Read MCQ Questions using CSS-calibrated layout
+    // 3. Read MCQ Questions using Calibrated Layout
     final answers = <int, QuestionResult>{};
     const optOffsets = [0.32, 0.49, 0.66, 0.83];
+
+    // Calibrated coordinates for 15-question single-column exams
+    final qYs15 = [
+      656, 708, 764, 817, 869,     // Block 1: Q1..5
+      978, 1030, 1082, 1139, 1191, // Block 2: Q6..10
+      1300, 1352, 1404, 1456, 1509 // Block 3: Q11..15
+    ];
+    final optXs15 = {'A': 796, 'B': 852, 'C': 910, 'D': 971};
 
     late final List<int> regX;
     if (numMcqCols == 1) {
@@ -648,6 +681,7 @@ class OMREngine {
       regX = [60, 290, 530, 770, 1010, 1140];
     }
 
+    const gridTopY = 480;
     final isSpacious = qPerCol <= 16;
     final isMedium = qPerCol > 16 && qPerCol <= 24;
     final rowStepY = isSpacious ? 48.0 : (isMedium ? 42.0 : 36.0);
@@ -661,32 +695,47 @@ class OMREngine {
     int correctCount = 0;
     double totalConfidence = 0.0;
 
+    final questionCoords = <int, Map<String, math.Point<int>>>{};
+
     for (int q = 1; q <= qCount; q++) {
-      final colIdx = (q - 1) ~/ qPerCol;
-      final inCol = (q - 1) % qPerCol;
-      final blockIdx = inCol ~/ 5;
-      final posInBlock = inCol % 5;
+      late final Map<String, math.Point<int>> coords;
+      if (numMcqCols == 1 && qCount <= 15 && (q - 1) < qYs15.length) {
+        // Direct calibrated lookup for 15-question sheet
+        final qy = qYs15[q - 1];
+        coords = {
+          'A': math.Point(optXs15['A']!, qy),
+          'B': math.Point(optXs15['B']!, qy),
+          'C': math.Point(optXs15['C']!, qy),
+          'D': math.Point(optXs15['D']!, qy),
+        };
+      } else {
+        final colIdx = (q - 1) ~/ qPerCol;
+        final inCol = (q - 1) % qPerCol;
+        final blockIdx = inCol ~/ 5;
+        final posInBlock = inCol % 5;
 
-      final xLeft = regX[colIdx + 1];
-      final xRight = regX[colIdx + 2];
-      final rawColW = xRight - xLeft;
-      final effColW = math.min(rawColW, (numMcqCols == 1 ? 320 : 340));
-      final colCenterX = (xLeft + xRight) / 2.0;
-      final effColLeft = (numMcqCols == 1) ? (colCenterX - effColW / 2.0) : xLeft.toDouble();
+        final xLeft = regX[colIdx + 1];
+        final xRight = regX[colIdx + 2];
+        final rawColW = xRight - xLeft;
+        final effColW = math.min(rawColW, (numMcqCols == 1 ? 320 : 340));
+        final colCenterX = (xLeft + xRight) / 2.0;
+        final effColLeft = (numMcqCols == 1) ? (colCenterX - effColW / 2.0) : xLeft.toDouble();
 
-      final qy = (colStartY +
-              (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) +
-              blockHeaderH +
-              (posInBlock * rowStepY))
-          .round();
+        final qy = (colStartY +
+                (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) +
+                blockHeaderH +
+                (posInBlock * rowStepY))
+            .round();
 
-      final coords = {
-        'A': math.Point((effColLeft + effColW * optOffsets[0]).round(), qy),
-        'B': math.Point((effColLeft + effColW * optOffsets[1]).round(), qy),
-        'C': math.Point((effColLeft + effColW * optOffsets[2]).round(), qy),
-        'D': math.Point((effColLeft + effColW * optOffsets[3]).round(), qy),
-      };
+        coords = {
+          'A': math.Point((effColLeft + effColW * optOffsets[0]).round(), qy),
+          'B': math.Point((effColLeft + effColW * optOffsets[1]).round(), qy),
+          'C': math.Point((effColLeft + effColW * optOffsets[2]).round(), qy),
+          'D': math.Point((effColLeft + effColW * optOffsets[3]).round(), qy),
+        };
+      }
 
+      questionCoords[q] = coords;
       final res = classifyQuestion(gray, coords, targetW, targetH);
       answers[q] = res;
 
@@ -706,45 +755,41 @@ class OMREngine {
 
     // Create Annotated Overlay Image
     final annotated = rectified.clone();
+
+    // 1. Draw green circle on detected Model bubble
+    img.drawCircle(annotated, x: detectedModelX, y: detectedModelY, radius: 16, color: img.ColorRgb8(16, 185, 129));
+
+    // 2. Draw green circle on detected Roll No bubbles
+    for (final pt in detectedRollCoords) {
+      img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: img.ColorRgb8(16, 185, 129));
+    }
+
+    // 3. Draw highlighted circles/boxes on MCQ questions
     for (int q = 1; q <= qCount; q++) {
       final ans = answers[q]!;
-      final colIdx = (q - 1) ~/ qPerCol;
-      final inCol = (q - 1) % qPerCol;
-      final blockIdx = inCol ~/ 5;
-      final posInBlock = inCol % 5;
+      final coords = questionCoords[q];
+      if (coords == null) continue;
 
-      final xLeft = regX[colIdx + 1];
-      final xRight = regX[colIdx + 2];
-      final rawColW = xRight - xLeft;
-      final effColW = math.min(rawColW, (numMcqCols == 1 ? 320 : 340));
-      final colCenterX = (xLeft + xRight) / 2.0;
-      final effColLeft = (numMcqCols == 1) ? (colCenterX - effColW / 2.0) : xLeft.toDouble();
-
-      final qy = (colStartY +
-              (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) +
-              blockHeaderH +
-              (posInBlock * rowStepY))
-          .round();
-
-      if (ans.state == QuestionState.selected && ans.selected != null) {
-        final optIdx = ['A', 'B', 'C', 'D'].indexOf(ans.selected!);
-        if (optIdx >= 0) {
-          final bx = (effColLeft + effColW * optOffsets[optIdx]).round();
-          img.drawCircle(annotated, x: bx, y: qy, radius: 14, color: img.ColorRgb8(16, 185, 129));
-        }
+      if (ans.state == QuestionState.selected && ans.selected != null && coords.containsKey(ans.selected!)) {
+        final pt = coords[ans.selected!]!;
+        img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: img.ColorRgb8(16, 185, 129));
       } else if (ans.state == QuestionState.uncertain) {
+        final ptA = coords['A']!;
+        final ptD = coords['D']!;
         img.drawRect(annotated,
-            x1: (effColLeft - 10).round(),
-            y1: qy - 12,
-            x2: (effColLeft + effColW + 10).round(),
-            y2: qy + 12,
+            x1: ptA.x - 20,
+            y1: ptA.y - 14,
+            x2: ptD.x + 20,
+            y2: ptD.y + 14,
             color: img.ColorRgb8(245, 158, 11));
       } else if (ans.state == QuestionState.multiple) {
+        final ptA = coords['A']!;
+        final ptD = coords['D']!;
         img.drawRect(annotated,
-            x1: (effColLeft - 10).round(),
-            y1: qy - 12,
-            x2: (effColLeft + effColW + 10).round(),
-            y2: qy + 12,
+            x1: ptA.x - 20,
+            y1: ptA.y - 14,
+            x2: ptD.x + 20,
+            y2: ptD.y + 14,
             color: img.ColorRgb8(239, 68, 68));
       }
     }

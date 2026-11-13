@@ -237,27 +237,180 @@ class _ReviewScreenState extends State<ReviewScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Student Info & Score Overview Header
+            // 1. Model Card (أولاً: نموذج الامتحان المكتشف)
             Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF0F766E).withValues(alpha: 0.3)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2)),
+                ],
+              ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '1️⃣ الخطوة الأولى',
+                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0F766E)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'نموذج الامتحان (Exam Model)',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFF10B981)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle, color: Color(0xFF047857), size: 14),
+                            const SizedBox(width: 4),
+                            Text(
+                              'تم الكشف: $_selectedModel',
+                              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12, color: const Color(0xFF047857)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text(
+                        'تأكيد النموذج:',
+                        style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 10),
+                      Wrap(
+                        spacing: 8,
+                        children: availModels.map((m) {
+                          final isSel = _selectedModel == m;
+                          return ChoiceChip(
+                            label: Text(
+                              'نموذج $m',
+                              style: GoogleFonts.cairo(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: isSel ? Colors.white : const Color(0xFF1E293B),
+                              ),
+                            ),
+                            selected: isSel,
+                            selectedColor: const Color(0xFF0F766E),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            onSelected: (val) {
+                              if (val) setState(() => _selectedModel = m);
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // 2. Student ID Card (ثانياً: كود الطالب المستخرج)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _studentCodeController.text.contains('?')
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFFE2E8F0),
+                ),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '2️⃣ الخطوة الثانية',
+                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'كود الطالب (Roll No)',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
+                      ),
+                      const Spacer(),
+                      if (_studentCodeController.text.contains('?'))
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFF59E0B)),
+                          ),
+                          child: Text(
+                            '⚠️ يرجى تصحيح الرقم',
+                            style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF10B981)),
+                          ),
+                          child: Text(
+                            '✅ مستخرج من التظليل',
+                            style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF047857)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
                       Expanded(
-                        flex: 4,
+                        flex: 5,
                         child: TextField(
                           controller: _studentCodeController,
                           keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            labelText: 'كود الطالب (Roll No)',
+                            labelText: 'كود الطالب (5 أرقام)',
                             labelStyle: GoogleFonts.cairo(fontSize: 12),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            prefixIcon: const Icon(Icons.tag, size: 20),
+                            prefixIcon: const Icon(Icons.tag, size: 20, color: Color(0xFF0F766E)),
                           ),
-                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 2),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -272,38 +425,51 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             prefixIcon: const Icon(Icons.person_outline, size: 20),
                           ),
-                          style: GoogleFonts.cairo(fontSize: 14),
+                          style: GoogleFonts.cairo(fontSize: 13),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
 
-                  // Model Selection & Score Bar
+            // 3. Scores & Status Card (ثالثاً: درجات الطالب)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Column(
+                children: [
                   Row(
                     children: [
-                      // Model selector
-                      Text('النموذج:', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '3️⃣ الخطوة الثالثة',
+                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED)),
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Wrap(
-                        spacing: 6,
-                        children: availModels.map((m) {
-                          final isSel = _selectedModel == m;
-                          return ChoiceChip(
-                            label: Text(m, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: isSel ? Colors.white : Colors.black87)),
-                            selected: isSel,
-                            selectedColor: const Color(0xFF0F766E),
-                            backgroundColor: const Color(0xFFF1F5F9),
-                            onSelected: (val) {
-                              if (val) setState(() => _selectedModel = m);
-                            },
-                          );
-                        }).toList(),
+                      Text(
+                        'تصحيح الاختيارات والدرجات',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
                       ),
                       const Spacer(),
-                      // Confidence indicator
+                      // Uncertainty indicator
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: _uncertainCount > 0 ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
                           borderRadius: BorderRadius.circular(8),
@@ -312,6 +478,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                           ),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               _uncertainCount > 0 ? Icons.warning_amber_rounded : Icons.check_circle_outline,
@@ -320,7 +487,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              _uncertainCount > 0 ? '$_uncertainCount للمراجعة' : 'مطابقة عالية',
+                              _uncertainCount > 0 ? '$_uncertainCount للمراجعة' : 'جميع الإجابات مؤكدة',
                               style: GoogleFonts.cairo(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -332,9 +499,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-
-                  // Score Summary Box
+                  const SizedBox(height: 12),
+                  // Score summary row
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -345,11 +511,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildScoreItem('الاختيار', '${_mcqScore.toStringAsFixed(1)} / ${(widget.exam.questionCount * widget.exam.mcqScorePerQ).toStringAsFixed(0)}', const Color(0xFF0284C7)),
+                        _buildScoreItem('الاختيار من متعدد', '${_mcqScore.toStringAsFixed(1)} / ${(widget.exam.questionCount * widget.exam.mcqScorePerQ).toStringAsFixed(0)}', const Color(0xFF0284C7)),
                         if (widget.exam.writtenMaxScore > 0)
                           _buildWrittenScoreStepper()
                         else
-                          _buildScoreItem('الصحيح', '$_correctMcqCount / ${widget.exam.questionCount}', const Color(0xFF16A34A)),
+                          _buildScoreItem('الإجابات الصحيحة', '$_correctMcqCount / ${widget.exam.questionCount}', const Color(0xFF16A34A)),
                         _buildScoreItem('المجموع الكلي', '${_totalScore.toStringAsFixed(1)} / ${widget.exam.totalScore.toStringAsFixed(0)}', const Color(0xFF0F766E), isBold: true),
                       ],
                     ),
