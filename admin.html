@@ -3387,36 +3387,27 @@ function getAdminCenterCoords(centerName, address) {
                 };
                 const centerPayloadStr = JSON.stringify(centerPayloadObj);
 
-                // 2. Persist to Supabase
+                // 2. Persist to Supabase (updating valid columns: center and created_at)
                 if (supabaseClient) {
                     if (match && match.id && !String(match.id).startsWith('local_')) {
                         const { error: updErr } = await supabaseClient
                             .from('attendance')
                             .update({
-                                center: centerPayloadStr,
-                                day: day,
-                                time: formattedTime,
-                                arrival_time: formattedTime
+                                center: centerPayloadStr
                             })
                             .eq('id', match.id);
 
                         if (updErr) {
-                            console.warn("Supabase arrival time update error:", updErr);
+                            console.error("Supabase arrival time update error:", updErr);
                         } else {
                             match.center = centerPayloadStr;
-                            match.day = day;
-                            match.time = formattedTime;
-                            match.arrival_time = formattedTime;
                         }
                     } else {
                         // Insert new attendance record in Supabase
                         const insertObj = {
                             assistant_name: canonicalAssistantName(assistantName),
                             center: centerPayloadStr,
-                            day: day,
-                            time: formattedTime,
-                            arrival_time: formattedTime,
-                            created_at: new Date(sessionDate + 'T12:00:00').toISOString()
+                            created_at: sessionDate ? new Date(sessionDate + 'T12:00:00').toISOString() : new Date().toISOString()
                         };
                         const { data: insData, error: insErr } = await supabaseClient
                             .from('attendance')
@@ -3424,26 +3415,28 @@ function getAdminCenterCoords(centerName, address) {
                             .select();
 
                         if (!insErr && insData && insData[0]) {
-                            State.attendances.unshift(insData[0]);
+                            match = insData[0];
+                            State.attendances.unshift(match);
                         } else {
-                            // Offline fallback
-                            State.attendances.unshift({
+                            if (insErr) console.warn("Supabase attendance insert error:", insErr);
+                            match = {
                                 id: 'local_' + Date.now(),
                                 assistant_name: canonicalAssistantName(assistantName),
                                 center: centerPayloadStr,
-                                day: day,
-                                time: formattedTime,
-                                arrival_time: formattedTime,
-                                created_at: new Date(sessionDate + 'T12:00:00').toISOString()
-                            });
+                                created_at: insertObj.created_at
+                            };
+                            State.attendances.unshift(match);
                         }
                     }
-                } else if (match) {
-                    match.center = centerPayloadStr;
-                    match.day = day;
-                    match.time = formattedTime;
-                    match.arrival_time = formattedTime;
                 }
+
+                // ALWAYS ensure local match and cache are updated immediately
+                if (match) {
+                    match.center = centerPayloadStr;
+                }
+                try {
+                    localStorage.setItem(CACHED_ATTENDANCE_KEY, JSON.stringify(State.attendances));
+                } catch(e) {}
 
                 // 3. Update State.entries if an entry exists for this session
                 const currentWeek = typeof getAdminCurrentWeekInfo === 'function' ? getAdminCurrentWeekInfo() : { startDate: sessionDate, endDate: sessionDate };
@@ -4935,16 +4928,12 @@ function getAdminCenterCoords(centerName, address) {
                                 const { error: updErr } = await supabaseClient
                                     .from('attendance')
                                     .update({ 
-                                        center: JSON.stringify(centerPayloadObj),
-                                        day: day,
-                                        time: originalArr,
-                                        arrival_time: originalArr
+                                        center: JSON.stringify(centerPayloadObj)
                                     })
                                     .eq('id', existingAtt.id);
                                 if (!updErr) {
                                     updated = true;
                                     existingAtt.center = JSON.stringify(centerPayloadObj);
-                                    existingAtt.day = day;
                                 }
                             }
 
@@ -4952,7 +4941,6 @@ function getAdminCenterCoords(centerName, address) {
                                 const insertObj = {
                                     assistant_name: astName,
                                     center: JSON.stringify(centerPayloadObj),
-                                    day: day,
                                     created_at: new Date(sessionDate + 'T12:00:00').toISOString()
                                 };
                                 let { data: insData, error: insErr } = await supabaseClient
@@ -4964,8 +4952,7 @@ function getAdminCenterCoords(centerName, address) {
                                         .from('attendance')
                                         .insert([{
                                             assistant_name: astName,
-                                            center: `${center} (${day})`,
-                                            day: day,
+                                            center: JSON.stringify(centerPayloadObj),
                                             created_at: new Date(sessionDate + 'T12:00:00').toISOString()
                                         }]);
                                 } else if (insData && insData[0]) {

@@ -1049,6 +1049,20 @@
                         const myName = currentAssistant.name.trim().toLowerCase();
                         const pName = (payload.assistant_name || '').trim().toLowerCase();
                         if (isSameAssistant(pName, myName) || (payload.assistant_email && currentAssistant && currentAssistant.email && payload.assistant_email.toLowerCase() === currentAssistant.email.toLowerCase())) {
+                            if (payload.time && Array.isArray(allAttendedLectures)) {
+                                const targetCenter = (payload.center || '').toLowerCase().trim();
+                                const targetDay = (payload.day || '').toLowerCase().trim();
+                                for (const rec of allAttendedLectures) {
+                                    const recCenter = (rec.center || '').toLowerCase().trim();
+                                    const centerMatches = recCenter === targetCenter || recCenter.includes(targetCenter) || targetCenter.includes(recCenter);
+                                    const dayMatches = !targetDay || !rec.day || rec.day.toLowerCase().trim() === targetDay;
+                                    if (centerMatches && dayMatches) {
+                                        rec.arrivalTime = payload.time;
+                                    }
+                                }
+                                if (typeof renderAttendedList === 'function') renderAttendedList();
+                                if (typeof renderHomeAttendedPreview === 'function') renderHomeAttendedPreview();
+                            }
                             if (typeof fetchAttendedLectures === 'function') {
                                 fetchAttendedLectures(true).then(() => {
                                     if (typeof renderScheduleList === 'function') renderScheduleList();
