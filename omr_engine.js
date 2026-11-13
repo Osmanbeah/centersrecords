@@ -903,7 +903,7 @@
          * Input: HTMLCanvasElement or HTMLImageElement
          * Output: { success, model, studentCode, answers: { 1: 'A', 2: 'B', ... }, confidence }
          */
-        scanImage(canvas, questionCount = 30) {
+                scanImage(canvas, questionCount = 30) {
             const ctx = canvas.getContext('2d');
             const w = canvas.width;
             const h = canvas.height;
@@ -911,116 +911,291 @@
             const imgData = ctx.getImageData(0, 0, w, h);
             const data = imgData.data;
 
-            // 1. Grayscale & Luminance Map
+            // 1. Grayscale & Fast Histogram Normalization
             const gray = new Uint8Array(w * h);
+            const hist = new Int32Array(256);
             let sumLum = 0;
             for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-                const lum = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
+                const lum = Math.round((data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000);
                 gray[j] = lum;
+                hist[lum]++;
                 sumLum += lum;
             }
             const avgLum = sumLum / (w * h);
-            const darkThreshold = avgLum * 0.70;
 
-            function sampleBubbleDarkness(normX, normY, radiusPx = 10) {
-                const cx = Math.round(normX * w);
-                const cy = Math.round(normY * h);
-                let darkCount = 0;
-                let totalCount = 0;
+            // Compute 10th and 85th percentiles to adaptively handle shadows and ambient light
+            const totalPixels = w * h;
+            let count = 0;
+            let p10 = 40, p85 = 200;
+            for (let l = 0; l < 256; l++) {
+                count += hist[l];
+                if (count >= totalPixels * 0.10 && p10 === 40) p10 = l;
+                if (count >= totalPixels * 0.85) { p85 = l; break; }
+            }
 
-                for (let dy = -radiusPx; dy <= radiusPx; dy++) {
-                    for (let dx = -radiusPx; dx <= radiusPx; dx++) {
-                        if (dx * dx + dy * dy <= radiusPx * radiusPx) {
-                            const px = cx + dx;
-                            const py = cy + dy;
-                            if (px >= 0 && px < w && py >= 0 && py < h) {
-                                totalCount++;
-                                if (gray[py * w + px] < darkThreshold) {
-                                    darkCount++;
+            // Dark threshold for solid black registration marks (fiducials)
+            const darkThresh = Math.min(avgLum * 0.65, p85 * 0.52);
+
+            // 2. High-Speed Registration Square Fiducial Detection
+            const minBlob = Math.max(6, Math.round(w * 0.005));
+            const maxBlob = Math.max(50, Math.round(w * 0.050));
+            const visited = new Uint8Array(w * h);
+            const candidateDots = [];
+
+            const step = Math.max(3, Math.floor(minBlob / 2));
+            for (let y = step; y < h - step; y += step) {
+                for (let x = step; x < w - step; x += step) {
+                    const idx = y * w + x;
+                    if (visited[idx] || gray[idx] >= darkThresh) continue;
+
+                    let minX = x, maxX = x, minY = y, maxY = y;
+                    let blobPixels = 0;
+                    const queue = [idx];
+                    visited[idx] = 1;
+
+                    while (queue.length > 0 && queue.length < 3500) {
+                        const curr = queue.pop();
+                        const cy = Math.floor(curr / w);
+                        const cx = curr % w;
+                        blobPixels++;
+
+                        if (cx < minX) minX = cx;
+                        if (cx > maxX) maxX = cx;
+                        if (cy < minY) minY = cy;
+                        if (cy > maxY) maxY = cy;
+
+                        const neighbors = [curr - 1, curr + 1, curr - w, curr + w];
+                        for (let k = 0; k < 4; k++) {
+                            const nIdx = neighbors[k];
+                            if (nIdx >= 0 && nIdx < totalPixels && !visited[nIdx]) {
+                                visited[nIdx] = 1;
+                                if (gray[nIdx] < darkThresh) {
+                                    queue.push(nIdx);
                                 }
                             }
                         }
                     }
+
+                    const bw = maxX - minX + 1;
+                    const bh = maxY - minY + 1;
+                    const aspect = bw / Math.max(1, bh);
+                    const fillDensity = blobPixels / (bw * bh);
+
+                    if (bw >= minBlob && bw <= maxBlob &&
+                        bh >= minBlob && bh <= maxBlob &&
+                        aspect >= 0.65 && aspect <= 1.45 &&
+                        fillDensity >= 0.84) {
+                        candidateDots.push({
+                            cx: (minX + maxX) / 2,
+                            cy: (minY + maxY) / 2,
+                            w: bw,
+                            h: bh
+                        });
+                    }
                 }
-                return totalCount > 0 ? (darkCount / totalCount) : 0;
             }
 
-            const layout = this.getLayout(questionCount);
-            const modelOpts = ['A', 'B', 'C', 'D'];
+            // Cluster candidate dots into vertical columns
+            candidateDots.sort((a, b) => a.cx - b.cx);
+            const rawCols = [];
+            const colClusterDist = w * 0.035;
 
-            // 2. Read Exam Model (A, B, C, D)
-            const modelScores = [];
-            for (let i = 0; i < 4; i++) {
-                const x = layout.model.baseX + (i * layout.model.stepX);
-                const dark = sampleBubbleDarkness(x, layout.model.baseY, Math.round(w * 0.012));
-                modelScores.push({ opt: modelOpts[i], dark });
+            for (const dot of candidateDots) {
+                let matched = false;
+                for (const col of rawCols) {
+                    if (Math.abs(col.x - dot.cx) < colClusterDist) {
+                        col.dots.push(dot);
+                        col.x = col.dots.reduce((s, d) => s + d.cx, 0) / col.dots.length;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    rawCols.push({ x: dot.cx, dots: [dot] });
+                }
             }
-            modelScores.sort((a, b) => b.dark - a.dark);
-            const detectedModel = (modelScores[0].dark > 0.30) ? modelScores[0].opt : 'A';
 
-            // 3. Read Student ID (5 Digits)
+            // Valid registration columns must have at least 2 dots
+            const validCols = rawCols.filter(c => { if (c.dots.length < 3) return false; const ys = c.dots.map(d => d.cy); return (Math.max(...ys) - Math.min(...ys)) > (h * 0.20); });
+            validCols.sort((a, b) => a.x - b.x);
+
+            // Determine Grid Geometry
+            let gridTopY, gridBotY, regColX;
+
+            const qCount = Math.max(10, Math.min(60, questionCount));
+            const numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
+            const expectedCols = numMcqCols + 2; // Col 0: Roll Left, Col 1: Roll Right/MCQ1 Left, ...
+
+            if (validCols.length >= 2) {
+                // If we found valid columns, calculate bounding Y
+                const allDots = validCols.flatMap(c => c.dots);
+                allDots.sort((a, b) => a.cy - b.cy);
+                gridTopY = allDots[0].cy;
+                gridBotY = allDots[allDots.length - 1].cy;
+                
+                if (validCols.length >= expectedCols) {
+                    regColX = validCols.slice(0, expectedCols).map(c => c.x);
+                } else {
+                    // Interpolate missing columns from found columns
+                    const firstX = validCols[0].x;
+                    const lastX = validCols[validCols.length - 1].x;
+                    const totalSpan = lastX - firstX;
+                    const stepX = totalSpan / (expectedCols - 1);
+                    regColX = [];
+                    for (let c = 0; c < expectedCols; c++) {
+                        regColX.push(firstX + c * stepX);
+                    }
+                }
+            } else {
+                // Fallback: Proportional Sheet Framing
+                // Sheet grid occupies horizontal 6% to 94%, vertical 28% to 92%
+                gridTopY = Math.round(h * 0.28);
+                gridBotY = Math.round(h * 0.90);
+                const leftX = Math.round(w * 0.08);
+                const rightX = Math.round(w * 0.92);
+                const stepX = (rightX - leftX) / (expectedCols - 1);
+                regColX = [];
+                for (let c = 0; c < expectedCols; c++) {
+                    regColX.push(leftX + c * stepX);
+                }
+            }
+
+            const gridH = gridBotY - gridTopY;
+            const bubbleSampleRadius = Math.max(4, Math.round(w * 0.007));
+
+            // Helper: Sample average darkness in a circle
+            function getCircleMeanDarkness(cx, cy, r) {
+                let darkSum = 0;
+                let count = 0;
+                const r2 = r * r;
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        if (dx * dx + dy * dy <= r2) {
+                            const px = Math.round(cx + dx);
+                            const py = Math.round(cy + dy);
+                            if (px >= 0 && px < w && py >= 0 && py < h) {
+                                darkSum += (255 - gray[py * w + px]);
+                                count++;
+                            }
+                        }
+                    }
+                }
+                return count > 0 ? (darkSum / count) : 0;
+            }
+
+            // Helper: Sample bubble with local peak snapping (±6px search)
+            function sampleBubbleValue(estX, estY) {
+                let bestDark = 0;
+                let snapX = estX;
+                let snapY = estY;
+                const searchR = Math.max(3, Math.round(w * 0.006));
+
+                for (let dy = -searchR; dy <= searchR; dy += 2) {
+                    for (let dx = -searchR; dx <= searchR; dx += 2) {
+                        const px = Math.round(estX + dx);
+                        const py = Math.round(estY + dy);
+                        if (px >= 0 && px < w && py >= 0 && py < h) {
+                            const dark = 255 - gray[py * w + px];
+                            if (dark > bestDark) {
+                                bestDark = dark;
+                                snapX = px;
+                                snapY = py;
+                            }
+                        }
+                    }
+                }
+
+                // Sample inner bubble darkness
+                const bubbleDark = getCircleMeanDarkness(snapX, snapY, bubbleSampleRadius);
+
+                // Sample paper reference baseline (just above the bubble)
+                const paperDark = getCircleMeanDarkness(snapX, Math.max(0, snapY - bubbleSampleRadius * 2.2), Math.max(3, Math.round(bubbleSampleRadius * 0.7)));
+
+                // Net contrast
+                return Math.max(0, bubbleDark - paperDark);
+            }
+
+            // 3. Read MCQ Questions
+            const detectedAnswers = {};
+            const qPerCol = Math.ceil(qCount / numMcqCols);
+            const numBlocks = Math.ceil(qPerCol / 5);
+            const blockH = gridH / numBlocks;
+            const optLetters = ['A', 'B', 'C', 'D'];
+            const optOffsets = [0.32, 0.49, 0.66, 0.83];
+
+            for (let q = 1; q <= qCount; q++) {
+                const colIdx = Math.floor((q - 1) / qPerCol);
+                const inCol = (q - 1) % qPerCol;
+                const blockIdx = Math.floor(inCol / 5);
+                const posInBlock = inCol % 5;
+
+                const xLeft = regColX[colIdx + 1] || regColX[1];
+                const xRight = regColX[colIdx + 2] || (xLeft + (xLeft - regColX[colIdx]));
+                const colW = xRight - xLeft;
+
+                const yRow = gridTopY + (blockIdx * blockH) + blockH * (0.16 + posInBlock * 0.145);
+
+                const scores = [];
+                for (let o = 0; o < 4; o++) {
+                    const bx = xLeft + (colW * optOffsets[o]);
+                    const netDark = sampleBubbleValue(bx, yRow);
+                    scores.push({ opt: optLetters[o], score: netDark });
+                }
+
+                scores.sort((a, b) => b.score - a.score);
+                                const best = scores[0];
+                const second = scores[1];
+
+                // Shaded answer threshold: net darkness > 28 and clearly darker than second option
+                if (best.score > 28 && (best.score - second.score) > 14) {
+                    detectedAnswers[q] = { selected: best.opt, ambiguous: false };
+                } else if (best.score > 28 && second.score > 25 && (best.score - second.score) <= 14) {
+                    detectedAnswers[q] = { selected: best.opt, ambiguous: true, second: second.opt };
+                } else {
+                    detectedAnswers[q] = { selected: null, ambiguous: false };
+                }
+            }
+
+            // 4. Read Student Roll No (ID)
             const idDigits = [];
-            for (let col = 0; col < layout.studentCode.digits; col++) {
-                const colScores = [];
-                for (let digit = 0; digit <= 9; digit++) {
-                    const x = layout.studentCode.baseX + (col * layout.studentCode.stepX);
-                    const y = layout.studentCode.baseY + (digit * layout.studentCode.stepY);
-                    const dark = sampleBubbleDarkness(x, y, Math.round(w * 0.010));
-                    colScores.push({ digit, dark });
+            const rollLeft = regColX[0];
+            const rollRight = regColX[1] || (rollLeft + w * 0.25);
+            const rollW = rollRight - rollLeft;
+
+            for (let col = 0; col < 5; col++) {
+                const bx = rollLeft + rollW * (0.30 + col * 0.145);
+                const digitScores = [];
+                for (let d = 0; d <= 9; d++) {
+                    const by = gridTopY + gridH * (0.16 + d * 0.076);
+                    const netDark = sampleBubbleValue(bx, by);
+                    digitScores.push({ digit: d, score: netDark });
                 }
-                colScores.sort((a, b) => b.dark - a.dark);
-                if (colScores[0].dark > 0.28) {
-                    idDigits.push(colScores[0].digit);
+                digitScores.sort((a, b) => b.score - a.score);
+                if (digitScores[0].score > 28 && (digitScores[0].score - digitScores[1].score) > 12) {
+                    idDigits.push(digitScores[0].digit);
                 } else {
                     idDigits.push('?');
                 }
             }
             const detectedStudentCode = idDigits.join('');
 
-            // 4. Read MCQ Questions
-            const detectedAnswers = {};
-            const qCount = layout.qCount;
-            const cols = layout.cols;
-            const qPerCol = layout.qPerCol;
-            const rowH = layout.mcq.totalHeight / Math.max(15, qPerCol);
-
-            for (let q = 1; q <= qCount; q++) {
-                const colIdx = Math.floor((q - 1) / qPerCol);
-                const inColIdx = (q - 1) % qPerCol;
-                const baseX = layout.mcq.colBaseX[colIdx] || layout.mcq.colBaseX[0];
-                const optStepX = layout.mcq.optStepX;
-
-                // Account for 5-question block spacers
-                const blockIdx = Math.floor(inColIdx / 5);
-                const cy = layout.mcq.baseY + (inColIdx * rowH) + (blockIdx * 0.014);
-
-                const optScores = [];
-                for (let optIdx = 0; optIdx < 4; optIdx++) {
-                    const cx = baseX + (optIdx * optStepX);
-                    const dark = sampleBubbleDarkness(cx, cy, Math.round(w * 0.010));
-                    optScores.push({ opt: modelOpts[optIdx], dark });
-                }
-
-                optScores.sort((a, b) => b.dark - a.dark);
-                const best = optScores[0];
-                const runnerUp = optScores[1];
-
-                if (best.dark > 0.30) {
-                    if (runnerUp.dark > 0.28 && (best.dark - runnerUp.dark) < 0.12) {
-                        detectedAnswers[q] = { selected: best.opt, ambiguous: true, second: runnerUp.opt };
-                    } else {
-                        detectedAnswers[q] = { selected: best.opt, ambiguous: false };
-                    }
-                } else {
-                    detectedAnswers[q] = { selected: null, ambiguous: false };
-                }
+            // 5. Read Exam Model (A, B, C, D)
+            const modelY = Math.max(10, gridTopY - gridH * 0.25);
+            const modelScores = [];
+            for (let o = 0; o < 4; o++) {
+                const mx = rollLeft + (rollW * (0.30 + o * 0.18));
+                const netDark = sampleBubbleValue(mx, modelY);
+                modelScores.push({ opt: optLetters[o], score: netDark });
             }
+            modelScores.sort((a, b) => b.score - a.score);
+            const detectedModel = (modelScores[0].score > 25 && (modelScores[0].score - modelScores[1].score) > 10) ? modelScores[0].opt : 'A';
 
             return {
                 success: true,
                 model: detectedModel,
                 studentCode: detectedStudentCode,
                 answers: detectedAnswers,
+                detectedRegDots: candidateDots.length,
                 scannedAt: new Date().toISOString()
             };
         }
