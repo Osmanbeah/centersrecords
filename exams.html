@@ -1,1239 +1,2561 @@
-<!DOCTYPE html>
-<html class="light" lang="en">
-<head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-    <meta name="theme-color" content="#006d44"/>
-    <meta name="apple-mobile-web-app-capable" content="yes"/>
-    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-    <meta name="apple-mobile-web-app-title" content="Exam Scanner"/>
-    <link rel="manifest" href="manifest.json"/>
-    <title>Exam Bubble Sheet Scanner - Centers Record</title>
-    
-    <!-- Material Symbols Outlined -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-    <!-- Google Fonts (Cairo & Inter) -->
-    <link href="https://fonts.googleapis.com" rel="preconnect"/>
-    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        primary: "#012d1d",
-                        secondary: "#0e6c4a",
-                        "secondary-container": "#a0f4c8",
-                        "on-secondary-container": "#19724f",
-                        surface: "#f5fbf9",
-                        "surface-container": "#e9efed",
-                        "surface-container-low": "#eff5f3",
-                        "surface-container-high": "#e4e9e7",
-                        "surface-container-lowest": "#ffffff",
-                        "on-surface": "#171d1c",
-                        "on-surface-variant": "#414844",
-                        outline: "#717973",
-                        "outline-variant": "#c1c8c2",
-                        error: "#ba1a1a",
-                        "error-container": "#ffdad6"
-                    }
-                }
-            }
-        }
-    </script>
-    
-    <style>
-        body {
-            -webkit-tap-highlight-color: transparent;
-            font-family: 'Inter', 'Cairo', sans-serif;
-            background-color: #f5fbf9;
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .icon-fill {
-            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .loading-spinner {
-            border: 3px solid rgba(0, 0, 0, 0.1);
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border-left-color: #0e6c4a;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* Scanner Viewfinder Box */
-        .scan-guide-box {
-            position: absolute;
-            inset: 8%;
-            border: 2px dashed rgba(16, 185, 129, 0.8);
-            border-radius: 16px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-            pointer-events: none;
-        }
-        .scan-corner {
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            border-color: #10b981;
-        }
-        .corner-tl { top: -2px; left: -2px; border-top: 4px solid; border-left: 4px solid; border-top-left-radius: 8px; }
-        .corner-tr { top: -2px; right: -2px; border-top: 4px solid; border-right: 4px solid; border-top-right-radius: 8px; }
-        .corner-bl { bottom: -2px; left: -2px; border-bottom: 4px solid; border-left: 4px solid; border-bottom-left-radius: 8px; }
-        .corner-br { bottom: -2px; right: -2px; border-bottom: 4px solid; border-right: 4px solid; border-bottom-right-radius: 8px; }
-    </style>
-
-    <!-- Supabase Client & OMR Engine -->
-    <script src="supabase.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-        if (typeof pdfjsLib !== 'undefined') {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
-    </script>
-    <script src="omr_engine.js"></script>
-</head>
-<body class="text-on-surface min-h-screen flex flex-col pb-20">
-
-    <!-- Header Navigation -->
-    <header class="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-outline-variant/60 px-4 py-3">
-        <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2.5">
-                <a href="schedule.html" class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
-                    <span class="material-symbols-outlined text-[20px]">arrow_back</span>
-                </a>
-                <div>
-                    <h1 class="text-base sm:text-lg font-bold leading-tight flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-secondary text-[20px]">document_scanner</span>
-                        <span>Bubble Sheet Scanner</span>
-                    </h1>
-                    <p class="text-[11px] text-on-surface-variant">Mr. Kelany Exams & OMR Marking</p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <a href="admin.html" class="px-2.5 py-1.5 bg-surface-container hover:bg-surface-container-high text-xs font-semibold rounded-xl inline-flex items-center gap-1 border border-outline-variant/50 transition-colors">
-                    <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
-                    <span class="hidden sm:inline">Admin</span>
-                </a>
-                <button type="button" onclick="refreshExamData()" title="Refresh Exams" class="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface active:scale-95 transition-all">
-                    <span class="material-symbols-outlined text-[20px]" id="refresh-icon">refresh</span>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-4xl w-full mx-auto p-4 space-y-4">
-
-        <!-- Active Exam Selector Card -->
-        <section class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl p-4 shadow-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex-1">
-                    <label for="active_exam_select" class="block text-xs font-bold text-on-surface mb-1">
-                        Select Active Exam (اختر الامتحان):
-                    </label>
-                    <select id="active_exam_select" onchange="onExamSelected()" class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-sm font-semibold p-2.5 focus:border-secondary focus:ring-1 focus:ring-secondary">
-                        <option value="">Loading exams...</option>
-                    </select>
-                </div>
-
-                <div class="w-full sm:w-48">
-                    <label for="center_filter_select" class="block text-xs font-bold text-on-surface mb-1">
-                        Current Center (السنتر):
-                    </label>
-                    <select id="center_filter_select" onchange="onCenterFilterChanged()" class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-sm font-semibold p-2.5 focus:border-secondary focus:ring-1 focus:ring-secondary">
-                        <option value="All Centers">All Centers (الكل)</option>
-                        <option value="الاوائل (حدايق القبه)">الاوائل (حدايق القبه)</option>
-                        <option value="First Elharam">First Elharam</option>
-                        <option value="i Learn Helwan">i Learn Helwan</option>
-                        <option value="Future soft (زهراء مدينه نصر)">Future soft</option>
-                        <option value="Dar Elsaaada">Dar Elsaaada</option>
-                        <option value="Newstar (المعادي)">Newstar (المعادي)</option>
-                        <option value="Capital (مصر الجديده)">Capital</option>
-                        <option value="Learn ELdokki">Learn ELdokki</option>
-                        <option value="Top Academy (التجمع الاول )">Top Academy</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Exam Details Banner -->
-            <div id="exam_info_banner" class="hidden mt-3 pt-3 border-t border-surface-variant flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div class="flex items-center gap-3 font-semibold text-on-surface-variant">
-                    <span id="banner_questions_count">30 MCQs</span>
-                    <span>•</span>
-                    <span id="banner_written_score">Written: 20 pts</span>
-                    <span>•</span>
-                    <span id="banner_total_score" class="text-secondary font-bold">Total: 50 Marks</span>
-                </div>
-                <div id="banner_models_badge" class="px-2 py-0.5 rounded-lg bg-secondary-container text-on-secondary-container font-bold text-[11px]">
-                    Models: A, B
-                </div>
-            </div>
-        </section>
-
-        <!-- Scanner Card -->
-        <section id="scanner_section" class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl p-4 shadow-sm text-center">
-            
-            <!-- Idle / Launch View -->
-            <div id="scanner_idle_view" class="py-6 flex flex-col items-center gap-3">
-                <div class="w-16 h-16 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center ring-8 ring-secondary/5">
-                    <span class="material-symbols-outlined text-[36px]">photo_camera</span>
-                </div>
-                <div>
-                    <h2 class="text-base font-bold">Scan Student Bubble Sheet</h2>
-                    <p class="text-xs text-on-surface-variant max-w-sm mt-0.5">
-                        Position the phone directly over the student's sheet. The 4 black corner squares ensure alignment.
-                    </p>
-                </div>
-
-                <div class="flex flex-wrap items-center justify-center gap-2.5 mt-2 w-full max-w-xs">
-                    <button type="button" onclick="startCameraScanner()" class="flex-1 py-3 px-4 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-sm inline-flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">
-                        <span class="material-symbols-outlined text-[20px]">videocam</span>
-                        <span>Open Camera</span>
-                    </button>
-                    
-                    <label class="flex-1 py-3 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface font-semibold text-sm inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all">
-                        <span class="material-symbols-outlined text-[20px]">upload_file</span>
-                        <span>Upload Photo</span>
-                        <input type="file" id="photo_file_input" accept="image/*,application/pdf" capture="environment" class="hidden" onchange="handlePhotoUpload(event)"/>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Live Camera Viewfinder -->
-            <div id="scanner_live_view" class="hidden relative rounded-xl overflow-hidden bg-black max-w-md mx-auto aspect-[3/4]">
-                <video id="camera_video" autoplay playsinline class="w-full h-full object-cover"></video>
-                <canvas id="hidden_processing_canvas" class="hidden"></canvas>
-                
-                <!-- Viewfinder Guide Box -->
-                <div class="scan-guide-box">
-                    <div class="scan-corner corner-tl"></div>
-                    <div class="scan-corner corner-tr"></div>
-                    <div class="scan-corner corner-bl"></div>
-                    <div class="scan-corner corner-br"></div>
-                </div>
-
-                <div class="absolute top-3 inset-x-3 flex items-center justify-between text-white text-xs z-10">
-                    <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm font-semibold flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>Align Sheet Inside Box</span>
-                    </span>
-                    <button type="button" onclick="stopCamera()" class="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center active:scale-95">
-                        <span class="material-symbols-outlined text-[18px]">close</span>
-                    </button>
-                </div>
-
-                <!-- Capture Action Button -->
-                <div class="absolute bottom-4 inset-x-0 flex items-center justify-center gap-4 z-10">
-                    <button type="button" onclick="captureAndProcessFrame()" class="w-16 h-16 rounded-full bg-white text-secondary p-1 shadow-2xl active:scale-90 transition-transform flex items-center justify-center ring-4 ring-white/40">
-                        <div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center">
-                            <span class="material-symbols-outlined text-[26px]">camera</span>
-                        </div>
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Marking & Verification Review Card (Appears after sheet is scanned) -->
-        <section id="review_card" class="hidden bg-surface-container-lowest border-2 border-secondary/40 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 animate-fade-in">
-            <div class="flex items-center justify-between pb-3 border-b border-surface-variant">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-secondary text-[22px]">verified</span>
-                    <h3 class="font-bold text-base">Grading & Review (مراجعة ورقة الطالب)</h3>
-                </div>
-                <button type="button" onclick="resetScannerForNext()" class="text-xs text-on-surface-variant hover:text-error flex items-center gap-1 font-semibold">
-                    <span class="material-symbols-outlined text-[16px]">restart_alt</span>
-                    <span>Discard & Re-scan</span>
-                </button>
-            </div>
-
-            <!-- Student Code & Model Row -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student ID (كود الطالب):</label>
-                    <input type="text" id="review_student_code" placeholder="e.g. 1042" 
-                        class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-base font-extrabold tracking-wider p-2 text-center focus:border-secondary focus:ring-1 focus:ring-secondary"/>
-                </div>
-
-                <div>
-                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student Name (اسم الطالب):</label>
-                    <input type="text" id="review_student_name" placeholder="Optional / اختياري" 
-                        class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-sm font-semibold p-2 focus:border-secondary focus:ring-1 focus:ring-secondary"/>
-                </div>
-
-                <div>
-                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Exam Model (النموذج):</label>
-                    <div class="flex items-center gap-1.5" id="model_toggle_container">
-                        <button type="button" onclick="selectReviewModel('A')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="A">A</button>
-                        <button type="button" onclick="selectReviewModel('B')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="B">B</button>
-                        <button type="button" onclick="selectReviewModel('C')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="C">C</button>
-                        <button type="button" onclick="selectReviewModel('D')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="D">D</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Score Summary Cards -->
-            <div class="grid grid-cols-3 gap-2.5 pt-1">
-                <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 text-center">
-                    <span class="block text-[11px] font-semibold text-on-surface-variant">MCQ Score</span>
-                    <strong id="review_mcq_score" class="text-xl sm:text-2xl font-extrabold text-secondary">0 / 30</strong>
-                    <span id="review_mcq_percent" class="block text-[10px] text-on-surface-variant mt-0.5">0%</span>
-                </div>
-
-                <div class="bg-amber-500/10 rounded-xl p-3 border border-amber-500/30 text-center">
-                    <span class="block text-[11px] font-semibold text-amber-800 dark:text-amber-300">Written Score</span>
-                    <strong id="review_written_display" class="text-xl sm:text-2xl font-extrabold text-amber-700 dark:text-amber-400">0 / 20</strong>
-                    <span class="block text-[10px] text-amber-700/80">المقالي</span>
-                </div>
-
-                <div class="bg-secondary-container/60 rounded-xl p-3 border border-secondary/40 text-center">
-                    <span class="block text-[11px] font-semibold text-on-secondary-container">Total Score</span>
-                    <strong id="review_total_score" class="text-xl sm:text-2xl font-extrabold text-secondary">0 / 50</strong>
-                    <span id="review_total_percent" class="block text-[10px] font-bold text-secondary mt-0.5">0%</span>
-                </div>
-            </div>
-
-            <!-- Visual Human Review: Side-by-Side Original vs Rectified Aligned Canvas with Overlays -->
-            <div class="bg-surface-container-low border border-outline-variant/60 rounded-xl p-3.5 space-y-3">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-secondary text-[18px]">compare</span>
-                        <span>Sheet Alignment & Visual Detection Preview</span>
-                    </span>
-                    <span id="rectified_badge" class="px-2 py-0.5 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px]">
-                        Perspective Aligned
-                    </span>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <span class="block text-[11px] font-bold text-on-surface-variant">Original Image:</span>
-                        <div class="rounded-xl overflow-hidden border border-outline-variant bg-black/5 aspect-[3/4] flex items-center justify-center max-h-64">
-                            <img id="review_original_img" class="w-full h-full object-contain" alt="Original Scan"/>
-                        </div>
-                    </div>
-
-                    <div class="space-y-1">
-                        <span class="block text-[11px] font-bold text-on-surface-variant">Aligned Sheet & Detected Bubbles:</span>
-                        <div class="rounded-xl overflow-hidden border border-outline-variant bg-black/5 aspect-[3/4] flex items-center justify-center max-h-64">
-                            <canvas id="review_aligned_canvas" class="w-full h-full object-contain"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Written Grade Input Tool -->
-            <div class="bg-surface-container-low border border-outline-variant/60 rounded-xl p-3.5 space-y-2">
-                <div class="flex items-center justify-between">
-                    <label for="input_written_score" class="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-amber-600 text-[18px]">edit_note</span>
-                        <span>Enter Written Question Grade (درجة السؤال المقالي):</span>
-                    </label>
-                    <span id="written_max_hint" class="text-xs font-bold text-on-surface-variant">Max: 20 pts</span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="adjustWrittenScore(-1)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-bold text-base active:scale-95 transition-all">-1</button>
-                    <button type="button" onclick="adjustWrittenScore(-0.5)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-semibold text-xs active:scale-95 transition-all">-½</button>
-                    
-                    <input type="number" id="input_written_score" min="0" step="0.5" value="0" oninput="onWrittenScoreInput()" 
-                        class="flex-1 bg-surface-container-lowest border border-outline-variant rounded-xl text-center font-extrabold text-xl py-2 focus:border-secondary focus:ring-1 focus:ring-secondary"/>
-                    
-                    <button type="button" onclick="adjustWrittenScore(0.5)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-semibold text-xs active:scale-95 transition-all">+½</button>
-                    <button type="button" onclick="adjustWrittenScore(1)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-bold text-base active:scale-95 transition-all">+1</button>
-                    <button type="button" onclick="setWrittenScoreMax()" class="px-3 h-10 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 font-bold text-xs active:scale-95 transition-all">Max</button>
-                </div>
-            </div>
-
-            <!-- Detected Question Answers Quick Review Grid -->
-            <div>
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-bold text-on-surface">Question Breakdown (اضغط على أي سؤال للتعديل):</span>
-                    <span class="text-[11px] text-on-surface-variant" id="review_breakdown_hint">Tap option to correct</span>
-                </div>
-                <div id="review_questions_grid" class="grid grid-cols-2 sm:grid-cols-5 gap-2 max-h-56 overflow-y-auto p-2 bg-surface-container-low rounded-xl border border-outline-variant/50 text-xs">
-                    <!-- Populated dynamically -->
-                </div>
-            </div>
-
-            <!-- Action Submit Button -->
-            <button type="button" id="btn_save_exam_result" onclick="saveStudentResult()" class="w-full py-3.5 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-sm inline-flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all">
-                <span class="material-symbols-outlined text-[20px]">save</span>
-                <span>Confirm & Save Result (حفظ النتيجة)</span>
-            </button>
-        </section>
-
-        <!-- Center Leaderboard & Recent Submissions -->
-        <section class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl p-4 shadow-sm space-y-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-secondary text-[22px]">leaderboard</span>
-                    <h3 class="font-bold text-sm sm:text-base">Center Leaderboard (ترتيب درجات السنتر)</h3>
-                </div>
-                <span id="results_count_badge" class="px-2 py-0.5 rounded-lg bg-surface-container text-xs font-bold">0 Students</span>
-            </div>
-
-            <!-- Results Table -->
-            <div class="overflow-x-auto rounded-xl border border-outline-variant/50">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-surface-container text-on-surface-variant font-bold border-b border-outline-variant/60">
-                        <tr>
-                            <th class="py-2.5 px-3 text-center">#</th>
-                            <th class="py-2.5 px-3">Student</th>
-                            <th class="py-2.5 px-3 text-center">Model</th>
-                            <th class="py-2.5 px-3 text-center">MCQ</th>
-                            <th class="py-2.5 px-3 text-center">Written</th>
-                            <th class="py-2.5 px-3 text-center font-bold">Total</th>
-                            <th class="py-2.5 px-3 text-center">%</th>
-                            <th class="py-2.5 px-3 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboard_tbody" class="divide-y divide-outline-variant/40 font-medium">
-                        <tr>
-                            <td colspan="8" class="text-center py-6 text-on-surface-variant">No exam results recorded yet today.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Quality Rejection Alert Modal -->
-    <div id="quality_rejection_modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="bg-surface rounded-2xl max-w-sm w-full p-5 border border-outline-variant shadow-2xl space-y-4 text-center animate-fade-in">
-            <div class="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto ring-8 ring-rose-500/5">
-                <span class="material-symbols-outlined text-[32px]">warning</span>
-            </div>
-            <div>
-                <h3 id="qr_title" class="text-base font-bold text-on-surface">Image Quality Too Low</h3>
-                <p id="qr_message" class="text-xs text-on-surface-variant mt-1">The image is blurry or out of focus. Please hold your camera steady and retake.</p>
-            </div>
-            <div class="bg-surface-container-low rounded-xl p-3 text-left text-[11px] space-y-1 font-mono text-on-surface-variant" id="qr_details">
-                <!-- Populated dynamically -->
-            </div>
-            <button type="button" onclick="closeQualityModal()" class="w-full py-2.5 rounded-xl bg-secondary text-white font-bold text-xs shadow-sm hover:bg-secondary/90 transition-all">
-                Try Scanning Again
-            </button>
-        </div>
-    </div>
-
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg transition-all duration-300 pointer-events-none opacity-0 translate-y-2"></div>
-
-    <!-- Application Script -->
-    <script>
-        // --- Supabase Config ---
-        const SUPABASE_URL = 'https://mwposurgahrcdexfvywa.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13cG9zdXJnYWhyY2RleGZ2eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE2NDAsImV4cCI6MjEwNzIxNzY0MH0.fxr7qxygr5Fl8urhcFWC1oYYqAxtYiObf5kNGnInPfk';
-        let supabaseClient = null;
-        try {
-            if (window.supabase) {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            }
-        } catch(e) {}
-
-        // --- State Variables ---
-        let allExams = [];
-        let currentExam = null;
-        let examResults = [];
-        let activeMediaStream = null;
-        let scannedData = null; // Holds { studentCode, model, answers, mcqScore, writtenScore, totalScore }
-
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            await loadExams();
-        });
-
-        // --- Notification Toast ---
-        function showToast(msg, type = 'info') {
-            const toast = document.getElementById('toast');
-            if (!toast) return;
-            toast.textContent = msg;
-            if (type === 'success') toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg bg-emerald-600 text-white transition-all opacity-100 translate-y-0';
-            else if (type === 'error') toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg bg-rose-600 text-white transition-all opacity-100 translate-y-0';
-            else toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg bg-primary text-white transition-all opacity-100 translate-y-0';
-            setTimeout(() => {
-                toast.classList.replace('opacity-100', 'opacity-0');
-                toast.classList.replace('translate-y-0', 'translate-y-2');
-            }, 3000);
-        }
-
-        // --- Audio Chime ---
-        function playChime(success = true) {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(success ? 660 : 300, ctx.currentTime);
-                if (success) osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.2, ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.35);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.35);
-            } catch(e) {}
-        }
-
-        // --- Load Exams from Supabase / Local Fallback ---
-        async function loadExams() {
-            const selectEl = document.getElementById('active_exam_select');
-            if (selectEl) selectEl.innerHTML = `<option value="">Loading exams...</option>`;
-
-            let cloudFetched = false;
-            try {
-                if (supabaseClient) {
-                    const { data, error } = await supabaseClient.from('exams').select('*').order('created_at', { ascending: false });
-                    if (!error && Array.isArray(data)) {
-                        cloudFetched = true;
-                        allExams = data.filter(e => e.status === 'active');
-                        try { localStorage.setItem('mr_kelany_exams', JSON.stringify(data)); } catch(e) {}
-                    }
-                }
-            } catch(e) {
-                console.warn("Supabase exams load fallback:", e);
-            }
-
-            // Fallback: Check local storage only if offline or network error
-            if (!cloudFetched && allExams.length === 0) {
-                try {
-                    const cached = JSON.parse(localStorage.getItem('mr_kelany_exams') || '[]');
-                    if (cached.length > 0) allExams = cached.filter(e => e.status === 'active');
-                } catch(e) {}
-            }
-
-            if (!selectEl) return;
-
-            if (allExams.length === 0) {
-                selectEl.innerHTML = `<option value="">No active exams found (لا توجد امتحانات مفعلة)</option>`;
-                currentExam = null;
-                const titleEl = document.getElementById('banner_exam_title');
-                if (titleEl) titleEl.textContent = 'No Active Exam Selected';
-                return;
-            }
-
-            // Preserve currently selected exam if still available
-            const prevSelectedId = currentExam ? currentExam.id : '';
-            selectEl.innerHTML = allExams.map(ex => `
-                <option value="${ex.id}" ${ex.id === prevSelectedId ? 'selected' : ''}>${escapeHtml(ex.title)} (${ex.question_count} Qs • ${ex.total_score || 50} pts)</option>
-            `).join('');
-
-            onExamSelected();
-        }
-
-        // --- Realtime Exam Sync Listener ---
-        if (supabaseClient) {
-            try {
-                const examsChannel = supabaseClient.channel('assistant_arrivals');
-                examsChannel.on('broadcast', { event: 'exam_updated' }, async ({ payload }) => {
-                    console.log('Realtime exam update received from admin:', payload);
-                    await loadExams();
-                    if (payload && payload.action === 'create') {
-                        showToast('New exam created by admin! (تمت إضافة امتحان جديد)', 'success');
-                    } else if (payload && payload.action === 'delete') {
-                        showToast('Exam list updated by admin', 'info');
-                    }
-                });
-                examsChannel.subscribe();
-            } catch(e) {
-                console.warn("Could not subscribe to exam updates channel:", e);
-            }
-        }
-
-        function onExamSelected() {
-            const selectEl = document.getElementById('active_exam_select');
-            const selectedId = selectEl.value;
-            currentExam = allExams.find(e => e.id === selectedId) || allExams[0];
-            if (!currentExam) return;
-
-            // Update Exam Banner
-            const banner = document.getElementById('exam_info_banner');
-            banner.classList.remove('hidden');
-            document.getElementById('banner_questions_count').textContent = `${currentExam.question_count || 30} MCQs`;
-            document.getElementById('banner_written_score').textContent = `Written: ${currentExam.written_max_score || 20} pts`;
-            document.getElementById('banner_total_score').textContent = `Total: ${currentExam.total_score || 50} Marks`;
-            
-            const models = currentExam.models ? Object.keys(currentExam.models).join(', ') : 'A';
-            document.getElementById('banner_models_badge').textContent = `Models: ${models}`;
-
-            document.getElementById('written_max_hint').textContent = `Max: ${currentExam.written_max_score || 20} pts`;
-
-            loadLeaderboard();
-        }
-
-        function onCenterFilterChanged() {
-            loadLeaderboard();
-        }
-
-        // --- Load Leaderboard for Selected Exam & Center ---
-        async function loadLeaderboard() {
-            if (!currentExam) return;
-            const centerFilter = document.getElementById('center_filter_select').value;
-            const tbody = document.getElementById('leaderboard_tbody');
-            const countBadge = document.getElementById('results_count_badge');
-
-            let results = [];
-            try {
-                if (supabaseClient) {
-                    let q = supabaseClient.from('exam_results').select('*').eq('exam_id', currentExam.id);
-                    if (centerFilter && centerFilter !== 'All Centers') {
-                        q = q.eq('center', centerFilter);
-                    }
-                    const { data, error } = await q.order('total_score', { ascending: false });
-                    if (!error && data) results = data;
-                }
-            } catch(e) {}
-
-            if (results.length === 0) {
-                try {
-                    const localRes = JSON.parse(localStorage.getItem('mr_kelany_exam_results_' + currentExam.id) || '[]');
-                    results = localRes;
-                    if (centerFilter && centerFilter !== 'All Centers') {
-                        results = results.filter(r => r.center === centerFilter);
-                    }
-                    results.sort((a, b) => b.total_score - a.total_score);
-                } catch(e) {}
-            }
-
-            examResults = results;
-            countBadge.textContent = `${results.length} Students`;
-
-            if (results.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-on-surface-variant">No exam results recorded yet for this center.</td></tr>`;
-                return;
-            }
-
-            tbody.innerHTML = results.map((r, idx) => {
-                const rank = idx + 1;
-                const totalScore = parseFloat(r.total_score) || 0;
-                const maxScore = parseFloat(currentExam.total_score) || 50;
-                const percent = Math.round((totalScore / maxScore) * 100);
-
-                let rankBadge = `<span class="font-bold text-on-surface-variant">#${rank}</span>`;
-                if (rank === 1) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-amber-950 font-black text-xs shadow-sm">1</span>`;
-                else if (rank === 2) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300 text-slate-800 font-bold text-xs">2</span>`;
-                else if (rank === 3) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-600/30 text-amber-900 font-bold text-xs">3</span>`;
-
-                return `
-                    <tr class="hover:bg-surface-container/50 transition-colors">
-                        <td class="py-2.5 px-3 text-center">${rankBadge}</td>
-                        <td class="py-2.5 px-3">
-                            <strong class="text-on-surface block">${escapeHtml(r.student_name || 'Student ' + (r.student_code || ''))}</strong>
-                            <span class="text-[10px] text-on-surface-variant font-mono">ID: ${escapeHtml(r.student_code || 'N/A')}</span>
-                        </td>
-                        <td class="py-2.5 px-3 text-center">
-                            <span class="px-1.5 py-0.5 rounded bg-surface-container font-bold text-[11px]">${r.model || 'A'}</span>
-                        </td>
-                        <td class="py-2.5 px-3 text-center font-semibold text-secondary">${r.mcq_score}</td>
-                        <td class="py-2.5 px-3 text-center font-semibold text-amber-700 dark:text-amber-400">${r.written_score}</td>
-                        <td class="py-2.5 px-3 text-center font-black text-sm text-secondary">${totalScore}</td>
-                        <td class="py-2.5 px-3 text-center font-bold text-xs ${percent >= 85 ? 'text-emerald-600' : percent >= 65 ? 'text-secondary' : 'text-rose-600'}">${percent}%</td>
-                        <td class="py-2.5 px-3 text-right">
-                            <button type="button" onclick="sendStudentWhatsApp('${r.id || idx}')" title="Send WhatsApp Message" class="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 active:scale-90 transition-all inline-flex items-center">
-                                <span class="material-symbols-outlined text-[16px]">chat</span>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        // --- Camera & Scanner Controls ---
-        async function startCameraScanner() {
-            const idleView = document.getElementById('scanner_idle_view');
-            const liveView = document.getElementById('scanner_live_view');
-            const video = document.getElementById('camera_video');
-
-            try {
-                const constraints = {
-                    video: {
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    }
-                };
-
-                activeMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = activeMediaStream;
-                await video.play();
-
-                idleView.classList.add('hidden');
-                liveView.classList.remove('hidden');
-            } catch(e) {
-                console.error("Camera access error:", e);
-                showToast("Could not access camera. Please allow camera permissions.", "error");
-            }
-        }
-
-        function stopCamera() {
-            if (activeMediaStream) {
-                activeMediaStream.getTracks().forEach(t => t.stop());
-                activeMediaStream = null;
-            }
-            document.getElementById('scanner_live_view').classList.add('hidden');
-            document.getElementById('scanner_idle_view').classList.remove('hidden');
-        }
-
-        // --- Photo Capture / File Upload Processing ---
-        function captureAndProcessFrame() {
-            const video = document.getElementById('camera_video');
-            const liveView = document.getElementById('scanner_live_view');
-            const canvas = document.getElementById('hidden_processing_canvas');
-            if (!video || !canvas) return;
-
-            const vw = video.videoWidth || 1280;
-            const vh = video.videoHeight || 720;
-
-            // In the live viewfinder, object-cover displays a centered container crop.
-            // When user aligns the paper inside the guide box, we crop precisely to that area
-            // with a small safety margin, so the paper dominates the canvas.
-            let cropX = 0, cropY = 0, cropW = vw, cropH = vh;
-            if (liveView && liveView.clientWidth > 0 && liveView.clientHeight > 0) {
-                const cw = liveView.clientWidth;
-                const ch = liveView.clientHeight;
-                const scale = Math.max(cw / vw, ch / vh);
-                const visW = cw / scale;
-                const visH = ch / scale;
-                const origX = (vw - visW) / 2;
-                const origY = (vh - visH) / 2;
-
-                // Crop inside the visible region with 4% safety margin around the guide box
-                cropX = Math.max(0, Math.round(origX + visW * 0.03));
-                cropY = Math.max(0, Math.round(origY + visH * 0.03));
-                cropW = Math.min(vw - cropX, Math.round(visW * 0.94));
-                cropH = Math.min(vh - cropY, Math.round(visH * 0.94));
-            }
-
-            canvas.width = cropW;
-            canvas.height = cropH;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-            stopCamera();
-            processCanvasWithOMR(canvas);
-        }
-
-        async function handlePhotoUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            // Reset file input so re-selecting same file fires onchange
-            event.target.value = '';
-
-            const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-
-            if (isPdf) {
-                try {
-                    showToast("Loading PDF document...", "info");
-                    if (!window.pdfjsLib) {
-                        showToast("PDF.js library is loading. Please try again shortly.", "warning");
-                        return;
-                    }
-                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                    const arrayBuffer = await file.arrayBuffer();
-                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-                    const pdf = await loadingTask.promise;
-                    const page = await pdf.getPage(1);
-                    const viewport = page.getViewport({ scale: 2.0 });
-
-                    const canvas = document.getElementById('hidden_processing_canvas');
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    const ctx = canvas.getContext('2d');
-                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-                    processCanvasWithOMR(canvas);
-                } catch (err) {
-                    console.error("PDF Render Error:", err);
-                    showToast("Failed to render PDF page. Please ensure it is a valid PDF.", "error");
-                }
-                return;
-            }
-
-            // Image handling (JPG, PNG, JPEG, WEBP)
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.getElementById('hidden_processing_canvas');
-                    // Cap max dimension to 2000px for speed and memory efficiency
-                    const maxDim = 2000;
-                    let w = img.width;
-                    let h = img.height;
-                    if (w > maxDim || h > maxDim) {
-                        const ratio = Math.min(maxDim / w, maxDim / h);
-                        w = Math.round(w * ratio);
-                        h = Math.round(h * ratio);
-                    }
-                    canvas.width = w;
-                    canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    processCanvasWithOMR(canvas);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        // --- Core OMR Processing ---
-        function processCanvasWithOMR(canvas) {
-            if (!currentExam) {
-                showToast("Please select an active exam first.", "error");
-                return;
-            }
-
-            const qCount = currentExam.question_count || 30;
-            const scanResult = OMREngine.scanImage(canvas, qCount);
-
-            if (!scanResult || !scanResult.success) {
-                showToast(scanResult ? scanResult.message : "Scanning failed.", "error");
-                showQualityRejectionModal(scanResult || { error: 'UNKNOWN', message: 'Failed to process answer sheet.' });
-                return;
-            }
-
-            scannedData = {
-                studentCode: scanResult.studentCode && !scanResult.studentCode.includes('?') ? scanResult.studentCode : (scanResult.studentCode || ''),
-                model: scanResult.model || 'A',
-                answers: scanResult.answers || {},
-                mcqScore: 0,
-                writtenScore: 0,
-                totalScore: 0,
-                overallConfidence: scanResult.overallConfidence || 0,
-                uncertainCount: scanResult.uncertainCount || 0,
-                multipleCount: scanResult.multipleCount || 0,
-                emptyCount: scanResult.emptyCount || 0,
-                wasRectified: scanResult.wasRectified,
-                rectifiedCanvas: scanResult.rectifiedCanvas,
-                annotatedCanvas: scanResult.annotatedCanvas
-            };
-
-            // Render original uploaded/captured photo in review
-            try {
-                const origImg = document.getElementById('review_original_img');
-                if (origImg) origImg.src = canvas.toDataURL('image/jpeg', 0.85);
-            } catch (e) {
-                console.warn("Could not preview original image:", e);
-            }
-
-            // Render rectified & annotated canvas in review
-            try {
-                const alignedCanvas = document.getElementById('review_aligned_canvas');
-                if (alignedCanvas && scanResult.annotatedCanvas) {
-                    alignedCanvas.width = scanResult.annotatedCanvas.width;
-                    alignedCanvas.height = scanResult.annotatedCanvas.height;
-                    const actx = alignedCanvas.getContext('2d');
-                    actx.drawImage(scanResult.annotatedCanvas, 0, 0);
-                }
-            } catch (e) {
-                console.warn("Could not preview aligned canvas:", e);
-            }
-
-            // Update perspective badge
-            const badge = document.getElementById('rectified_badge');
-            if (badge) {
-                if (scanResult.wasRectified) {
-                    badge.className = "px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 font-bold text-[11px] flex items-center gap-1";
-                    badge.innerHTML = `<span class="material-symbols-outlined text-[14px]">auto_fix_high</span> Homography Aligned`;
-                } else {
-                    badge.className = "px-2 py-0.5 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px] flex items-center gap-1";
-                    badge.innerHTML = `<span class="material-symbols-outlined text-[14px]">grid_on</span> Standard Grid`;
-                }
-            }
-
-            // Compute MCQ Score based on selected Model's answer key
-            gradeMCQAnswers();
-
-            // Populate Review UI
-            populateReviewCard();
-            playChime(true);
-
-            const answeredCount = Object.values(scannedData.answers).filter(a => a && a.state === 'SELECTED').length;
-            if (scannedData.uncertainCount > 0 || scannedData.multipleCount > 0) {
-                showToast(`Scan complete with warnings: ${scannedData.uncertainCount} uncertain, ${scannedData.multipleCount} multi-marked. Please review highlighted questions.`, "warning");
-            } else if (answeredCount > 0) {
-                showToast(`Scanned successfully! Recognized ${answeredCount}/${qCount} answers (${scanResult.overallConfidence}% confidence).`, "success");
-            } else {
-                showToast("No shaded answers detected. Please check lighting or alignment.", "warning");
-            }
-        }
-
-        function showQualityRejectionModal(res) {
-            const modal = document.getElementById('quality_rejection_modal');
-            if (!modal) return;
-            const titleEl = document.getElementById('qr_title');
-            const msgEl = document.getElementById('qr_message');
-            const detailsEl = document.getElementById('qr_details');
-
-            if (res.error === 'BLURRY_IMAGE') {
-                titleEl.textContent = 'Image Too Blurry (صورة غير واضحة)';
-                msgEl.textContent = 'The camera was moving or out of focus. Please hold the phone steady and capture again in good light.';
-            } else if (res.error === 'IMAGE_TOO_DARK') {
-                titleEl.textContent = 'Lighting Too Dark (إضاءة ضعيفة جداً)';
-                msgEl.textContent = 'The room is too dark or there is a heavy shadow over the sheet. Please turn on room lights or camera flash.';
-            } else if (res.error === 'LOW_RESOLUTION') {
-                titleEl.textContent = 'Resolution Too Low (دقة الصورة ضعيفة)';
-                msgEl.textContent = 'The image is too small or taken from too far away. Please move closer to fill the screen with the sheet.';
-            } else {
-                titleEl.textContent = 'Sheet Not Recognized';
-                msgEl.textContent = res.message || 'Unable to scan the sheet reliably. Please align the sheet within the viewfinder guide.';
-            }
-
-            let detailsHtml = '';
-            if (res.details) {
-                for (const [k, v] of Object.entries(res.details)) {
-                    const valStr = typeof v === 'number' ? v.toFixed(2) : String(v);
-                    detailsHtml += `<div class="flex justify-between"><span>${escapeHtml(k)}:</span><span class="font-bold">${escapeHtml(valStr)}</span></div>`;
-                }
-            }
-            detailsEl.innerHTML = detailsHtml || '<div>No specific metrics available.</div>';
-            modal.classList.remove('hidden');
-        }
-
-        function closeQualityModal() {
-            const modal = document.getElementById('quality_rejection_modal');
-            if (modal) modal.classList.add('hidden');
-        }
-
-        function gradeMCQAnswers() {
-            if (!currentExam || !scannedData) return;
-            const qCount = currentExam.question_count || 30;
-            const perQ = currentExam.mcq_score_per_q || 1;
-            const modelKey = (currentExam.models && currentExam.models[scannedData.model]) || {};
-
-            let correctCount = 0;
-            let incorrectCount = 0;
-            let unansweredCount = 0;
-            let uncertainCount = 0;
-            let multipleCount = 0;
-
-            for (let q = 1; q <= qCount; q++) {
-                const ansObj = scannedData.answers[q] || {};
-                const studentAns = ansObj.selected;
-                const state = ansObj.state || (studentAns ? 'SELECTED' : 'EMPTY');
-                const modelAns = modelKey[q];
-
-                if (state === 'UNCERTAIN') {
-                    uncertainCount++;
-                } else if (state === 'MULTIPLE') {
-                    multipleCount++;
-                } else if (!studentAns || state === 'EMPTY') {
-                    unansweredCount++;
-                } else if (studentAns === modelAns) {
-                    correctCount++;
-                } else {
-                    incorrectCount++;
-                }
-            }
-
-            scannedData.mcqScore = correctCount * perQ;
-            scannedData.correctCount = correctCount;
-            scannedData.incorrectCount = incorrectCount;
-            scannedData.unansweredCount = unansweredCount;
-            scannedData.uncertainCount = uncertainCount;
-            scannedData.multipleCount = multipleCount;
-
-            recalculateTotalScore();
-        }
-
-        function recalculateTotalScore() {
-            if (!scannedData) return;
-            scannedData.totalScore = (parseFloat(scannedData.mcqScore) || 0) + (parseFloat(scannedData.writtenScore) || 0);
-
-            // Update UI elements
-            const qCount = currentExam.question_count || 30;
-            const perQ = currentExam.mcq_score_per_q || 1;
-            const mcqMax = qCount * perQ;
-            const writtenMax = parseFloat(currentExam.written_max_score) || 20;
-            const totalMax = mcqMax + writtenMax;
-
-            document.getElementById('review_mcq_score').textContent = `${scannedData.mcqScore} / ${mcqMax}`;
-            const mcqPct = Math.round((scannedData.mcqScore / mcqMax) * 100);
-            document.getElementById('review_mcq_percent').textContent = `${mcqPct}%`;
-
-            document.getElementById('review_written_display').textContent = `${scannedData.writtenScore} / ${writtenMax}`;
-            document.getElementById('review_total_score').textContent = `${scannedData.totalScore} / ${totalMax}`;
-            const totPct = Math.round((scannedData.totalScore / totalMax) * 100);
-            document.getElementById('review_total_percent').textContent = `${totPct}%`;
-        }
-
-        // --- Review Card Interaction ---
-        function populateReviewCard() {
-            const card = document.getElementById('review_card');
-            card.classList.remove('hidden');
-            card.scrollIntoView({ behavior: 'smooth' });
-
-            document.getElementById('review_student_code').value = scannedData.studentCode || '';
-            document.getElementById('review_student_name').value = '';
-            document.getElementById('input_written_score').value = scannedData.writtenScore || 0;
-
-            selectReviewModel(scannedData.model || 'A');
-            renderQuestionsGrid();
-        }
-
-        function selectReviewModel(modelLetter) {
-            if (!scannedData) return;
-            scannedData.model = modelLetter;
-
-            // Highlight button
-            document.querySelectorAll('.model-opt-btn').forEach(btn => {
-                if (btn.dataset.model === modelLetter) {
-                    btn.className = "model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-secondary bg-secondary text-white shadow-sm";
-                } else {
-                    btn.className = "model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high";
-                }
-            });
-
-            gradeMCQAnswers();
-            renderQuestionsGrid();
-        }
-
-        function renderQuestionsGrid() {
-            if (!currentExam || !scannedData) return;
-            const grid = document.getElementById('review_questions_grid');
-            const qCount = currentExam.question_count || 30;
-            const modelKey = (currentExam.models && currentExam.models[scannedData.model]) || {};
-
-            let html = '';
-            for (let q = 1; q <= qCount; q++) {
-                const ansObj = scannedData.answers[q] || {};
-                const selected = ansObj.selected;
-                const state = ansObj.state || (selected ? 'SELECTED' : 'EMPTY');
-                const modelAns = modelKey[q] || '-';
-                const confPct = Math.round((ansObj.confidence || 0) * 100);
-
-                let cardBg = 'bg-surface-container border-outline-variant/60';
-                let statusBadge = '';
-                let labelDisplay = '';
-
-                if (state === 'SELECTED') {
-                    const isCorrect = selected && selected === modelAns;
-                    if (isCorrect) {
-                        cardBg = 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800';
-                        statusBadge = `<span class="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>`;
-                        labelDisplay = `<span class="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm">${selected}</span>`;
-                    } else {
-                        cardBg = 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800';
-                        statusBadge = `<span class="material-symbols-outlined text-rose-500 text-[16px]">cancel</span>`;
-                        labelDisplay = `<span class="font-extrabold text-rose-600 dark:text-rose-400 text-sm">${selected}</span>
-                                        ${modelAns !== '-' ? `<span class="text-[10px] text-on-surface-variant font-mono">(${modelAns})</span>` : ''}`;
-                    }
-                } else if (state === 'UNCERTAIN') {
-                    cardBg = 'bg-amber-500/10 border-dashed border-2 border-amber-400 dark:border-amber-600 ring-2 ring-amber-400/20';
-                    statusBadge = `<span class="material-symbols-outlined text-amber-600 text-[16px]">help_outline</span>`;
-                    labelDisplay = `<span class="font-bold text-amber-700 dark:text-amber-400 text-xs">Uncertain?</span>
-                                    ${selected ? `<span class="text-[10px] text-amber-600">(${selected})</span>` : ''}`;
-                } else if (state === 'MULTIPLE') {
-                    cardBg = 'bg-rose-500/10 border-2 border-rose-400 dark:border-rose-700 ring-2 ring-rose-400/20';
-                    statusBadge = `<span class="material-symbols-outlined text-rose-600 text-[16px]">rule</span>`;
-                    labelDisplay = `<span class="font-bold text-rose-700 dark:text-rose-400 text-xs">Multiple</span>`;
-                } else {
-                    // EMPTY
-                    cardBg = 'bg-surface-container-low border-dashed border border-outline-variant';
-                    statusBadge = `<span class="material-symbols-outlined text-outline text-[16px]">radio_button_unchecked</span>`;
-                    labelDisplay = `<span class="font-medium text-on-surface-variant text-xs">Blank</span>
-                                    ${modelAns !== '-' ? `<span class="text-[10px] text-outline font-mono">(${modelAns})</span>` : ''}`;
-                }
-
-                html += `
-                    <div class="p-2 rounded-xl border ${cardBg} flex items-center justify-between transition-all">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <span class="font-bold text-[11px] text-on-surface-variant">Q${q}:</span>
-                            ${labelDisplay}
-                            ${confPct > 0 ? `<span class="text-[9px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/5 font-mono text-on-surface-variant">${confPct}%</span>` : ''}
-                        </div>
-                        <div class="flex items-center gap-1">
-                            ${statusBadge}
-                            <button type="button" onclick="cycleAnswer(${q})" title="Click to override answer (A->B->C->D->Blank)" class="w-6 h-6 rounded-lg bg-surface hover:bg-secondary hover:text-white border border-outline-variant text-[10px] font-bold transition-colors flex items-center justify-center">✎</button>
-                        </div>
-                    </div>
-                `;
-            }
-            grid.innerHTML = html;
-        }
-
-        function cycleAnswer(qNum) {
-            if (!scannedData) return;
-            const opts = ['A', 'B', 'C', 'D', null];
-            const current = scannedData.answers[qNum] ? scannedData.answers[qNum].selected : null;
-            const nextIdx = (opts.indexOf(current) + 1) % opts.length;
-            const nextVal = opts[nextIdx];
-
-            scannedData.answers[qNum] = {
-                selected: nextVal,
-                state: nextVal ? 'SELECTED' : 'EMPTY',
-                confidence: 1.0,
-                manualOverride: true
-            };
-            gradeMCQAnswers();
-            renderQuestionsGrid();
-        }
-
-        // --- Written Score Steppers ---
-        function adjustWrittenScore(delta) {
-            const input = document.getElementById('input_written_score');
-            const max = parseFloat(currentExam.written_max_score) || 20;
-            let val = parseFloat(input.value) || 0;
-            val = Math.max(0, Math.min(max, val + delta));
-            input.value = val;
-            onWrittenScoreInput();
-        }
-
-        function setWrittenScoreMax() {
-            const input = document.getElementById('input_written_score');
-            const max = parseFloat(currentExam.written_max_score) || 20;
-            input.value = max;
-            onWrittenScoreInput();
-        }
-
-        function onWrittenScoreInput() {
-            const input = document.getElementById('input_written_score');
-            const max = parseFloat(currentExam.written_max_score) || 20;
-            let val = parseFloat(input.value) || 0;
-            if (val < 0) val = 0;
-            if (val > max) val = max;
-            if (scannedData) {
-                scannedData.writtenScore = val;
-                recalculateTotalScore();
-            }
-        }
-
-        // --- Save Result ---
-        async function saveStudentResult() {
-            if (!currentExam || !scannedData) return;
-
-            const codeInput = document.getElementById('review_student_code');
-            const nameInput = document.getElementById('review_student_name');
-            const centerFilter = document.getElementById('center_filter_select').value;
-            const btn = document.getElementById('btn_save_exam_result');
-
-            const studentCode = (codeInput.value || '').trim();
-
-            // Verification Requirement: Never assign grades to an unverified student
-            if (!studentCode || studentCode === 'NO-ID' || studentCode.includes('?')) {
-                showToast("Please enter or verify the Student ID before saving (يرجى إدخال كود الطالب أولاً)", "error");
-                codeInput.focus();
-                codeInput.classList.add('ring-2', 'ring-rose-500');
-                setTimeout(() => codeInput.classList.remove('ring-2', 'ring-rose-500'), 3000);
-                return;
-            }
-
-            // Supervisor Verification Gate for Uncertain / Multiple questions
-            if ((scannedData.uncertainCount > 0 || scannedData.multipleCount > 0)) {
-                const totalAlerts = scannedData.uncertainCount + scannedData.multipleCount;
-                const confirmMsg = `تنبيه: يوجد ${totalAlerts} سؤال بعلامة مشكوك فيها أو تظليل مكرر.\nهل قمت بمراجعتها وتريد تأكيد الحفظ الآن؟`;
-                if (!confirm(confirmMsg)) {
-                    return;
-                }
-            }
-
-            const studentName = (nameInput.value || '').trim() || `Student (${studentCode})`;
-            const center = centerFilter !== 'All Centers' ? centerFilter : (currentExam.center || 'Center');
-
-            btn.disabled = true;
-            btn.innerHTML = `<div class="loading-spinner"></div> <span>Saving...</span>`;
-
-            const record = {
-                id: 'res_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-                created_at: new Date().toISOString(),
-                exam_id: currentExam.id,
-                student_code: studentCode,
-                student_name: studentName,
-                center: center,
-                model: scannedData.model,
-                mcq_score: scannedData.mcqScore,
-                written_score: scannedData.writtenScore,
-                total_score: scannedData.totalScore,
-                student_answers: scannedData.answers,
-                assistant_name: (localStorage.getItem('assistant_name') || 'Assistant')
-            };
-
-            // 1. Save to Supabase if available
-            try {
-                if (supabaseClient) {
-                    await supabaseClient.from('exam_results').insert([record]);
-                }
-            } catch(e) {
-                console.warn("Supabase insert error (saving locally):", e);
-            }
-
-            // 2. Always persist locally
-            try {
-                const key = 'mr_kelany_exam_results_' + currentExam.id;
-                const existing = JSON.parse(localStorage.getItem(key) || '[]');
-                existing.unshift(record);
-                localStorage.setItem(key, JSON.stringify(existing));
-            } catch(e) {}
-
-            btn.disabled = false;
-            btn.innerHTML = `<span class="material-symbols-outlined text-[20px]">save</span> <span>Confirm & Save Result</span>`;
-
-            playChime(true);
-            showToast(`Grade recorded for ${studentName}! (${record.total_score}/${currentExam.total_score || 50})`, "success");
-
-            // Reset and reload leaderboard
-            resetScannerForNext();
-            await loadLeaderboard();
-        }
-
-        function resetScannerForNext() {
-            scannedData = null;
-            document.getElementById('review_card').classList.add('hidden');
-            document.getElementById('scanner_idle_view').classList.remove('hidden');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function refreshExamData() {
-            const icon = document.getElementById('refresh-icon');
-            if (icon) icon.classList.add('animate-spin');
-            loadExams().finally(() => {
-                setTimeout(() => { if (icon) icon.classList.remove('animate-spin'); }, 600);
-            });
-        }
-
-        // --- WhatsApp Parent Notification Generator ---
-        function sendStudentWhatsApp(recordId) {
-            const record = examResults.find(r => r.id === recordId || String(examResults.indexOf(r)) === String(recordId));
-            if (!record || !currentExam) return;
-
-            const rank = examResults.indexOf(record) + 1;
-            const maxScore = parseFloat(currentExam.total_score) || 50;
-            const pct = Math.round((record.total_score / maxScore) * 100);
-
-            const msg = 
-`*أكاديمية مستر كيلاني - نتيجة الاختبار* 📝
-------------------------------
-👤 *اسم الطالب:* ${record.student_name}
-🆔 *كود الطالب:* ${record.student_code}
-🏫 *السنتر:* ${record.center}
-📋 *الامتحان:* ${currentExam.title} (نموذج ${record.model})
-
-✅ *درجة الاختياري (MCQ):* ${record.mcq_score}
-✍️ *درجة المقالي (Written):* ${record.written_score}
-🏆 *المجموع الكلي:* ${record.total_score} من ${maxScore} (${pct}%)
-🏅 *الترتيب على السنتر:* المركز رقم #${rank}
-
-مع تمنياتنا بدوام التفوق والنجاح! 🌟`;
-
-            const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-            window.open(url, '_blank');
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
-        }
-    </script>
-</body>
-</html>
+<!DOCTYPE html>
+
+<html class="light" lang="en">
+
+<head>
+
+    <meta charset="utf-8"/>
+
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+
+    <meta name="theme-color" content="#006d44"/>
+
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+
+    <meta name="apple-mobile-web-app-title" content="Exam Scanner"/>
+
+    <link rel="manifest" href="manifest.json"/>
+
+    <title>Exam Bubble Sheet Scanner - Centers Record</title>
+
+    
+
+    <!-- Material Symbols Outlined -->
+
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+
+    <!-- Google Fonts (Cairo & Inter) -->
+
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+
+    
+
+    <!-- Tailwind CSS -->
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <script id="tailwind-config">
+
+        tailwind.config = {
+
+            darkMode: "class",
+
+            theme: {
+
+                extend: {
+
+                    colors: {
+
+                        primary: "#012d1d",
+
+                        secondary: "#0e6c4a",
+
+                        "secondary-container": "#a0f4c8",
+
+                        "on-secondary-container": "#19724f",
+
+                        surface: "#f5fbf9",
+
+                        "surface-container": "#e9efed",
+
+                        "surface-container-low": "#eff5f3",
+
+                        "surface-container-high": "#e4e9e7",
+
+                        "surface-container-lowest": "#ffffff",
+
+                        "on-surface": "#171d1c",
+
+                        "on-surface-variant": "#414844",
+
+                        outline: "#717973",
+
+                        "outline-variant": "#c1c8c2",
+
+                        error: "#ba1a1a",
+
+                        "error-container": "#ffdad6"
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    </script>
+
+    
+
+    <style>
+
+        body {
+
+            -webkit-tap-highlight-color: transparent;
+
+            font-family: 'Inter', 'Cairo', sans-serif;
+
+            background-color: #f5fbf9;
+
+        }
+
+        .material-symbols-outlined {
+
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+
+        }
+
+        .icon-fill {
+
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+
+        }
+
+        .loading-spinner {
+
+            border: 3px solid rgba(0, 0, 0, 0.1);
+
+            width: 24px;
+
+            height: 24px;
+
+            border-radius: 50%;
+
+            border-left-color: #0e6c4a;
+
+            animation: spin 1s linear infinite;
+
+        }
+
+        @keyframes spin {
+
+            0% { transform: rotate(0deg); }
+
+            100% { transform: rotate(360deg); }
+
+        }
+
+        /* Scanner Viewfinder Box & Dynamic Guidance States */
+        .scan-guide-box {
+            position: absolute;
+            inset: 7%;
+            border: 2.5px dashed rgba(255, 255, 255, 0.7);
+            border-radius: 16px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+            pointer-events: none;
+            transition: all 0.25s ease;
+        }
+        .scan-corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-color: #ffffff;
+            transition: border-color 0.25s ease;
+        }
+        .corner-tl { top: -2px; left: -2px; border-top: 4px solid; border-left: 4px solid; border-top-left-radius: 8px; }
+        .corner-tr { top: -2px; right: -2px; border-top: 4px solid; border-right: 4px solid; border-top-right-radius: 8px; }
+        .corner-bl { bottom: -2px; left: -2px; border-bottom: 4px solid; border-left: 4px solid; border-bottom-left-radius: 8px; }
+        .corner-br { bottom: -2px; right: -2px; border-bottom: 4px solid; border-right: 4px solid; border-bottom-right-radius: 8px; }
+        .guide-box-ready { border: 3px solid #10b981 !important; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55), 0 0 25px rgba(16, 185, 129, 0.6) !important; }
+        .guide-box-ready .scan-corner { border-color: #10b981 !important; }
+        .guide-box-closer { border: 2.5px dashed #f59e0b !important; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55), 0 0 15px rgba(245, 158, 11, 0.4) !important; }
+        .guide-box-closer .scan-corner { border-color: #f59e0b !important; }
+        .guide-box-dark { border: 2.5px solid #ef4444 !important; }
+        .guide-box-dark .scan-corner { border-color: #ef4444 !important; }
+    </style>
+
+
+
+    <!-- Supabase Client & OMR Engine -->
+
+    <script src="supabase.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <script>
+
+        if (typeof pdfjsLib !== 'undefined') {
+
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        }
+
+    </script>
+
+    <script src="omr_engine.js"></script>
+
+</head>
+
+<body class="text-on-surface min-h-screen flex flex-col pb-20">
+
+
+
+    <!-- Header Navigation -->
+
+    <header class="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-outline-variant/60 px-4 py-3">
+
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+
+            <div class="flex items-center gap-2.5">
+
+                <a href="schedule.html" class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
+
+                    <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+
+                </a>
+
+                <div>
+
+                    <h1 class="text-base sm:text-lg font-bold leading-tight flex items-center gap-1.5">
+
+                        <span class="material-symbols-outlined text-secondary text-[20px]">document_scanner</span>
+
+                        <span>Bubble Sheet Scanner</span>
+
+                    </h1>
+
+                    <p class="text-[11px] text-on-surface-variant">Mr. Kelany Exams & OMR Marking</p>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="flex items-center gap-2">
+
+                <a href="admin.html" class="px-2.5 py-1.5 bg-surface-container hover:bg-surface-container-high text-xs font-semibold rounded-xl inline-flex items-center gap-1 border border-outline-variant/50 transition-colors">
+
+                    <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+
+                    <span class="hidden sm:inline">Admin</span>
+
+                </a>
+
+                <button type="button" onclick="refreshExamData()" title="Refresh Exams" class="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface active:scale-95 transition-all">
+
+                    <span class="material-symbols-outlined text-[20px]" id="refresh-icon">refresh</span>
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- Main Content Container -->
+
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 space-y-4">
+
+
+
+        <!-- Active Exam Selector Card -->
+
+        <section class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl p-4 shadow-sm">
+
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+                <div class="flex-1">
+
+                    <label for="active_exam_select" class="block text-xs font-bold text-on-surface mb-1">
+
+                        Select Active Exam (اختر الامتحان):
+
+                    </label>
+
+                    <select id="active_exam_select" onchange="onExamSelected()" class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-sm font-semibold p-2.5 focus:border-secondary focus:ring-1 focus:ring-secondary">
+
+                        <option value="">Loading exams...</option>
+
+                    </select>
+
+                </div>
+
+
+
+                <div class="w-full sm:w-48">
+
+                    <label for="center_filter_select" class="block text-xs font-bold text-on-surface mb-1">
+
+                        Current Center (السنتر):
+
+                    </label>
+
+                    <select id="center_filter_select" onchange="onCenterFilterChanged()" class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-sm font-semibold p-2.5 focus:border-secondary focus:ring-1 focus:ring-secondary">
+
+                        <option value="All Centers">All Centers (الكل)</option>
+
+                        <option value="الاوائل (حدايق القبه)">الاوائل (حدايق القبه)</option>
+
+                        <option value="First Elharam">First Elharam</option>
+
+                        <option value="i Learn Helwan">i Learn Helwan</option>
+
+                        <option value="Future soft (زهراء مدينه نصر)">Future soft</option>
+
+                        <option value="Dar Elsaaada">Dar Elsaaada</option>
+
+                        <option value="Newstar (المعادي)">Newstar (المعادي)</option>
+
+                        <option value="Capital (مصر الجديده)">Capital</option>
+
+                        <option value="Learn ELdokki">Learn ELdokki</option>
+
+                        <option value="Top Academy (التجمع الاول )">Top Academy</option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Exam Details Banner -->
+
+            <div id="exam_info_banner" class="hidden mt-3 pt-3 border-t border-surface-variant flex flex-wrap items-center justify-between gap-2 text-xs">
+
+                <div class="flex items-center gap-3 font-semibold text-on-surface-variant">
+
+                    <span id="banner_questions_count">30 MCQs</span>
+
+                    <span>•</span>
+
+                    <span id="banner_written_score">Written: 20 pts</span>
+
+                    <span>•</span>
+
+                    <span id="banner_total_score" class="text-secondary font-bold">Total: 50 Marks</span>
+
+                </div>
+
+                <div id="banner_models_badge" class="px-2 py-0.5 rounded-lg bg-secondary-container text-on-secondary-container font-bold text-[11px]">
+
+                    Models: A, B
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- Scanner Card -->
+
+        <section id="scanner_section" class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl p-4 shadow-sm text-center">
+
+            
+
+            <!-- Idle / Launch View -->
+
+            <div id="scanner_idle_view" class="py-6 flex flex-col items-center gap-3">
+
+                <div class="w-16 h-16 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center ring-8 ring-secondary/5">
+
+                    <span class="material-symbols-outlined text-[36px]">photo_camera</span>
+
+                </div>
+
+                <div>
+
+                    <h2 class="text-base font-bold">Scan Student Bubble Sheet</h2>
+
+                    <p class="text-xs text-on-surface-variant max-w-sm mt-0.5">
+
+                        Position the phone directly over the student's sheet. The 4 black corner squares ensure alignment.
+
+                    </p>
+
+                </div>
+
+
+
+                <div class="flex flex-wrap items-center justify-center gap-2.5 mt-2 w-full max-w-xs">
+
+                    <button type="button" onclick="startCameraScanner()" class="flex-1 py-3 px-4 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-sm inline-flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">
+
+                        <span class="material-symbols-outlined text-[20px]">videocam</span>
+
+                        <span>Open Camera</span>
+
+                    </button>
+
+                    
+
+                    <label class="flex-1 py-3 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface font-semibold text-sm inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all">
+
+                        <span class="material-symbols-outlined text-[20px]">upload_file</span>
+
+                        <span>Upload Photo</span>
+
+                        <input type="file" id="photo_file_input" accept="image/*,application/pdf" capture="environment" class="hidden" onchange="handlePhotoUpload(event)"/>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Live Camera Viewfinder -->
+
+            <div id="scanner_live_view" class="hidden relative rounded-xl overflow-hidden bg-black max-w-md mx-auto aspect-[3/4]">
+                <video id="camera_video" autoplay playsinline class="w-full h-full object-cover"></video>
+                <canvas id="hidden_processing_canvas" class="hidden"></canvas>
+                <canvas id="live_guidance_canvas" class="hidden"></canvas>
+                
+                <!-- Viewfinder Guide Box -->
+                <div id="scan_guide_box" class="scan-guide-box">
+                    <div class="scan-corner corner-tl"></div>
+                    <div class="scan-corner corner-tr"></div>
+                    <div class="scan-corner corner-bl"></div>
+                    <div class="scan-corner corner-br"></div>
+                </div>
+
+                <!-- Dynamic Live Status Banner at Top -->
+                <div class="absolute top-3 inset-x-3 flex items-center justify-between text-white text-xs z-10">
+                    <span id="scanner_status_badge" class="px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md font-bold flex items-center gap-2 shadow-lg transition-all duration-300">
+                        <span id="scanner_status_dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span id="scanner_status_text">Align Sheet Inside Box</span>
+                    </span>
+                    <button type="button" onclick="stopCamera()" class="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center active:scale-95 text-white">
+                        <span class="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Live Distance / Guidance Hint above shutter -->
+                <div id="scanner_guidance_container" class="absolute bottom-24 inset-x-4 text-center z-10 transition-all pointer-events-none">
+                    <span id="scanner_guidance_pill" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/80 backdrop-blur-md text-xs font-bold text-amber-300 border border-amber-400/40 shadow-xl transition-all">
+                        <span class="material-symbols-outlined text-[16px]">zoom_in</span>
+                        <span id="scanner_guidance_text">Move Closer to Paper (اقترب أكثر)</span>
+                    </span>
+                </div>
+
+                <!-- Capture Action Button -->
+                <div class="absolute bottom-4 inset-x-0 flex items-center justify-center gap-4 z-10">
+                    <button id="btn_capture_frame" type="button" onclick="captureAndProcessFrame()" class="w-16 h-16 rounded-full bg-white text-secondary p-1 shadow-2xl active:scale-90 transition-all flex items-center justify-center ring-4 ring-white/40">
+                        <div id="capture_inner_circle" class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center transition-colors">
+                            <span class="material-symbols-outlined text-[26px]">camera</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+
+        <!-- Marking & Verification Review Card (Appears after sheet is scanned) -->
+
+        <section id="review_card" class="hidden bg-surface-container-lowest border-2 border-secondary/40 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 animate-fade-in">
+
+            <div class="flex items-center justify-between pb-3 border-b border-surface-variant">
+
+                <div class="flex items-center gap-2">
+
+                    <span class="material-symbols-outlined text-secondary text-[22px]">verified</span>
+
+                    <h3 class="font-bold text-base">Grading & Review (مراجعة ورقة الطالب)</h3>
+
+                </div>
+
+                <button type="button" onclick="resetScannerForNext()" class="text-xs text-on-surface-variant hover:text-error flex items-center gap-1 font-semibold">
+
+                    <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+
+                    <span>Discard & Re-scan</span>
+
+                </button>
+
+            </div>
+
+
+
+            <!-- Student Code & Model Row -->
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                <div>
+
+                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student ID (كود الطالب):</label>
+
+                    <input type="text" id="review_student_code" placeholder="e.g. 1042" 
+
+                        class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-base font-extrabold tracking-wider p-2 text-center focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+
+                </div>
+
+
+
+                <div>
+
+                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Student Name (اسم الطالب):</label>
+
+                    <input type="text" id="review_student_name" placeholder="Optional / اختياري" 
+
+                        class="w-full bg-surface-container-low border border-outline-variant rounded-xl text-sm font-semibold p-2 focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+
+                </div>
+
+
+
+                <div>
+
+                    <label class="block text-[11px] font-bold text-on-surface-variant mb-1">Exam Model (النموذج):</label>
+
+                    <div class="flex items-center gap-1.5" id="model_toggle_container">
+
+                        <button type="button" onclick="selectReviewModel('A')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="A">A</button>
+
+                        <button type="button" onclick="selectReviewModel('B')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="B">B</button>
+
+                        <button type="button" onclick="selectReviewModel('C')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="C">C</button>
+
+                        <button type="button" onclick="selectReviewModel('D')" class="model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container" data-model="D">D</button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Score Summary Cards -->
+
+            <div class="grid grid-cols-3 gap-2.5 pt-1">
+
+                <div class="bg-surface-container-low rounded-xl p-3 border border-outline-variant/60 text-center">
+
+                    <span class="block text-[11px] font-semibold text-on-surface-variant">MCQ Score</span>
+
+                    <strong id="review_mcq_score" class="text-xl sm:text-2xl font-extrabold text-secondary">0 / 30</strong>
+
+                    <span id="review_mcq_percent" class="block text-[10px] text-on-surface-variant mt-0.5">0%</span>
+
+                </div>
+
+
+
+                <div class="bg-amber-500/10 rounded-xl p-3 border border-amber-500/30 text-center">
+
+                    <span class="block text-[11px] font-semibold text-amber-800 dark:text-amber-300">Written Score</span>
+
+                    <strong id="review_written_display" class="text-xl sm:text-2xl font-extrabold text-amber-700 dark:text-amber-400">0 / 20</strong>
+
+                    <span class="block text-[10px] text-amber-700/80">المقالي</span>
+
+                </div>
+
+
+
+                <div class="bg-secondary-container/60 rounded-xl p-3 border border-secondary/40 text-center">
+
+                    <span class="block text-[11px] font-semibold text-on-secondary-container">Total Score</span>
+
+                    <strong id="review_total_score" class="text-xl sm:text-2xl font-extrabold text-secondary">0 / 50</strong>
+
+                    <span id="review_total_percent" class="block text-[10px] font-bold text-secondary mt-0.5">0%</span>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Visual Human Review: Side-by-Side Original vs Rectified Aligned Canvas with Overlays -->
+
+            <div class="bg-surface-container-low border border-outline-variant/60 rounded-xl p-3.5 space-y-3">
+
+                <div class="flex items-center justify-between">
+
+                    <span class="text-xs font-bold text-on-surface flex items-center gap-1.5">
+
+                        <span class="material-symbols-outlined text-secondary text-[18px]">compare</span>
+
+                        <span>Sheet Alignment & Visual Detection Preview</span>
+
+                    </span>
+
+                    <span id="rectified_badge" class="px-2 py-0.5 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px]">
+
+                        Perspective Aligned
+
+                    </span>
+
+                </div>
+
+
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                    <div class="space-y-1">
+
+                        <span class="block text-[11px] font-bold text-on-surface-variant">Original Image:</span>
+
+                        <div class="rounded-xl overflow-hidden border border-outline-variant bg-black/5 aspect-[3/4] flex items-center justify-center max-h-64">
+
+                            <img id="review_original_img" class="w-full h-full object-contain" alt="Original Scan"/>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="space-y-1">
+
+                        <span class="block text-[11px] font-bold text-on-surface-variant">Aligned Sheet & Detected Bubbles:</span>
+
+                        <div class="rounded-xl overflow-hidden border border-outline-variant bg-black/5 aspect-[3/4] flex items-center justify-center max-h-64">
+
+                            <canvas id="review_aligned_canvas" class="w-full h-full object-contain"></canvas>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Written Grade Input Tool -->
+
+            <div class="bg-surface-container-low border border-outline-variant/60 rounded-xl p-3.5 space-y-2">
+
+                <div class="flex items-center justify-between">
+
+                    <label for="input_written_score" class="text-xs font-bold text-on-surface flex items-center gap-1.5">
+
+                        <span class="material-symbols-outlined text-amber-600 text-[18px]">edit_note</span>
+
+                        <span>Enter Written Question Grade (درجة السؤال المقالي):</span>
+
+                    </label>
+
+                    <span id="written_max_hint" class="text-xs font-bold text-on-surface-variant">Max: 20 pts</span>
+
+                </div>
+
+
+
+                <div class="flex items-center gap-2">
+
+                    <button type="button" onclick="adjustWrittenScore(-1)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-bold text-base active:scale-95 transition-all">-1</button>
+
+                    <button type="button" onclick="adjustWrittenScore(-0.5)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-semibold text-xs active:scale-95 transition-all">-½</button>
+
+                    
+
+                    <input type="number" id="input_written_score" min="0" step="0.5" value="0" oninput="onWrittenScoreInput()" 
+
+                        class="flex-1 bg-surface-container-lowest border border-outline-variant rounded-xl text-center font-extrabold text-xl py-2 focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+
+                    
+
+                    <button type="button" onclick="adjustWrittenScore(0.5)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-semibold text-xs active:scale-95 transition-all">+½</button>
+
+                    <button type="button" onclick="adjustWrittenScore(1)" class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant font-bold text-base active:scale-95 transition-all">+1</button>
+
+                    <button type="button" onclick="setWrittenScoreMax()" class="px-3 h-10 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 font-bold text-xs active:scale-95 transition-all">Max</button>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Detected Question Answers Quick Review Grid -->
+
+            <div>
+
+                <div class="flex items-center justify-between mb-2">
+
+                    <span class="text-xs font-bold text-on-surface">Question Breakdown (اضغط على أي سؤال للتعديل):</span>
+
+                    <span class="text-[11px] text-on-surface-variant" id="review_breakdown_hint">Tap option to correct</span>
+
+                </div>
+
+                <div id="review_questions_grid" class="grid grid-cols-2 sm:grid-cols-5 gap-2 max-h-56 overflow-y-auto p-2 bg-surface-container-low rounded-xl border border-outline-variant/50 text-xs">
+
+                    <!-- Populated dynamically -->
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Action Submit Button -->
+
+            <button type="button" id="btn_save_exam_result" onclick="saveStudentResult()" class="w-full py-3.5 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-sm inline-flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all">
+
+                <span class="material-symbols-outlined text-[20px]">save</span>
+
+                <span>Confirm & Save Result (حفظ النتيجة)</span>
+
+            </button>
+
+        </section>
+
+
+
+        <!-- Center Leaderboard & Recent Submissions -->
+
+        <section class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl p-4 shadow-sm space-y-3">
+
+            <div class="flex items-center justify-between">
+
+                <div class="flex items-center gap-2">
+
+                    <span class="material-symbols-outlined text-secondary text-[22px]">leaderboard</span>
+
+                    <h3 class="font-bold text-sm sm:text-base">Center Leaderboard (ترتيب درجات السنتر)</h3>
+
+                </div>
+
+                <span id="results_count_badge" class="px-2 py-0.5 rounded-lg bg-surface-container text-xs font-bold">0 Students</span>
+
+            </div>
+
+
+
+            <!-- Results Table -->
+
+            <div class="overflow-x-auto rounded-xl border border-outline-variant/50">
+
+                <table class="w-full text-left text-xs">
+
+                    <thead class="bg-surface-container text-on-surface-variant font-bold border-b border-outline-variant/60">
+
+                        <tr>
+
+                            <th class="py-2.5 px-3 text-center">#</th>
+
+                            <th class="py-2.5 px-3">Student</th>
+
+                            <th class="py-2.5 px-3 text-center">Model</th>
+
+                            <th class="py-2.5 px-3 text-center">MCQ</th>
+
+                            <th class="py-2.5 px-3 text-center">Written</th>
+
+                            <th class="py-2.5 px-3 text-center font-bold">Total</th>
+
+                            <th class="py-2.5 px-3 text-center">%</th>
+
+                            <th class="py-2.5 px-3 text-right">Actions</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="leaderboard_tbody" class="divide-y divide-outline-variant/40 font-medium">
+
+                        <tr>
+
+                            <td colspan="8" class="text-center py-6 text-on-surface-variant">No exam results recorded yet today.</td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+
+    </main>
+
+
+
+    <!-- Quality Rejection Alert Modal -->
+
+    <div id="quality_rejection_modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+
+        <div class="bg-surface rounded-2xl max-w-sm w-full p-5 border border-outline-variant shadow-2xl space-y-4 text-center animate-fade-in">
+
+            <div class="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto ring-8 ring-rose-500/5">
+
+                <span class="material-symbols-outlined text-[32px]">warning</span>
+
+            </div>
+
+            <div>
+
+                <h3 id="qr_title" class="text-base font-bold text-on-surface">Image Quality Too Low</h3>
+
+                <p id="qr_message" class="text-xs text-on-surface-variant mt-1">The image is blurry or out of focus. Please hold your camera steady and retake.</p>
+
+            </div>
+
+            <div class="bg-surface-container-low rounded-xl p-3 text-left text-[11px] space-y-1 font-mono text-on-surface-variant" id="qr_details">
+
+                <!-- Populated dynamically -->
+
+            </div>
+
+            <button type="button" onclick="closeQualityModal()" class="w-full py-2.5 rounded-xl bg-secondary text-white font-bold text-xs shadow-sm hover:bg-secondary/90 transition-all">
+
+                Try Scanning Again
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- Notification Toast -->
+
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg transition-all duration-300 pointer-events-none opacity-0 translate-y-2"></div>
+
+
+
+    <!-- Application Script -->
+
+    <script>
+
+        // --- Supabase Config ---
+
+        const SUPABASE_URL = 'https://mwposurgahrcdexfvywa.supabase.co';
+
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13cG9zdXJnYWhyY2RleGZ2eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE2NDAsImV4cCI6MjEwNzIxNzY0MH0.fxr7qxygr5Fl8urhcFWC1oYYqAxtYiObf5kNGnInPfk';
+
+        let supabaseClient = null;
+
+        try {
+
+            if (window.supabase) {
+
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+            }
+
+        } catch(e) {}
+
+
+
+        // --- State Variables ---
+
+        let allExams = [];
+
+        let currentExam = null;
+
+        let examResults = [];
+
+        let activeMediaStream = null;
+
+        let scannedData = null; // Holds { studentCode, model, answers, mcqScore, writtenScore, totalScore }
+
+
+
+        // --- Initialization ---
+
+        document.addEventListener('DOMContentLoaded', async () => {
+
+            await loadExams();
+
+        });
+
+
+
+        // --- Notification Toast ---
+
+        function showToast(msg, type = 'info') {
+
+            const toast = document.getElementById('toast');
+
+            if (!toast) return;
+
+            toast.textContent = msg;
+
+            if (type === 'success') toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg bg-emerald-600 text-white transition-all opacity-100 translate-y-0';
+
+            else if (type === 'error') toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg bg-rose-600 text-white transition-all opacity-100 translate-y-0';
+
+            else toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg bg-primary text-white transition-all opacity-100 translate-y-0';
+
+            setTimeout(() => {
+
+                toast.classList.replace('opacity-100', 'opacity-0');
+
+                toast.classList.replace('translate-y-0', 'translate-y-2');
+
+            }, 3000);
+
+        }
+
+
+
+        // --- Audio Chime ---
+
+        function playChime(success = true) {
+
+            try {
+
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+                const osc = ctx.createOscillator();
+
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+
+                osc.frequency.setValueAtTime(success ? 660 : 300, ctx.currentTime);
+
+                if (success) osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.35);
+
+                osc.connect(gain);
+
+                gain.connect(ctx.destination);
+
+                osc.start();
+
+                osc.stop(ctx.currentTime + 0.35);
+
+            } catch(e) {}
+
+        }
+
+
+
+        // --- Load Exams from Supabase / Local Fallback ---
+
+        async function loadExams() {
+
+            const selectEl = document.getElementById('active_exam_select');
+
+            if (selectEl) selectEl.innerHTML = `<option value="">Loading exams...</option>`;
+
+
+
+            let cloudFetched = false;
+
+            try {
+
+                if (supabaseClient) {
+
+                    const { data, error } = await supabaseClient.from('exams').select('*').order('created_at', { ascending: false });
+
+                    if (!error && Array.isArray(data)) {
+
+                        cloudFetched = true;
+
+                        allExams = data.filter(e => e.status === 'active');
+
+                        try { localStorage.setItem('mr_kelany_exams', JSON.stringify(data)); } catch(e) {}
+
+                    }
+
+                }
+
+            } catch(e) {
+
+                console.warn("Supabase exams load fallback:", e);
+
+            }
+
+
+
+            // Fallback: Check local storage only if offline or network error
+
+            if (!cloudFetched && allExams.length === 0) {
+
+                try {
+
+                    const cached = JSON.parse(localStorage.getItem('mr_kelany_exams') || '[]');
+
+                    if (cached.length > 0) allExams = cached.filter(e => e.status === 'active');
+
+                } catch(e) {}
+
+            }
+
+
+
+            if (!selectEl) return;
+
+
+
+            if (allExams.length === 0) {
+
+                selectEl.innerHTML = `<option value="">No active exams found (لا توجد امتحانات مفعلة)</option>`;
+
+                currentExam = null;
+
+                const titleEl = document.getElementById('banner_exam_title');
+
+                if (titleEl) titleEl.textContent = 'No Active Exam Selected';
+
+                return;
+
+            }
+
+
+
+            // Preserve currently selected exam if still available
+
+            const prevSelectedId = currentExam ? currentExam.id : '';
+
+            selectEl.innerHTML = allExams.map(ex => `
+
+                <option value="${ex.id}" ${ex.id === prevSelectedId ? 'selected' : ''}>${escapeHtml(ex.title)} (${ex.question_count} Qs • ${ex.total_score || 50} pts)</option>
+
+            `).join('');
+
+
+
+            onExamSelected();
+
+        }
+
+
+
+        // --- Realtime Exam Sync Listener ---
+
+        if (supabaseClient) {
+
+            try {
+
+                const examsChannel = supabaseClient.channel('assistant_arrivals');
+
+                examsChannel.on('broadcast', { event: 'exam_updated' }, async ({ payload }) => {
+
+                    console.log('Realtime exam update received from admin:', payload);
+
+                    await loadExams();
+
+                    if (payload && payload.action === 'create') {
+
+                        showToast('New exam created by admin! (تمت إضافة امتحان جديد)', 'success');
+
+                    } else if (payload && payload.action === 'delete') {
+
+                        showToast('Exam list updated by admin', 'info');
+
+                    }
+
+                });
+
+                examsChannel.subscribe();
+
+            } catch(e) {
+
+                console.warn("Could not subscribe to exam updates channel:", e);
+
+            }
+
+        }
+
+
+
+        function onExamSelected() {
+
+            const selectEl = document.getElementById('active_exam_select');
+
+            const selectedId = selectEl.value;
+
+            currentExam = allExams.find(e => e.id === selectedId) || allExams[0];
+
+            if (!currentExam) return;
+
+
+
+            // Update Exam Banner
+
+            const banner = document.getElementById('exam_info_banner');
+
+            banner.classList.remove('hidden');
+
+            document.getElementById('banner_questions_count').textContent = `${currentExam.question_count || 30} MCQs`;
+
+            document.getElementById('banner_written_score').textContent = `Written: ${currentExam.written_max_score || 20} pts`;
+
+            document.getElementById('banner_total_score').textContent = `Total: ${currentExam.total_score || 50} Marks`;
+
+            
+
+            const models = currentExam.models ? Object.keys(currentExam.models).join(', ') : 'A';
+
+            document.getElementById('banner_models_badge').textContent = `Models: ${models}`;
+
+
+
+            document.getElementById('written_max_hint').textContent = `Max: ${currentExam.written_max_score || 20} pts`;
+
+
+
+            loadLeaderboard();
+
+        }
+
+
+
+        function onCenterFilterChanged() {
+
+            loadLeaderboard();
+
+        }
+
+
+
+        // --- Load Leaderboard for Selected Exam & Center ---
+
+        async function loadLeaderboard() {
+
+            if (!currentExam) return;
+
+            const centerFilter = document.getElementById('center_filter_select').value;
+
+            const tbody = document.getElementById('leaderboard_tbody');
+
+            const countBadge = document.getElementById('results_count_badge');
+
+
+
+            let results = [];
+
+            try {
+
+                if (supabaseClient) {
+
+                    let q = supabaseClient.from('exam_results').select('*').eq('exam_id', currentExam.id);
+
+                    if (centerFilter && centerFilter !== 'All Centers') {
+
+                        q = q.eq('center', centerFilter);
+
+                    }
+
+                    const { data, error } = await q.order('total_score', { ascending: false });
+
+                    if (!error && data) results = data;
+
+                }
+
+            } catch(e) {}
+
+
+
+            if (results.length === 0) {
+
+                try {
+
+                    const localRes = JSON.parse(localStorage.getItem('mr_kelany_exam_results_' + currentExam.id) || '[]');
+
+                    results = localRes;
+
+                    if (centerFilter && centerFilter !== 'All Centers') {
+
+                        results = results.filter(r => r.center === centerFilter);
+
+                    }
+
+                    results.sort((a, b) => b.total_score - a.total_score);
+
+                } catch(e) {}
+
+            }
+
+
+
+            examResults = results;
+
+            countBadge.textContent = `${results.length} Students`;
+
+
+
+            if (results.length === 0) {
+
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-on-surface-variant">No exam results recorded yet for this center.</td></tr>`;
+
+                return;
+
+            }
+
+
+
+            tbody.innerHTML = results.map((r, idx) => {
+
+                const rank = idx + 1;
+
+                const totalScore = parseFloat(r.total_score) || 0;
+
+                const maxScore = parseFloat(currentExam.total_score) || 50;
+
+                const percent = Math.round((totalScore / maxScore) * 100);
+
+
+
+                let rankBadge = `<span class="font-bold text-on-surface-variant">#${rank}</span>`;
+
+                if (rank === 1) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-amber-950 font-black text-xs shadow-sm">1</span>`;
+
+                else if (rank === 2) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300 text-slate-800 font-bold text-xs">2</span>`;
+
+                else if (rank === 3) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-600/30 text-amber-900 font-bold text-xs">3</span>`;
+
+
+
+                return `
+
+                    <tr class="hover:bg-surface-container/50 transition-colors">
+
+                        <td class="py-2.5 px-3 text-center">${rankBadge}</td>
+
+                        <td class="py-2.5 px-3">
+
+                            <strong class="text-on-surface block">${escapeHtml(r.student_name || 'Student ' + (r.student_code || ''))}</strong>
+
+                            <span class="text-[10px] text-on-surface-variant font-mono">ID: ${escapeHtml(r.student_code || 'N/A')}</span>
+
+                        </td>
+
+                        <td class="py-2.5 px-3 text-center">
+
+                            <span class="px-1.5 py-0.5 rounded bg-surface-container font-bold text-[11px]">${r.model || 'A'}</span>
+
+                        </td>
+
+                        <td class="py-2.5 px-3 text-center font-semibold text-secondary">${r.mcq_score}</td>
+
+                        <td class="py-2.5 px-3 text-center font-semibold text-amber-700 dark:text-amber-400">${r.written_score}</td>
+
+                        <td class="py-2.5 px-3 text-center font-black text-sm text-secondary">${totalScore}</td>
+
+                        <td class="py-2.5 px-3 text-center font-bold text-xs ${percent >= 85 ? 'text-emerald-600' : percent >= 65 ? 'text-secondary' : 'text-rose-600'}">${percent}%</td>
+
+                        <td class="py-2.5 px-3 text-right">
+
+                            <button type="button" onclick="sendStudentWhatsApp('${r.id || idx}')" title="Send WhatsApp Message" class="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 active:scale-90 transition-all inline-flex items-center">
+
+                                <span class="material-symbols-outlined text-[16px]">chat</span>
+
+                            </button>
+
+                        </td>
+
+                    </tr>
+
+                `;
+
+            }).join('');
+
+        }
+
+
+
+        // --- Camera & Scanner Controls ---
+
+        let liveGuidanceInterval = null;
+        let lastGuidanceState = 'SEARCHING';
+
+        async function startCameraScanner() {
+            const idleView = document.getElementById('scanner_idle_view');
+            const liveView = document.getElementById('scanner_live_view');
+            const video = document.getElementById('camera_video');
+
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+
+                activeMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = activeMediaStream;
+                await video.play();
+
+                idleView.classList.add('hidden');
+                liveView.classList.remove('hidden');
+
+                startLiveGuidance();
+            } catch(e) {
+                console.error('Camera access error:', e);
+                showToast('Could not access camera. Please allow camera permissions.', 'error');
+            }
+        }
+
+        function stopCamera() {
+            stopLiveGuidance();
+            if (activeMediaStream) {
+                activeMediaStream.getTracks().forEach(t => t.stop());
+                activeMediaStream = null;
+            }
+            document.getElementById('scanner_live_view').classList.add('hidden');
+            document.getElementById('scanner_idle_view').classList.remove('hidden');
+        }
+
+        function startLiveGuidance() {
+            if (liveGuidanceInterval) clearInterval(liveGuidanceInterval);
+            lastGuidanceState = '';
+            liveGuidanceInterval = setInterval(analyzeLiveCameraFrame, 220);
+        }
+
+        function stopLiveGuidance() {
+            if (liveGuidanceInterval) {
+                clearInterval(liveGuidanceInterval);
+                liveGuidanceInterval = null;
+            }
+        }
+
+        function analyzeLiveCameraFrame() {
+            const video = document.getElementById('camera_video');
+            if (!video || video.readyState < 2 || video.paused || video.ended) return;
+
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (vw === 0 || vh === 0) return;
+
+            let gCanvas = document.getElementById('live_guidance_canvas');
+            if (!gCanvas) {
+                gCanvas = document.createElement('canvas');
+                gCanvas.id = 'live_guidance_canvas';
+                gCanvas.className = 'hidden';
+                document.body.appendChild(gCanvas);
+            }
+            const sampleW = 160;
+            const sampleH = 213;
+            gCanvas.width = sampleW;
+            gCanvas.height = sampleH;
+            const gCtx = gCanvas.getContext('2d');
+            gCtx.drawImage(video, 0, 0, sampleW, sampleH);
+
+            const imgData = gCtx.getImageData(0, 0, sampleW, sampleH).data;
+            let sumLum = 0;
+            let darkCount = 0;
+            let minDarkX = sampleW, maxDarkX = 0, minDarkY = sampleH, maxDarkY = 0;
+
+            const gray = new Uint8Array(sampleW * sampleH);
+            for (let i = 0, j = 0; i < imgData.length; i += 4, j++) {
+                const lum = Math.round((imgData[i] * 299 + imgData[i + 1] * 587 + imgData[i + 2] * 114) / 1000);
+                gray[j] = lum;
+                sumLum += lum;
+            }
+            const meanLum = sumLum / gray.length;
+            const darkThresh = Math.min(80, meanLum * 0.55);
+
+            for (let y = 10; y < sampleH - 10; y += 3) {
+                const row = y * sampleW;
+                for (let x = 10; x < sampleW - 10; x += 3) {
+                    if (gray[row + x] < darkThresh) {
+                        darkCount++;
+                        if (x < minDarkX) minDarkX = x;
+                        if (x > maxDarkX) maxDarkX = x;
+                        if (y < minDarkY) minDarkY = y;
+                        if (y > maxDarkY) maxDarkY = y;
+                    }
+                }
+            }
+
+            const darkSpanW = (maxDarkX > minDarkX) ? (maxDarkX - minDarkX) / sampleW : 0;
+            const darkSpanH = (maxDarkY > minDarkY) ? (maxDarkY - minDarkY) / sampleH : 0;
+
+            let newState = 'SEARCHING';
+            if (meanLum < 38) {
+                newState = 'TOO_DARK';
+            } else if (darkCount < 8 || darkSpanW < 0.25 || darkSpanH < 0.20) {
+                newState = 'SEARCHING';
+            } else if (darkSpanW < 0.55 || darkSpanH < 0.45) {
+                newState = 'TOO_FAR';
+            } else if (darkSpanW > 0.96 || darkSpanH > 0.96) {
+                newState = 'TOO_CLOSE';
+            } else {
+                newState = 'READY';
+            }
+
+            updateLiveGuidanceUI(newState);
+        }
+
+        function updateLiveGuidanceUI(state) {
+            if (state === lastGuidanceState) return;
+            lastGuidanceState = state;
+
+            const guideBox = document.getElementById('scan_guide_box');
+            const statusBadge = document.getElementById('scanner_status_badge');
+            const statusDot = document.getElementById('scanner_status_dot');
+            const statusText = document.getElementById('scanner_status_text');
+            const guidancePill = document.getElementById('scanner_guidance_pill');
+            const guidanceText = document.getElementById('scanner_guidance_text');
+            const captureBtn = document.getElementById('btn_capture_frame');
+            const innerCircle = document.getElementById('capture_inner_circle');
+
+            if (guideBox) guideBox.className = 'scan-guide-box';
+
+            if (state === 'READY') {
+                if (guideBox) guideBox.classList.add('guide-box-ready');
+                if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-full bg-emerald-600 text-white font-extrabold flex items-center gap-2 shadow-lg transition-all';
+                if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-200 animate-ping';
+                if (statusText) statusText.textContent = 'Ready to Scan! (الورقة مضبوطة)';
+                if (guidancePill) guidancePill.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-700/90 text-white font-black text-xs border border-emerald-400/60 shadow-xl';
+                if (guidanceText) guidanceText.textContent = '✅ Perfect Distance! Tap Shutter';
+                if (captureBtn) captureBtn.className = 'w-16 h-16 rounded-full bg-white text-emerald-600 p-1 shadow-2xl active:scale-90 transition-all flex items-center justify-center ring-4 ring-emerald-400 animate-pulse';
+                if (innerCircle) innerCircle.className = 'w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center transition-colors';
+            } else if (state === 'TOO_FAR') {
+                if (guideBox) guideBox.classList.add('guide-box-closer');
+                if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-full bg-amber-500 text-slate-900 font-extrabold flex items-center gap-2 shadow-lg transition-all';
+                if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-900 animate-pulse';
+                if (statusText) statusText.textContent = 'Move Closer (اقترب أكثر)';
+                if (guidancePill) guidancePill.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/90 text-slate-950 font-black text-xs border border-amber-300 shadow-xl animate-bounce';
+                if (guidanceText) guidanceText.textContent = '🔍 Move camera closer to fill the box';
+                if (captureBtn) captureBtn.className = 'w-16 h-16 rounded-full bg-white text-secondary p-1 shadow-2xl active:scale-90 transition-all flex items-center justify-center ring-4 ring-white/40';
+                if (innerCircle) innerCircle.className = 'w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center transition-colors';
+            } else if (state === 'TOO_CLOSE') {
+                if (guideBox) guideBox.classList.add('guide-box-closer');
+                if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-full bg-amber-500 text-slate-900 font-extrabold flex items-center gap-2 shadow-lg transition-all';
+                if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-900 animate-pulse';
+                if (statusText) statusText.textContent = 'Move Back a Bit (ابتعد قليلاً)';
+                if (guidancePill) guidancePill.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/90 text-slate-950 font-black text-xs border border-amber-300 shadow-xl';
+                if (guidanceText) guidanceText.textContent = '↔️ Keep entire sheet inside box';
+                if (captureBtn) captureBtn.className = 'w-16 h-16 rounded-full bg-white text-secondary p-1 shadow-2xl active:scale-90 transition-all flex items-center justify-center ring-4 ring-white/40';
+                if (innerCircle) innerCircle.className = 'w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center transition-colors';
+            } else if (state === 'TOO_DARK') {
+                if (guideBox) guideBox.classList.add('guide-box-dark');
+                if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-full bg-rose-600 text-white font-extrabold flex items-center gap-2 shadow-lg transition-all';
+                if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-200 animate-ping';
+                if (statusText) statusText.textContent = 'Too Dark (الإضاءة ضعيفة)';
+                if (guidancePill) guidancePill.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-700/90 text-white font-black text-xs border border-rose-400 shadow-xl';
+                if (guidanceText) guidanceText.textContent = '💡 Turn on room lights or flash';
+                if (captureBtn) captureBtn.className = 'w-16 h-16 rounded-full bg-white text-secondary p-1 shadow-2xl active:scale-90 transition-all flex items-center justify-center ring-4 ring-white/40';
+                if (innerCircle) innerCircle.className = 'w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center transition-colors';
+            } else {
+                if (statusBadge) statusBadge.className = 'px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md font-bold text-white flex items-center gap-2 shadow-lg transition-all';
+                if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+                if (statusText) statusText.textContent = 'Align Sheet Inside Box';
+                if (guidancePill) guidancePill.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/80 backdrop-blur-md text-xs font-bold text-amber-300 border border-amber-400/40 shadow-xl';
+                if (guidanceText) guidanceText.textContent = '📐 Center paper inside guide box';
+                if (captureBtn) captureBtn.className = 'w-16 h-16 rounded-full bg-white text-secondary p-1 shadow-2xl active:scale-90 transition-all flex items-center justify-center ring-4 ring-white/40';
+                if (innerCircle) innerCircle.className = 'w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center transition-colors';
+            }
+        }
+
+        function captureAndProcessFrame() {
+
+            const video = document.getElementById('camera_video');
+
+            const liveView = document.getElementById('scanner_live_view');
+
+            const canvas = document.getElementById('hidden_processing_canvas');
+
+            if (!video || !canvas) return;
+
+
+
+            const vw = video.videoWidth || 1280;
+
+            const vh = video.videoHeight || 720;
+
+
+
+            // In the live viewfinder, object-cover displays a centered container crop.
+
+            // When user aligns the paper inside the guide box, we crop precisely to that area
+
+            // with a small safety margin, so the paper dominates the canvas.
+
+            let cropX = 0, cropY = 0, cropW = vw, cropH = vh;
+
+            if (liveView && liveView.clientWidth > 0 && liveView.clientHeight > 0) {
+
+                const cw = liveView.clientWidth;
+
+                const ch = liveView.clientHeight;
+
+                const scale = Math.max(cw / vw, ch / vh);
+
+                const visW = cw / scale;
+
+                const visH = ch / scale;
+
+                const origX = (vw - visW) / 2;
+
+                const origY = (vh - visH) / 2;
+
+
+
+                // Crop inside the visible region with 4% safety margin around the guide box
+
+                cropX = Math.max(0, Math.round(origX + visW * 0.03));
+
+                cropY = Math.max(0, Math.round(origY + visH * 0.03));
+
+                cropW = Math.min(vw - cropX, Math.round(visW * 0.94));
+
+                cropH = Math.min(vh - cropY, Math.round(visH * 0.94));
+
+            }
+
+
+
+            canvas.width = cropW;
+
+            canvas.height = cropH;
+
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+
+
+            stopCamera();
+
+            processCanvasWithOMR(canvas);
+
+        }
+
+
+
+        async function handlePhotoUpload(event) {
+
+            const file = event.target.files[0];
+
+            if (!file) return;
+
+
+
+            // Reset file input so re-selecting same file fires onchange
+
+            event.target.value = '';
+
+
+
+            const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+
+
+            if (isPdf) {
+
+                try {
+
+                    showToast("Loading PDF document...", "info");
+
+                    if (!window.pdfjsLib) {
+
+                        showToast("PDF.js library is loading. Please try again shortly.", "warning");
+
+                        return;
+
+                    }
+
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+                    const arrayBuffer = await file.arrayBuffer();
+
+                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+
+                    const pdf = await loadingTask.promise;
+
+                    const page = await pdf.getPage(1);
+
+                    const viewport = page.getViewport({ scale: 2.0 });
+
+
+
+                    const canvas = document.getElementById('hidden_processing_canvas');
+
+                    canvas.width = viewport.width;
+
+                    canvas.height = viewport.height;
+
+                    const ctx = canvas.getContext('2d');
+
+                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+
+
+                    processCanvasWithOMR(canvas);
+
+                } catch (err) {
+
+                    console.error("PDF Render Error:", err);
+
+                    showToast("Failed to render PDF page. Please ensure it is a valid PDF.", "error");
+
+                }
+
+                return;
+
+            }
+
+
+
+            // Image handling (JPG, PNG, JPEG, WEBP)
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+
+                const img = new Image();
+
+                img.onload = () => {
+
+                    const canvas = document.getElementById('hidden_processing_canvas');
+
+                    // Cap max dimension to 2000px for speed and memory efficiency
+
+                    const maxDim = 2000;
+
+                    let w = img.width;
+
+                    let h = img.height;
+
+                    if (w > maxDim || h > maxDim) {
+
+                        const ratio = Math.min(maxDim / w, maxDim / h);
+
+                        w = Math.round(w * ratio);
+
+                        h = Math.round(h * ratio);
+
+                    }
+
+                    canvas.width = w;
+
+                    canvas.height = h;
+
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    processCanvasWithOMR(canvas);
+
+                };
+
+                img.src = e.target.result;
+
+            };
+
+            reader.readAsDataURL(file);
+
+        }
+
+
+
+        // --- Core OMR Processing ---
+
+        function processCanvasWithOMR(canvas) {
+
+            if (!currentExam) {
+
+                showToast("Please select an active exam first.", "error");
+
+                return;
+
+            }
+
+
+
+            const qCount = currentExam.question_count || 30;
+
+            const scanResult = OMREngine.scanImage(canvas, qCount);
+
+
+
+            if (!scanResult || !scanResult.success) {
+
+                showToast(scanResult ? scanResult.message : "Scanning failed.", "error");
+
+                showQualityRejectionModal(scanResult || { error: 'UNKNOWN', message: 'Failed to process answer sheet.' });
+
+                return;
+
+            }
+
+
+
+            scannedData = {
+
+                studentCode: scanResult.studentCode && !scanResult.studentCode.includes('?') ? scanResult.studentCode : (scanResult.studentCode || ''),
+
+                model: scanResult.model || 'A',
+
+                answers: scanResult.answers || {},
+
+                mcqScore: 0,
+
+                writtenScore: 0,
+
+                totalScore: 0,
+
+                overallConfidence: scanResult.overallConfidence || 0,
+
+                uncertainCount: scanResult.uncertainCount || 0,
+
+                multipleCount: scanResult.multipleCount || 0,
+
+                emptyCount: scanResult.emptyCount || 0,
+
+                wasRectified: scanResult.wasRectified,
+
+                rectifiedCanvas: scanResult.rectifiedCanvas,
+
+                annotatedCanvas: scanResult.annotatedCanvas
+
+            };
+
+
+
+            // Render original uploaded/captured photo in review
+
+            try {
+
+                const origImg = document.getElementById('review_original_img');
+
+                if (origImg) origImg.src = canvas.toDataURL('image/jpeg', 0.85);
+
+            } catch (e) {
+
+                console.warn("Could not preview original image:", e);
+
+            }
+
+
+
+            // Render rectified & annotated canvas in review
+
+            try {
+
+                const alignedCanvas = document.getElementById('review_aligned_canvas');
+
+                if (alignedCanvas && scanResult.annotatedCanvas) {
+
+                    alignedCanvas.width = scanResult.annotatedCanvas.width;
+
+                    alignedCanvas.height = scanResult.annotatedCanvas.height;
+
+                    const actx = alignedCanvas.getContext('2d');
+
+                    actx.drawImage(scanResult.annotatedCanvas, 0, 0);
+
+                }
+
+            } catch (e) {
+
+                console.warn("Could not preview aligned canvas:", e);
+
+            }
+
+
+
+            // Update perspective badge
+
+            const badge = document.getElementById('rectified_badge');
+
+            if (badge) {
+
+                if (scanResult.wasRectified) {
+
+                    badge.className = "px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 font-bold text-[11px] flex items-center gap-1";
+
+                    badge.innerHTML = `<span class="material-symbols-outlined text-[14px]">auto_fix_high</span> Homography Aligned`;
+
+                } else {
+
+                    badge.className = "px-2 py-0.5 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px] flex items-center gap-1";
+
+                    badge.innerHTML = `<span class="material-symbols-outlined text-[14px]">grid_on</span> Standard Grid`;
+
+                }
+
+            }
+
+
+
+            // Compute MCQ Score based on selected Model's answer key
+
+            gradeMCQAnswers();
+
+
+
+            // Populate Review UI
+
+            populateReviewCard();
+
+            playChime(true);
+
+
+
+            const answeredCount = Object.values(scannedData.answers).filter(a => a && a.state === 'SELECTED').length;
+
+            if (scannedData.uncertainCount > 0 || scannedData.multipleCount > 0) {
+
+                showToast(`Scan complete with warnings: ${scannedData.uncertainCount} uncertain, ${scannedData.multipleCount} multi-marked. Please review highlighted questions.`, "warning");
+
+            } else if (answeredCount > 0) {
+
+                showToast(`Scanned successfully! Recognized ${answeredCount}/${qCount} answers (${scanResult.overallConfidence}% confidence).`, "success");
+
+            } else {
+
+                showToast("No shaded answers detected. Please check lighting or alignment.", "warning");
+
+            }
+
+        }
+
+
+
+        function showQualityRejectionModal(res) {
+
+            const modal = document.getElementById('quality_rejection_modal');
+
+            if (!modal) return;
+
+            const titleEl = document.getElementById('qr_title');
+
+            const msgEl = document.getElementById('qr_message');
+
+            const detailsEl = document.getElementById('qr_details');
+
+
+
+            if (res.error === 'SHEET_TOO_FAR') {
+                titleEl.textContent = 'Move Closer to Paper (الورقة بعيدة جداً)';
+                msgEl.textContent = 'The answer sheet was captured from too far away. Please move your camera closer (20-30 cm above the paper) so the sheet fills the viewfinder box.';
+            } else             if (res.error === 'BLURRY_IMAGE') {
+
+                titleEl.textContent = 'Image Too Blurry (صورة غير واضحة)';
+
+                msgEl.textContent = 'The camera was moving or out of focus. Please hold the phone steady and capture again in good light.';
+
+            } else if (res.error === 'IMAGE_TOO_DARK') {
+
+                titleEl.textContent = 'Lighting Too Dark (إضاءة ضعيفة جداً)';
+
+                msgEl.textContent = 'The room is too dark or there is a heavy shadow over the sheet. Please turn on room lights or camera flash.';
+
+            } else if (res.error === 'LOW_RESOLUTION') {
+
+                titleEl.textContent = 'Resolution Too Low (دقة الصورة ضعيفة)';
+
+                msgEl.textContent = 'The image is too small or taken from too far away. Please move closer to fill the screen with the sheet.';
+
+            } else {
+
+                titleEl.textContent = 'Sheet Not Recognized';
+
+                msgEl.textContent = res.message || 'Unable to scan the sheet reliably. Please align the sheet within the viewfinder guide.';
+
+            }
+
+
+
+            let detailsHtml = '';
+
+            if (res.details) {
+
+                for (const [k, v] of Object.entries(res.details)) {
+
+                    const valStr = typeof v === 'number' ? v.toFixed(2) : String(v);
+
+                    detailsHtml += `<div class="flex justify-between"><span>${escapeHtml(k)}:</span><span class="font-bold">${escapeHtml(valStr)}</span></div>`;
+
+                }
+
+            }
+
+            detailsEl.innerHTML = detailsHtml || '<div>No specific metrics available.</div>';
+
+            modal.classList.remove('hidden');
+
+        }
+
+
+
+        function closeQualityModal() {
+
+            const modal = document.getElementById('quality_rejection_modal');
+
+            if (modal) modal.classList.add('hidden');
+
+        }
+
+
+
+        function gradeMCQAnswers() {
+
+            if (!currentExam || !scannedData) return;
+
+            const qCount = currentExam.question_count || 30;
+
+            const perQ = currentExam.mcq_score_per_q || 1;
+
+            const modelKey = (currentExam.models && currentExam.models[scannedData.model]) || {};
+
+
+
+            let correctCount = 0;
+
+            let incorrectCount = 0;
+
+            let unansweredCount = 0;
+
+            let uncertainCount = 0;
+
+            let multipleCount = 0;
+
+
+
+            for (let q = 1; q <= qCount; q++) {
+
+                const ansObj = scannedData.answers[q] || {};
+
+                const studentAns = ansObj.selected;
+
+                const state = ansObj.state || (studentAns ? 'SELECTED' : 'EMPTY');
+
+                const modelAns = modelKey[q];
+
+
+
+                if (state === 'UNCERTAIN') {
+
+                    uncertainCount++;
+
+                } else if (state === 'MULTIPLE') {
+
+                    multipleCount++;
+
+                } else if (!studentAns || state === 'EMPTY') {
+
+                    unansweredCount++;
+
+                } else if (studentAns === modelAns) {
+
+                    correctCount++;
+
+                } else {
+
+                    incorrectCount++;
+
+                }
+
+            }
+
+
+
+            scannedData.mcqScore = correctCount * perQ;
+
+            scannedData.correctCount = correctCount;
+
+            scannedData.incorrectCount = incorrectCount;
+
+            scannedData.unansweredCount = unansweredCount;
+
+            scannedData.uncertainCount = uncertainCount;
+
+            scannedData.multipleCount = multipleCount;
+
+
+
+            recalculateTotalScore();
+
+        }
+
+
+
+        function recalculateTotalScore() {
+
+            if (!scannedData) return;
+
+            scannedData.totalScore = (parseFloat(scannedData.mcqScore) || 0) + (parseFloat(scannedData.writtenScore) || 0);
+
+
+
+            // Update UI elements
+
+            const qCount = currentExam.question_count || 30;
+
+            const perQ = currentExam.mcq_score_per_q || 1;
+
+            const mcqMax = qCount * perQ;
+
+            const writtenMax = parseFloat(currentExam.written_max_score) || 20;
+
+            const totalMax = mcqMax + writtenMax;
+
+
+
+            document.getElementById('review_mcq_score').textContent = `${scannedData.mcqScore} / ${mcqMax}`;
+
+            const mcqPct = Math.round((scannedData.mcqScore / mcqMax) * 100);
+
+            document.getElementById('review_mcq_percent').textContent = `${mcqPct}%`;
+
+
+
+            document.getElementById('review_written_display').textContent = `${scannedData.writtenScore} / ${writtenMax}`;
+
+            document.getElementById('review_total_score').textContent = `${scannedData.totalScore} / ${totalMax}`;
+
+            const totPct = Math.round((scannedData.totalScore / totalMax) * 100);
+
+            document.getElementById('review_total_percent').textContent = `${totPct}%`;
+
+        }
+
+
+
+        // --- Review Card Interaction ---
+
+        function populateReviewCard() {
+
+            const card = document.getElementById('review_card');
+
+            card.classList.remove('hidden');
+
+            card.scrollIntoView({ behavior: 'smooth' });
+
+
+
+            document.getElementById('review_student_code').value = scannedData.studentCode || '';
+
+            document.getElementById('review_student_name').value = '';
+
+            document.getElementById('input_written_score').value = scannedData.writtenScore || 0;
+
+
+
+            selectReviewModel(scannedData.model || 'A');
+
+            renderQuestionsGrid();
+
+        }
+
+
+
+        function selectReviewModel(modelLetter) {
+
+            if (!scannedData) return;
+
+            scannedData.model = modelLetter;
+
+
+
+            // Highlight button
+
+            document.querySelectorAll('.model-opt-btn').forEach(btn => {
+
+                if (btn.dataset.model === modelLetter) {
+
+                    btn.className = "model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-secondary bg-secondary text-white shadow-sm";
+
+                } else {
+
+                    btn.className = "model-opt-btn flex-1 py-2 rounded-xl text-xs font-bold border border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high";
+
+                }
+
+            });
+
+
+
+            gradeMCQAnswers();
+
+            renderQuestionsGrid();
+
+        }
+
+
+
+        function renderQuestionsGrid() {
+
+            if (!currentExam || !scannedData) return;
+
+            const grid = document.getElementById('review_questions_grid');
+
+            const qCount = currentExam.question_count || 30;
+
+            const modelKey = (currentExam.models && currentExam.models[scannedData.model]) || {};
+
+
+
+            let html = '';
+
+            for (let q = 1; q <= qCount; q++) {
+
+                const ansObj = scannedData.answers[q] || {};
+
+                const selected = ansObj.selected;
+
+                const state = ansObj.state || (selected ? 'SELECTED' : 'EMPTY');
+
+                const modelAns = modelKey[q] || '-';
+
+                const confPct = Math.round((ansObj.confidence || 0) * 100);
+
+
+
+                let cardBg = 'bg-surface-container border-outline-variant/60';
+
+                let statusBadge = '';
+
+                let labelDisplay = '';
+
+
+
+                if (state === 'SELECTED') {
+
+                    const isCorrect = selected && selected === modelAns;
+
+                    if (isCorrect) {
+
+                        cardBg = 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800';
+
+                        statusBadge = `<span class="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>`;
+
+                        labelDisplay = `<span class="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm">${selected}</span>`;
+
+                    } else {
+
+                        cardBg = 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800';
+
+                        statusBadge = `<span class="material-symbols-outlined text-rose-500 text-[16px]">cancel</span>`;
+
+                        labelDisplay = `<span class="font-extrabold text-rose-600 dark:text-rose-400 text-sm">${selected}</span>
+
+                                        ${modelAns !== '-' ? `<span class="text-[10px] text-on-surface-variant font-mono">(${modelAns})</span>` : ''}`;
+
+                    }
+
+                } else if (state === 'UNCERTAIN') {
+
+                    cardBg = 'bg-amber-500/10 border-dashed border-2 border-amber-400 dark:border-amber-600 ring-2 ring-amber-400/20';
+
+                    statusBadge = `<span class="material-symbols-outlined text-amber-600 text-[16px]">help_outline</span>`;
+
+                    labelDisplay = `<span class="font-bold text-amber-700 dark:text-amber-400 text-xs">Uncertain?</span>
+
+                                    ${selected ? `<span class="text-[10px] text-amber-600">(${selected})</span>` : ''}`;
+
+                } else if (state === 'MULTIPLE') {
+
+                    cardBg = 'bg-rose-500/10 border-2 border-rose-400 dark:border-rose-700 ring-2 ring-rose-400/20';
+
+                    statusBadge = `<span class="material-symbols-outlined text-rose-600 text-[16px]">rule</span>`;
+
+                    labelDisplay = `<span class="font-bold text-rose-700 dark:text-rose-400 text-xs">Multiple</span>`;
+
+                } else {
+
+                    // EMPTY
+
+                    cardBg = 'bg-surface-container-low border-dashed border border-outline-variant';
+
+                    statusBadge = `<span class="material-symbols-outlined text-outline text-[16px]">radio_button_unchecked</span>`;
+
+                    labelDisplay = `<span class="font-medium text-on-surface-variant text-xs">Blank</span>
+
+                                    ${modelAns !== '-' ? `<span class="text-[10px] text-outline font-mono">(${modelAns})</span>` : ''}`;
+
+                }
+
+
+
+                html += `
+
+                    <div class="p-2 rounded-xl border ${cardBg} flex items-center justify-between transition-all">
+
+                        <div class="flex items-center gap-1.5 flex-wrap">
+
+                            <span class="font-bold text-[11px] text-on-surface-variant">Q${q}:</span>
+
+                            ${labelDisplay}
+
+                            ${confPct > 0 ? `<span class="text-[9px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/5 font-mono text-on-surface-variant">${confPct}%</span>` : ''}
+
+                        </div>
+
+                        <div class="flex items-center gap-1">
+
+                            ${statusBadge}
+
+                            <button type="button" onclick="cycleAnswer(${q})" title="Click to override answer (A->B->C->D->Blank)" class="w-6 h-6 rounded-lg bg-surface hover:bg-secondary hover:text-white border border-outline-variant text-[10px] font-bold transition-colors flex items-center justify-center">✎</button>
+
+                        </div>
+
+                    </div>
+
+                `;
+
+            }
+
+            grid.innerHTML = html;
+
+        }
+
+
+
+        function cycleAnswer(qNum) {
+
+            if (!scannedData) return;
+
+            const opts = ['A', 'B', 'C', 'D', null];
+
+            const current = scannedData.answers[qNum] ? scannedData.answers[qNum].selected : null;
+
+            const nextIdx = (opts.indexOf(current) + 1) % opts.length;
+
+            const nextVal = opts[nextIdx];
+
+
+
+            scannedData.answers[qNum] = {
+
+                selected: nextVal,
+
+                state: nextVal ? 'SELECTED' : 'EMPTY',
+
+                confidence: 1.0,
+
+                manualOverride: true
+
+            };
+
+            gradeMCQAnswers();
+
+            renderQuestionsGrid();
+
+        }
+
+
+
+        // --- Written Score Steppers ---
+
+        function adjustWrittenScore(delta) {
+
+            const input = document.getElementById('input_written_score');
+
+            const max = parseFloat(currentExam.written_max_score) || 20;
+
+            let val = parseFloat(input.value) || 0;
+
+            val = Math.max(0, Math.min(max, val + delta));
+
+            input.value = val;
+
+            onWrittenScoreInput();
+
+        }
+
+
+
+        function setWrittenScoreMax() {
+
+            const input = document.getElementById('input_written_score');
+
+            const max = parseFloat(currentExam.written_max_score) || 20;
+
+            input.value = max;
+
+            onWrittenScoreInput();
+
+        }
+
+
+
+        function onWrittenScoreInput() {
+
+            const input = document.getElementById('input_written_score');
+
+            const max = parseFloat(currentExam.written_max_score) || 20;
+
+            let val = parseFloat(input.value) || 0;
+
+            if (val < 0) val = 0;
+
+            if (val > max) val = max;
+
+            if (scannedData) {
+
+                scannedData.writtenScore = val;
+
+                recalculateTotalScore();
+
+            }
+
+        }
+
+
+
+        // --- Save Result ---
+
+        async function saveStudentResult() {
+
+            if (!currentExam || !scannedData) return;
+
+
+
+            const codeInput = document.getElementById('review_student_code');
+
+            const nameInput = document.getElementById('review_student_name');
+
+            const centerFilter = document.getElementById('center_filter_select').value;
+
+            const btn = document.getElementById('btn_save_exam_result');
+
+
+
+            const studentCode = (codeInput.value || '').trim();
+
+
+
+            // Verification Requirement: Never assign grades to an unverified student
+
+            if (!studentCode || studentCode === 'NO-ID' || studentCode.includes('?')) {
+
+                showToast("Please enter or verify the Student ID before saving (يرجى إدخال كود الطالب أولاً)", "error");
+
+                codeInput.focus();
+
+                codeInput.classList.add('ring-2', 'ring-rose-500');
+
+                setTimeout(() => codeInput.classList.remove('ring-2', 'ring-rose-500'), 3000);
+
+                return;
+
+            }
+
+
+
+            // Supervisor Verification Gate for Uncertain / Multiple questions
+
+            if ((scannedData.uncertainCount > 0 || scannedData.multipleCount > 0)) {
+
+                const totalAlerts = scannedData.uncertainCount + scannedData.multipleCount;
+
+                const confirmMsg = `تنبيه: يوجد ${totalAlerts} سؤال بعلامة مشكوك فيها أو تظليل مكرر.\nهل قمت بمراجعتها وتريد تأكيد الحفظ الآن؟`;
+
+                if (!confirm(confirmMsg)) {
+
+                    return;
+
+                }
+
+            }
+
+
+
+            const studentName = (nameInput.value || '').trim() || `Student (${studentCode})`;
+
+            const center = centerFilter !== 'All Centers' ? centerFilter : (currentExam.center || 'Center');
+
+
+
+            btn.disabled = true;
+
+            btn.innerHTML = `<div class="loading-spinner"></div> <span>Saving...</span>`;
+
+
+
+            const record = {
+
+                id: 'res_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+
+                created_at: new Date().toISOString(),
+
+                exam_id: currentExam.id,
+
+                student_code: studentCode,
+
+                student_name: studentName,
+
+                center: center,
+
+                model: scannedData.model,
+
+                mcq_score: scannedData.mcqScore,
+
+                written_score: scannedData.writtenScore,
+
+                total_score: scannedData.totalScore,
+
+                student_answers: scannedData.answers,
+
+                assistant_name: (localStorage.getItem('assistant_name') || 'Assistant')
+
+            };
+
+
+
+            // 1. Save to Supabase if available
+
+            try {
+
+                if (supabaseClient) {
+
+                    await supabaseClient.from('exam_results').insert([record]);
+
+                }
+
+            } catch(e) {
+
+                console.warn("Supabase insert error (saving locally):", e);
+
+            }
+
+
+
+            // 2. Always persist locally
+
+            try {
+
+                const key = 'mr_kelany_exam_results_' + currentExam.id;
+
+                const existing = JSON.parse(localStorage.getItem(key) || '[]');
+
+                existing.unshift(record);
+
+                localStorage.setItem(key, JSON.stringify(existing));
+
+            } catch(e) {}
+
+
+
+            btn.disabled = false;
+
+            btn.innerHTML = `<span class="material-symbols-outlined text-[20px]">save</span> <span>Confirm & Save Result</span>`;
+
+
+
+            playChime(true);
+
+            showToast(`Grade recorded for ${studentName}! (${record.total_score}/${currentExam.total_score || 50})`, "success");
+
+
+
+            // Reset and reload leaderboard
+
+            resetScannerForNext();
+
+            await loadLeaderboard();
+
+        }
+
+
+
+        function resetScannerForNext() {
+
+            scannedData = null;
+
+            document.getElementById('review_card').classList.add('hidden');
+
+            document.getElementById('scanner_idle_view').classList.remove('hidden');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        }
+
+
+
+        function refreshExamData() {
+
+            const icon = document.getElementById('refresh-icon');
+
+            if (icon) icon.classList.add('animate-spin');
+
+            loadExams().finally(() => {
+
+                setTimeout(() => { if (icon) icon.classList.remove('animate-spin'); }, 600);
+
+            });
+
+        }
+
+
+
+        // --- WhatsApp Parent Notification Generator ---
+
+        function sendStudentWhatsApp(recordId) {
+
+            const record = examResults.find(r => r.id === recordId || String(examResults.indexOf(r)) === String(recordId));
+
+            if (!record || !currentExam) return;
+
+
+
+            const rank = examResults.indexOf(record) + 1;
+
+            const maxScore = parseFloat(currentExam.total_score) || 50;
+
+            const pct = Math.round((record.total_score / maxScore) * 100);
+
+
+
+            const msg = 
+
+`*أكاديمية مستر كيلاني - نتيجة الاختبار* 📝
+
+------------------------------
+
+👤 *اسم الطالب:* ${record.student_name}
+
+🆔 *كود الطالب:* ${record.student_code}
+
+🏫 *السنتر:* ${record.center}
+
+📋 *الامتحان:* ${currentExam.title} (نموذج ${record.model})
+
+
+
+✅ *درجة الاختياري (MCQ):* ${record.mcq_score}
+
+✍️ *درجة المقالي (Written):* ${record.written_score}
+
+🏆 *المجموع الكلي:* ${record.total_score} من ${maxScore} (${pct}%)
+
+🏅 *الترتيب على السنتر:* المركز رقم #${rank}
+
+
+
+مع تمنياتنا بدوام التفوق والنجاح! 🌟`;
+
+
+
+            const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+
+            window.open(url, '_blank');
+
+        }
+
+
+
+        function escapeHtml(str) {
+
+            if (!str) return '';
+
+            return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+
+        }
+
+    </script>
+
+</body>
+
+</html>
+

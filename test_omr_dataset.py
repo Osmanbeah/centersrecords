@@ -98,16 +98,26 @@ def fill_bubble(img, cx, cy, fill_type='pen'):
 
 # Computer Vision Preprocessing & Classification Functions
 def check_quality(gray):
-    """Detects blur, darkness, low-res."""
+    """Detects blur, darkness, low-res, and distance."""
     h, w = gray.shape
     if w < 600 or h < 800:
         return False, "LOW_RESOLUTION"
     mean_lum = float(np.mean(gray))
-    if mean_lum < 40:
+    if mean_lum < 38:
         return False, "TOO_DARK"
     laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    if laplacian_var < 30.0:
+    if laplacian_var < 28.0:
         return False, "TOO_BLURRY"
+        
+    # Distance / Framing check
+    dark_mask = gray < min(85, mean_lum * 0.55)
+    ys, xs = np.where(dark_mask)
+    if len(xs) > 15:
+        span_w = (xs.max() - xs.min()) / float(w)
+        span_h = (ys.max() - ys.min()) / float(h)
+        if span_w < 0.40 or span_h < 0.35:
+            return False, "SHEET_TOO_FAR"
+            
     return True, "OK"
 
 def rectify_sheet(gray, target_w=SHEET_W, target_h=SHEET_H):
@@ -153,12 +163,26 @@ def rectify_sheet(gray, target_w=SHEET_W, target_h=SHEET_H):
     bl = corners[np.argmax(diff)]
     
     src_pts = np.array([tl, tr, br, bl], dtype=np.float32)
-    dst_pts = np.array([
-        [60, 60],
-        [target_w - 60, 60],
-        [target_w - 60, target_h - 60],
-        [60, target_h - 60]
-    ], dtype=np.float32)
+    box_w = max(np.hypot(tr[0] - tl[0], tr[1] - tl[1]), np.hypot(br[0] - bl[0], br[1] - bl[1]))
+    box_h = max(np.hypot(bl[0] - tl[0], bl[1] - tl[1]), np.hypot(br[0] - tr[0], br[1] - tr[1]))
+    aspect = box_w / max(1.0, box_h)
+    
+    if aspect >= 0.80:
+        # OMR Grid Fiducials detected
+        dst_pts = np.array([
+            [100, 480],
+            [1100, 480],
+            [1100, 1550],
+            [100, 1550]
+        ], dtype=np.float32)
+    else:
+        # Full Page corners detected
+        dst_pts = np.array([
+            [60, 60],
+            [target_w - 60, 60],
+            [target_w - 60, target_h - 60],
+            [60, target_h - 60]
+        ], dtype=np.float32)
     
     M = cv2.getPerspectiveTransform(src_pts, dst_pts)
     warped = cv2.warpPerspective(gray, M, (target_w, target_h), flags=cv2.INTER_LINEAR, borderValue=250)
@@ -427,6 +451,14 @@ def run_accuracy_benchmark():
     dark_img = (img * 0.1).astype(np.uint8)
     d_ok, d_reason = check_quality(dark_img)
     print(f"   -> Dark Image Rejection:   {'PASSED (Rejected: ' + d_reason + ')' if not d_ok else 'FAILED'}")
+    
+    # Far sheet (sheet scaled to 30% centered in 1200x1697)
+    far_img = np.ones((SHEET_H, SHEET_W), dtype=np.uint8) * 180
+    small_sheet = cv2.resize(img, (int(SHEET_W * 0.35), int(SHEET_H * 0.30)))
+    sy, sx = (SHEET_H - small_sheet.shape[0]) // 2, (SHEET_W - small_sheet.shape[1]) // 2
+    far_img[sy:sy+small_sheet.shape[0], sx:sx+small_sheet.shape[1]] = small_sheet
+    f_ok, f_reason = check_quality(far_img)
+    print(f"   -> Too Far Rejection:      {'PASSED (Rejected: ' + f_reason + ')' if not f_ok else 'FAILED'}")
     print()
     
     # Overall summary metrics
