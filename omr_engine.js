@@ -28,6 +28,8 @@
             const qCount = Math.max(1, Math.min(100, parseInt(questionCount, 10) || 30));
             const cols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
             const qPerCol = Math.ceil(qCount / cols);
+            const isSpacious = qPerCol <= 16;
+            const isMedium = qPerCol > 16 && qPerCol <= 24;
 
             return {
                 width: SHEET_WIDTH,
@@ -36,24 +38,24 @@
                 qPerCol: qPerCol,
                 qCount: qCount,
                 model: {
-                    baseY: 0.205,
+                    baseY: isSpacious ? 0.22 : (isMedium ? 0.21 : 0.20),
                     baseX: 0.26,
-                    stepX: 0.065
+                    stepX: isSpacious ? 0.075 : (isMedium ? 0.068 : 0.065)
                 },
                 studentCode: {
                     digits: 5,
-                    baseX: 0.145,
-                    stepX: 0.026,
-                    baseY: 0.44,
-                    stepY: 0.038
+                    baseX: isSpacious ? 0.135 : 0.145,
+                    stepX: isSpacious ? 0.028 : 0.026,
+                    baseY: isSpacious ? 0.34 : (isMedium ? 0.38 : 0.42),
+                    stepY: isSpacious ? 0.046 : (isMedium ? 0.040 : 0.038)
                 },
                 mcq: {
                     cols: cols,
                     qPerCol: qPerCol,
                     colBaseX: cols === 1 ? [0.55] : (cols === 2 ? [0.44, 0.73] : [0.38, 0.59, 0.80]),
-                    optStepX: cols === 1 ? 0.055 : (cols === 2 ? 0.048 : 0.040),
-                    baseY: 0.42,
-                    totalHeight: 0.50
+                    optStepX: cols === 1 ? (isSpacious ? 0.060 : 0.055) : (cols === 2 ? 0.048 : 0.040),
+                    baseY: isSpacious ? 0.33 : (isMedium ? 0.37 : 0.41),
+                    totalHeight: isSpacious ? 0.58 : (isMedium ? 0.54 : 0.50)
                 }
             };
         },
@@ -63,13 +65,14 @@
          */
         /**
          * Generates high-resolution printable HTML/SVG Bubble Sheet
-         * Reorganized to match professional exam sheets:
-         * - Structured student info table widget with phone, parent phone, ID, Model, center
-         * - Dedicated teacher written score widget
-         * - Aligned Roll No digit boxes + vertical 0-9 bubble columns
+         * Formatted for standard A4 paper with proportional vertical distribution:
+         * - Dynamically scales font sizes, row heights, and bubble dimensions to eliminate blank voids
+         * - Generous handwritten student info table rows
+         * - Prominent teacher written score widget
+         * - Calibrated Roll No digit boxes & vertical 0-9 bubble columns
          * - 5-question grouped MCQ bubble sections with column headers A B C D
          * - Black square registration anchor dots (fiducials) framing every column
-         * - Calibrated A4 printable dimensions (with dual-sheet A5 option) with zero overflow
+         * - Full-height A4 print styling (with dual-sheet A5 option) with zero page overflow
          */
         generatePrintableSheetHtml(exam = {}) {
             const title = exam.title || 'Comprehensive Examination';
@@ -92,7 +95,7 @@
             const attendLabel = cfg.attend_center_label || 'بتحضر فين :';
             const examCenterLabel = cfg.exam_center_label || 'بتمتحن فين :';
             const showParentPhone = cfg.show_parent_phone !== false;
-            const showCenterQuestions = cfg.show_center_questions === true; // Default hidden / removed
+            const showCenterQuestions = cfg.show_center_questions === true;
             const showWrittenBox = cfg.show_written_box !== false;
             const writtenBoxTitle = cfg.written_box_title || 'خاص بالمصحح';
             const writtenBoxSub = cfg.written_box_sub || 'درجة السؤال المقالي';
@@ -104,8 +107,78 @@
             const numCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
             const qPerCol = Math.ceil(qCount / numCols);
 
+            // Sizing tier based on questions per column
+            const isSpacious = qPerCol <= 16;
+            const isMedium = qPerCol > 16 && qPerCol <= 24;
+            const isCompact = qPerCol > 24;
+
+            // Dimensions and typography tailored for standard A4 paper
+            const dyn = {
+                // Page & Layout
+                pageMinH: '277mm',
+                pagePad: isSpacious ? '8mm 12mm' : (isMedium ? '7mm 10mm' : '6mm 8mm'),
+                
+                // Header
+                headerTitleFont: isSpacious ? '26px' : (isMedium ? '22px' : '19px'),
+                headerSubFont: isSpacious ? '13.5px' : (isMedium ? '12px' : '11px'),
+                metaBadgeFont: isSpacious ? '14.5px' : (isMedium ? '12px' : '10.5px'),
+                metaBadgePad: isSpacious ? '6px 14px' : (isMedium ? '4px 10px' : '3px 7px'),
+                headerPadB: isSpacious ? '12px' : (isMedium ? '8px' : '6px'),
+                headerMarB: isSpacious ? '16px' : (isMedium ? '10px' : '8px'),
+
+                // Student Table
+                tableRowH: isSpacious ? '42px' : (isMedium ? '33px' : '26px'),
+                tableFont: isSpacious ? '14.5px' : (isMedium ? '13px' : '11.5px'),
+                labelWidth: isSpacious ? '150px' : (isMedium ? '130px' : '115px'),
+                tablePad: isSpacious ? '7px 12px' : (isMedium ? '5px 10px' : '4px 8px'),
+                modelBubbleSize: isSpacious ? '22px' : (isMedium ? '19px' : '17px'),
+                modelBubbleGap: isSpacious ? '24px' : (isMedium ? '16px' : '12px'),
+                modelLabelFont: isSpacious ? '13.5px' : (isMedium ? '11.5px' : '10px'),
+
+                // Teacher Written Score Box
+                writtenBoxW: isSpacious ? '160px' : (isMedium ? '140px' : '125px'),
+                writtenBoxTitleFont: isSpacious ? '16px' : (isMedium ? '13px' : '11px'),
+                writtenBoxSubFont: isSpacious ? '12px' : (isMedium ? '10px' : '9px'),
+                writtenScoreAreaH: isSpacious ? '65px' : (isMedium ? '44px' : '34px'),
+                writtenMaxFont: isSpacious ? '13.5px' : (isMedium ? '11px' : '10px'),
+
+                // Spacing between Top Info Section and OMR Grid
+                topInfoMargin: isSpacious ? '24px' : (isMedium ? '15px' : '10px'),
+
+                // Roll No Matrix
+                rollTitleFont: isSpacious ? '14.5px' : (isMedium ? '12.5px' : '11px'),
+                rollBoxW: isSpacious ? '28px' : (isMedium ? '24px' : '20px'),
+                rollBoxH: isSpacious ? '32px' : (isMedium ? '26px' : '20px'),
+                rollBoxesGap: isSpacious ? '6px' : (isMedium ? '5px' : '4px'),
+                rollBoxesMarB: isSpacious ? '12px' : (isMedium ? '8px' : '6px'),
+                rollRowGap: isSpacious ? '7px' : (isMedium ? '4.5px' : '3.5px'),
+                rollDigitFont: isSpacious ? '13.5px' : (isMedium ? '11.5px' : '10px'),
+                rollBubbleSize: isSpacious ? '22px' : (isMedium ? '19px' : '17px'),
+                rollBubblesGap: isSpacious ? '6px' : (isMedium ? '5px' : '4px'),
+
+                // MCQ Questions & Bubbles
+                bubbleSize: isSpacious ? '22px' : (isMedium ? '19px' : '17px'),
+                bubbleBorder: isSpacious ? '1.8px' : '1.5px',
+                qRowMargin: isSpacious ? '9px' : (isMedium ? '5px' : '3.5px'),
+                qBlockSpacer: isSpacious ? '18px' : (isMedium ? '11px' : '7px'),
+                qNumFont: isSpacious ? '14.5px' : (isMedium ? '12.5px' : '11px'),
+                qNumWidth: isSpacious ? '32px' : '26px',
+                optHeaderFont: isSpacious ? '14px' : (isMedium ? '12px' : '10.5px'),
+                colTitleFont: isSpacious ? '14.5px' : (isMedium ? '12.5px' : '11px'),
+                colMaxWidth: isSpacious ? '210px' : (isMedium ? '180px' : '155px'),
+                optBubblePad: isSpacious ? '0 8px' : '0 4px',
+
+                // Registration Dots (Fiducials)
+                regDotSize: isSpacious ? '14px' : (isMedium ? '13px' : '11px'),
+                regDotColW: isSpacious ? '16px' : (isMedium ? '15px' : '13px'),
+
+                // Footer
+                footerFont: isSpacious ? '11.5px' : (isMedium ? '10px' : '9px'),
+                footerPadT: isSpacious ? '12px' : (isMedium ? '8px' : '5px'),
+                footerMarT: isSpacious ? '18px' : (isMedium ? '12px' : '6px')
+            };
+
             // Calculate exact number of registration dots needed based on question blocks
-            const maxRowsInCol = Math.max(11, qPerCol + Math.ceil(qPerCol / 5)); // account for headers/spacers
             const numDots = Math.max(3, Math.min(6, Math.ceil(qPerCol / 5) + 1));
 
             function buildRegDotsColHtml() {
@@ -166,7 +239,7 @@
 
                 return `
                     <div class="mcq-column">
-                        <div class="mcq-col-title">${subject} (${startQ} - ${endQ})</div>
+                        <div class="mcq-col-title">${escapeHtml(subject)} (${startQ} - ${endQ})</div>
                         <div class="mcq-col-body">${html}</div>
                     </div>
                 `;
@@ -194,7 +267,7 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 8mm;
+            margin: 8mm 10mm;
         }
         * {
             box-sizing: border-box;
@@ -214,7 +287,7 @@
         .preview-toolbar {
             background: #0f172a;
             color: #ffffff;
-            padding: 10px 20px;
+            padding: 12px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -229,9 +302,9 @@
             background: #10b981;
             color: #ffffff;
             font-weight: 800;
-            font-size: 13px;
+            font-size: 13.5px;
             border: none;
-            padding: 8px 20px;
+            padding: 9px 22px;
             border-radius: 8px;
             cursor: pointer;
             display: inline-flex;
@@ -245,7 +318,7 @@
             background: #334155;
             color: #f8fafc;
             border: 1px solid #475569;
-            padding: 6px 14px;
+            padding: 7px 16px;
             border-radius: 6px;
             font-size: 12px;
             font-weight: 700;
@@ -256,24 +329,25 @@
             border-color: #3b82f6;
         }
 
-        /* Sheet Page Container */
+        /* Sheet Page Container - Full A4 Proportions */
         .sheet-wrapper {
-            padding: 16px;
+            padding: 20px;
             display: flex;
             justify-content: center;
         }
         .bubble-sheet-page {
-            width: 194mm;
-            height: auto;
-            min-height: auto;
+            width: 200mm;
+            max-width: 100%;
+            min-height: ${dyn.pageMinH};
             background: #ffffff;
-            padding: 7mm 9mm;
+            padding: ${dyn.pagePad};
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
+            justify-content: space-between;
             position: relative;
-            margin-bottom: 12px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
         }
 
         /* Two-Up A5 Mode */
@@ -282,78 +356,92 @@
             height: auto;
             min-height: 135mm;
             max-height: 138mm;
-            padding: 4mm 6mm;
+            padding: 3mm 5mm;
             page-break-inside: avoid;
             margin-bottom: 4mm;
             border-bottom: 1px dashed #94a3b8;
         }
+        body.mode-dual .sheet-header h1 { font-size: 15px !important; }
+        body.mode-dual .student-table td { height: 22px !important; font-size: 10px !important; padding: 2px 4px !important; }
+        body.mode-dual .student-table .td-label { width: 95px !important; }
+        body.mode-dual .teacher-written-box { width: 110px !important; }
+        body.mode-dual .twb-score-area { height: 26px !important; }
+        body.mode-dual .top-info-section { margin-bottom: 6px !important; }
+        body.mode-dual .bubble { width: 15px !important; height: 15px !important; }
+        body.mode-dual .omr-q-row { margin-bottom: 2px !important; }
+        body.mode-dual .q-block-spacer { height: 5px !important; }
+        body.mode-dual .roll-box { width: 16px !important; height: 16px !important; }
+        body.mode-dual .roll-matrix { gap: 2px !important; }
+        body.mode-dual .roll-digit-label { font-size: 8.5px !important; }
+        body.mode-dual .sheet-footer { font-size: 8px !important; padding-top: 3px !important; margin-top: 4px !important; }
 
         /* Top Header */
         .sheet-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            padding-bottom: 6px;
-            border-bottom: 2px solid #000000;
-            margin-bottom: 8px;
+            padding-bottom: ${dyn.headerPadB};
+            border-bottom: 2.5px solid #000000;
+            margin-bottom: ${dyn.headerMarB};
         }
         .exam-title-group h1 {
             margin: 0;
-            font-size: 18px;
+            font-size: ${dyn.headerTitleFont};
             font-weight: 900;
             color: #000000;
             letter-spacing: -0.02em;
             line-height: 1.2;
         }
         .exam-subtitle {
-            font-size: 11px;
+            font-size: ${dyn.headerSubFont};
             font-weight: 800;
             color: #334155;
-            margin-top: 2px;
+            margin-top: 3px;
             letter-spacing: 0.04em;
         }
         .sheet-meta-badges {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 10.5px;
-            font-weight: 700;
         }
         .meta-badge {
-            border: 1.2px solid #000000;
-            padding: 3px 7px;
-            border-radius: 4px;
+            border: 1.6px solid #000000;
+            padding: ${dyn.metaBadgePad};
+            border-radius: 6px;
             background: #f8fafc;
+            font-size: ${dyn.metaBadgeFont};
+            font-weight: 800;
         }
 
         /* Student Info Table & Written Score Row */
         .top-info-section {
             display: flex;
-            gap: 10px;
-            margin-bottom: 12px;
+            gap: 12px;
+            margin-bottom: ${dyn.topInfoMargin};
             align-items: stretch;
         }
 
-        /* Student Info Table (Boxed Widget matching user's image) */
+        /* Student Info Table (Boxed Widget matching user request) */
         .student-table {
             flex: 1;
-            border: 1.6px solid #000000;
+            border: 1.8px solid #000000;
             border-collapse: collapse;
-            font-size: 11.5px;
+            font-size: ${dyn.tableFont};
             font-weight: 700;
             width: 100%;
         }
         .student-table td {
-            border: 1.2px solid #000000;
-            padding: 4px 8px;
-            height: 25px;
+            border: 1.4px solid #000000;
+            padding: ${dyn.tablePad};
+            height: ${dyn.tableRowH};
             vertical-align: middle;
         }
         .student-table .td-label {
-            width: 120px;
+            width: ${dyn.labelWidth};
             background: #ffffff;
-            font-weight: 800;
+            font-weight: 900;
             white-space: nowrap;
+            letter-spacing: 0.01em;
         }
         .student-table .td-fill {
             background: #ffffff;
@@ -361,59 +449,60 @@
         .model-bubbles-row {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: ${dyn.modelBubbleGap};
         }
         .model-bubble-item {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
+            font-size: ${dyn.modelLabelFont};
+            font-weight: 900;
         }
         .model-bubble-item .bubble {
-            width: 17px;
-            height: 17px;
-            border: 1.5px solid #000000;
+            width: ${dyn.modelBubbleSize};
+            height: ${dyn.modelBubbleSize};
+            border: 1.8px solid #000000;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 9.5px;
-            font-weight: 800;
         }
 
         /* Teacher's Written Score Box */
         .teacher-written-box {
-            width: 130px;
-            border: 1.6px solid #000000;
+            width: ${dyn.writtenBoxW};
+            border: 1.8px solid #000000;
             border-radius: 4px;
             background: #ffffff;
-            padding: 6px;
+            padding: 8px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             text-align: center;
         }
         .twb-header {
-            font-size: 11px;
+            font-size: ${dyn.writtenBoxTitleFont};
             font-weight: 900;
             color: #b91c1c;
             line-height: 1.2;
         }
         .twb-sub {
-            font-size: 9px;
-            font-weight: 700;
+            font-size: ${dyn.writtenBoxSubFont};
+            font-weight: 800;
             color: #475569;
+            margin-top: 2px;
         }
         .twb-score-area {
-            height: 38px;
-            border-bottom: 2px solid #000000;
-            margin: 4px 10px;
+            height: ${dyn.writtenScoreAreaH};
+            border-bottom: 2.5px solid #000000;
+            margin: 6px 10px;
         }
         .twb-max {
-            font-size: 10px;
-            font-weight: 800;
+            font-size: ${dyn.writtenMaxFont};
+            font-weight: 900;
             color: #0f172a;
             border-top: 1px solid #cbd5e1;
-            padding-top: 3px;
+            padding-top: 4px;
         }
 
         /* Registration Dots & OMR Grid Layout */
@@ -421,72 +510,74 @@
             display: flex;
             align-items: stretch;
             justify-content: space-between;
-            gap: 8px;
-            padding: 4px 0 8px 0;
+            gap: 12px;
+            padding: 4px 0;
+            flex: 1;
         }
 
-        /* Solid Black Square Registration Dots - Locked strictly to questions height */
+        /* Solid Black Square Registration Dots */
         .reg-dot-col {
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
-            width: 14px;
+            width: ${dyn.regDotColW};
             padding: 2px 0;
         }
         .reg-dot {
-            width: 12px;
-            height: 12px;
+            width: ${dyn.regDotSize};
+            height: ${dyn.regDotSize};
             background: #000000;
             border-radius: 1px;
-            margin: 3px 0;
+            margin: 2px 0;
         }
 
         /* Roll No Section (Student Code Matrix) */
         .roll-section {
-            width: 145px;
+            width: ${isSpacious ? '170px' : (isMedium ? '150px' : '140px')};
             display: flex;
             flex-direction: column;
             align-items: center;
         }
         .roll-title {
-            font-size: 11px;
+            font-size: ${dyn.rollTitleFont};
             font-weight: 900;
             text-align: center;
-            margin-bottom: 4px;
+            margin-bottom: ${dyn.rollBoxesMarB};
             letter-spacing: -0.01em;
         }
         .roll-boxes-row {
             display: flex;
-            gap: 4px;
-            margin-bottom: 6px;
+            gap: ${dyn.rollBoxesGap};
+            margin-bottom: ${dyn.rollBoxesMarB};
         }
         .roll-box {
-            width: 20px;
-            height: 20px;
-            border: 1.4px solid #000000;
+            width: ${dyn.rollBoxW};
+            height: ${dyn.rollBoxH};
+            border: 1.8px solid #000000;
             background: #ffffff;
+            border-radius: 2px;
         }
         .roll-matrix {
             display: flex;
             flex-direction: column;
-            gap: 3.5px;
+            gap: ${dyn.rollRowGap};
         }
         .roll-row {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
         .roll-digit-label {
-            width: 12px;
+            width: 14px;
             text-align: right;
-            font-size: 10px;
-            font-weight: 700;
+            font-size: ${dyn.rollDigitFont};
+            font-weight: 800;
             color: #334155;
         }
         .roll-bubbles {
             display: flex;
-            gap: 5px;
+            gap: ${dyn.rollBubblesGap};
         }
 
         /* MCQ Columns */
@@ -497,10 +588,10 @@
             align-items: center;
         }
         .mcq-col-title {
-            font-size: 11px;
+            font-size: ${dyn.colTitleFont};
             font-weight: 900;
             text-align: center;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
             letter-spacing: -0.01em;
             text-transform: uppercase;
         }
@@ -516,24 +607,24 @@
             display: flex;
             align-items: center;
             width: 100%;
-            max-width: 155px;
-            margin-bottom: 2px;
+            max-width: ${dyn.colMaxWidth};
+            margin-bottom: 3px;
         }
         .q-num-spacer {
-            width: 26px;
+            width: ${dyn.qNumWidth};
             display: inline-block;
         }
         .opt-labels {
             display: flex;
             justify-content: space-between;
             flex: 1;
-            padding: 0 5px;
+            padding: ${dyn.optBubblePad};
         }
         .opt-labels span {
-            width: 18px;
+            width: ${dyn.bubbleSize};
             text-align: center;
-            font-size: 10.5px;
-            font-weight: 800;
+            font-size: ${dyn.optHeaderFont};
+            font-weight: 900;
             color: #1e293b;
         }
 
@@ -542,29 +633,29 @@
             display: flex;
             align-items: center;
             width: 100%;
-            max-width: 155px;
-            margin-bottom: 3.5px;
+            max-width: ${dyn.colMaxWidth};
+            margin-bottom: ${dyn.qRowMargin};
         }
         .q-num {
-            width: 26px;
-            font-size: 11px;
-            font-weight: 800;
+            width: ${dyn.qNumWidth};
+            font-size: ${dyn.qNumFont};
+            font-weight: 900;
             color: #0f172a;
             text-align: right;
-            padding-right: 6px;
+            padding-right: 8px;
         }
         .opt-bubbles {
             display: flex;
             justify-content: space-between;
             flex: 1;
-            padding: 0 4px;
+            padding: ${dyn.optBubblePad};
         }
 
-        /* Hollow Circular Bubbles (Matching image) */
+        /* Hollow Circular Bubbles */
         .bubble {
-            width: 18px;
-            height: 18px;
-            border: 1.5px solid #000000;
+            width: ${dyn.bubbleSize};
+            height: ${dyn.bubbleSize};
+            border: ${dyn.bubbleBorder} solid #000000;
             border-radius: 50%;
             display: inline-block;
             background: #ffffff;
@@ -573,27 +664,27 @@
 
         /* Gap between 5-question groups */
         .q-block-spacer {
-            height: 8px;
+            height: ${dyn.qBlockSpacer};
             width: 100%;
         }
 
         /* Footer Instructions */
         .sheet-footer {
-            border-top: 1.4px solid #000000;
-            padding-top: 5px;
-            margin-top: 6px;
+            border-top: 2px solid #000000;
+            padding-top: ${dyn.footerPadT};
+            margin-top: ${dyn.footerMarT};
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 9px;
-            font-weight: 600;
+            font-size: ${dyn.footerFont};
+            font-weight: 700;
             color: #334155;
         }
         .inst-icons {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-weight: 700;
+            gap: 8px;
+            font-weight: 800;
         }
         .inst-icons span {
             display: inline-flex;
@@ -604,12 +695,25 @@
         @media print {
             .preview-toolbar { display: none !important; }
             body { background: #ffffff !important; padding: 0 !important; }
-            .sheet-wrapper { padding: 0 !important; }
+            .sheet-wrapper { padding: 0 !important; margin: 0 !important; }
             .bubble-sheet-page {
                 box-shadow: none !important;
-                padding: 6mm 7mm !important;
-                page-break-inside: avoid;
-                page-break-after: avoid;
+                width: 100% !important;
+                min-height: 279mm !important;
+                height: 279mm !important;
+                max-height: 279mm !important;
+                padding: 4mm 6mm !important;
+                margin: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                page-break-inside: avoid !important;
+                page-break-after: avoid !important;
+            }
+            body.mode-dual .bubble-sheet-page {
+                height: 138mm !important;
+                min-height: 135mm !important;
+                max-height: 138mm !important;
             }
         }
     </style>
@@ -644,7 +748,7 @@
                 </div>
             </div>
 
-            <!-- 2. Student Info Table & Written Score Box (Customizable widget) -->
+            <!-- 2. Student Info Table & Written Score Box -->
             <div class="top-info-section">
                 <table class="student-table">
                     <tr>
@@ -679,12 +783,12 @@
                     ${showCenterQuestions ? `
                     <tr>
                         <td colspan="2" style="padding:0;">
-                            <table style="width:100%; border-collapse:collapse; height:24px;">
+                            <table style="width:100%; border-collapse:collapse; height:28px;">
                                 <tr>
-                                    <td style="width:50%; border-right:1.4px solid #000; direction:rtl; text-align:right; font-weight:800; padding:2px 8px; font-size:11px;">
+                                    <td style="width:50%; border-right:1.4px solid #000; direction:rtl; text-align:right; font-weight:800; padding:4px 10px; font-size:12px;">
                                         ${escapeHtml(attendLabel)}
                                     </td>
-                                    <td style="width:50%; direction:rtl; text-align:right; font-weight:800; padding:2px 8px; font-size:11px;">
+                                    <td style="width:50%; direction:rtl; text-align:right; font-weight:800; padding:4px 10px; font-size:12px;">
                                         ${escapeHtml(examCenterLabel)}
                                     </td>
                                 </tr>
@@ -768,7 +872,7 @@
                 btnA4.classList.remove('active');
                 btnDual.classList.add('active');
 
-                // Duplicate sheet for 2-up per A4 page if not already present
+                // Duplicate the sheet for 2-up printing on single A4 sheet
                 if (!document.getElementById('sheet_page_2')) {
                     const page2 = page1.cloneNode(true);
                     page2.id = 'sheet_page_2';
@@ -785,7 +889,6 @@
         }
 
         function escapeHtml(str) {
-            if (!str) return '';
             return String(str).replace(/[&<>"']/g, function(m) {
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
             });
