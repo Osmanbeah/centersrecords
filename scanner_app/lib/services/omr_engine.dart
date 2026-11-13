@@ -269,7 +269,7 @@ class OMREngine {
     final visited = Uint8List(srcW * srcH);
     final candidateDots = <math.Point<double>>[];
     final step = math.max(3, minBlob ~/ 2);
-    final darkThresh = math.min(95, math.max(65, (meanLum * 0.45).toInt()));
+    final darkThresh = math.min(160, math.max(85, (meanLum * 0.65).toInt()));
 
     for (int y = step; y < srcH - step; y += step) {
       for (int x = step; x < srcW - step; x += step) {
@@ -659,9 +659,9 @@ class OMREngine {
     }
 
     // 2. Read Student Roll No (5 Digits)
-    final rollRowYs = [604, 657, 708, 763, 817, 872, 924, 974, 1028, 1080];
+    final rollRowYs = [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
     final rollColXs = numMcqCols == 1
-        ? [268, 326, 385, 443, 502]  // 15-question sheet
+        ? [175, 215, 255, 295, 335]  // 15-question sheet (calibrated between X=100 and X=480)
         : [196, 242, 289, 335, 382]; // 30+ question multi-column sheet
     final detectedRollCoords = <math.Point<int>>[];
     final idDigits = <String>[];
@@ -698,7 +698,7 @@ class OMREngine {
       978, 1030, 1082, 1139, 1191, // Block 2: Q6..10
       1300, 1352, 1404, 1456, 1509 // Block 3: Q11..15
     ];
-    final optXs15 = {'A': 796, 'B': 852, 'C': 910, 'D': 971};
+    final optXs15 = {'A': 650, 'B': 730, 'C': 810, 'D': 885};
 
     late final List<int> regX;
     if (numMcqCols == 1) {
@@ -801,7 +801,7 @@ class OMREngine {
       if (coords == null) continue;
 
       if (ans.state == QuestionState.selected && ans.selected != null && coords.containsKey(ans.selected!)) {
-        final pt = coords[ans.selected!]!;
+        final pt = ans.snappedCoords[ans.selected!] ?? coords[ans.selected!]!;
         img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: img.ColorRgb8(16, 185, 129));
       } else if (ans.state == QuestionState.uncertain) {
         final ptA = coords['A']!;

@@ -2218,7 +2218,7 @@
             const visited = new Uint8Array(srcW * srcH);
             const candidateDots = [];
             const step = Math.max(3, Math.floor(minBlob / 2));
-            const darkThresh = Math.min(95, Math.max(65, Math.round(meanLum * 0.45)));
+            const darkThresh = Math.min(160, Math.max(85, Math.round(meanLum * 0.65)));
 
 
 
@@ -2870,9 +2870,9 @@
             }
 
             // Step 5: Read Student Roll No (5 Digits) with Snapping
-            const rollRowYs = [604, 657, 708, 763, 817, 872, 924, 974, 1028, 1080];
+            const rollRowYs = [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
             const rollColXs = (numMcqCols === 1)
-                ? [268, 326, 385, 443, 502]  // 15-question sheet
+                ? [175, 215, 255, 295, 335]  // 15-question sheet (calibrated between X=100 and X=480)
                 : [196, 242, 289, 335, 382]; // 30+ question multi-column sheet
             const detectedRollCoords = [];
 
@@ -2907,7 +2907,7 @@
                 978, 1030, 1082, 1139, 1191, // Block 2: Q6..10
                 1300, 1352, 1404, 1456, 1509 // Block 3: Q11..15
             ];
-            const optXs15 = { 'A': 796, 'B': 852, 'C': 910, 'D': 971 };
+            const optXs15 = { 'A': 650, 'B': 730, 'C': 810, 'D': 885 };
 
             let regX;
             if (numMcqCols === 1) regX = [100, 480, 1100];

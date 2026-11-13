@@ -252,25 +252,33 @@ class _ReviewScreenState extends State<ReviewScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F766E).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '1️⃣ الخطوة الأولى',
-                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0F766E)),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '1️⃣ الخطوة الأولى',
+                              style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0F766E)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'نموذج الامتحان',
+                            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'نموذج الامتحان (Exam Model)',
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
-                      ),
-                      const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -293,35 +301,34 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       Text(
                         'تأكيد النموذج:',
                         style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(width: 10),
-                      Wrap(
-                        spacing: 8,
-                        children: availModels.map((m) {
-                          final isSel = _selectedModel == m;
-                          return ChoiceChip(
-                            label: Text(
-                              'نموذج $m',
-                              style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: isSel ? Colors.white : const Color(0xFF1E293B),
-                              ),
+                      ...availModels.map((m) {
+                        final isSel = _selectedModel == m;
+                        return ChoiceChip(
+                          label: Text(
+                            'نموذج $m',
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: isSel ? Colors.white : const Color(0xFF1E293B),
                             ),
-                            selected: isSel,
-                            selectedColor: const Color(0xFF0F766E),
-                            backgroundColor: const Color(0xFFF1F5F9),
-                            onSelected: (val) {
-                              if (val) setState(() => _selectedModel = m);
-                            },
-                          );
-                        }).toList(),
-                      ),
+                          ),
+                          selected: isSel,
+                          selectedColor: const Color(0xFF0F766E),
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          onSelected: (val) {
+                            if (val) setState(() => _selectedModel = m);
+                          },
+                        );
+                      }),
                     ],
                   ),
                 ],
@@ -347,25 +354,33 @@ class _ReviewScreenState extends State<ReviewScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '2️⃣ الخطوة الثانية',
-                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '2️⃣ الخطوة الثانية',
+                              style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'كود الطالب (Roll No)',
+                            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'كود الطالب (Roll No)',
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
-                      ),
-                      const Spacer(),
                       if (_studentCodeController.text.contains('?'))
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -448,6 +463,65 @@ class _ReviewScreenState extends State<ReviewScreen> {
               ),
               child: Column(
                 children: [
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '3️⃣ الخطوة الثالثة',
+                              style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'تصحيح الاختيارات والدرجات',
+                            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
+                          ),
+                        ],
+                      ),
+                      // Uncertainty indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _uncertainCount > 0 ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _uncertainCount > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _uncertainCount > 0 ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                              size: 14,
+                              color: _uncertainCount > 0 ? const Color(0xFFB45309) : const Color(0xFF047857),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _uncertainCount > 0 ? '$_uncertainCount للمراجعة' : 'جميع الإجابات مؤكدة',
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _uncertainCount > 0 ? const Color(0xFFB45309) : const Color(0xFF047857),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                   Row(
                     children: [
                       Container(
@@ -786,8 +860,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       onTap: () => _onAnswerTapped(q, opt),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        width: 38,
-                        height: 38,
+                        width: 34,
+                        height: 34,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: btnColor,
