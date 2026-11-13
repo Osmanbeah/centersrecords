@@ -205,6 +205,7 @@
         }
     </script>
     <script src="html5-qrcode.min.js"></script>
+    <script src="omr_engine.js"></script>
     <script>
         if (typeof Html5Qrcode === 'undefined') {
             document.write('<script src="https://unpkg.com/html5-qrcode"><\/script>');
@@ -335,6 +336,9 @@
                 </button>
                 <button onclick="switchTab('attendance')" id="nav-desktop-attendance" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
                     <span class="material-symbols-outlined text-[20px]">qr_code_scanner</span> Attendance
+                </button>
+                <button onclick="switchTab('exams')" id="nav-desktop-exams" class="flex items-center gap-2 text-on-surface-variant hover:bg-surface-container-high px-4 py-2 rounded-lg font-label-md transition-colors nav-desktop-item">
+                    <span class="material-symbols-outlined text-[20px]">assignment</span> Exams & OMR
                 </button>
             </nav>
 
@@ -1337,6 +1341,52 @@
             </div>
         </div>
 
+
+        <!-- ================= EXAMS & BUBBLE SHEETS MANAGEMENT VIEW ================= -->
+        <div id="view-exams" class="view-section hidden max-w-7xl mx-auto space-y-6">
+            <!-- Header Banner -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant shadow-sm">
+                <div>
+                    <h2 class="text-xl font-black text-on-surface flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary text-[26px]">assignment</span>
+                        <span>Exams & Bubble Sheets (إدارة الامتحانات ونماذج الإجابة)</span>
+                    </h2>
+                    <p class="text-xs text-on-surface-variant mt-1">
+                        Configure exam answer keys, generate and print standard bubble sheets, and monitor student rankings.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <a href="exams.html" target="_blank" class="px-3.5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface font-semibold text-xs inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition-all">
+                        <span class="material-symbols-outlined text-[17px]">photo_camera</span>
+                        <span>Open Assistant Scanner</span>
+                    </a>
+                    <button type="button" onclick="openCreateExamModal()" class="px-4 py-2.5 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md active:scale-95 transition-all">
+                        <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                        <span>New Exam (إنشاء امتحان)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Exams Cards Grid -->
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold text-on-surface">Active & Past Exams (قائمة الامتحانات)</h3>
+                    <button type="button" onclick="loadAdminExams()" class="text-xs text-secondary hover:underline flex items-center gap-1 font-semibold">
+                        <span class="material-symbols-outlined text-[16px]">refresh</span>
+                        <span>Refresh List</span>
+                    </button>
+                </div>
+
+                <div id="admin_exams_loading" class="py-12 flex justify-center hidden">
+                    <div class="loading-spinner"></div>
+                </div>
+
+                <div id="admin_exams_grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- BottomNavBar (Mobile) -->
@@ -1356,6 +1406,10 @@
         <button onclick="switchTab('attendance')" id="nav-mobile-attendance" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
             <span class="material-symbols-outlined nav-icon text-sm">qr_code_scanner</span>
             <span class="font-label-md text-[10px] mt-1 leading-none text-center">Attendance</span>
+        </button>
+        <button onclick="switchTab('exams')" id="nav-mobile-exams" class="flex flex-col items-center justify-center rounded-full px-2 py-1 scale-95 active:scale-90 transition-all duration-150 nav-mobile-item">
+            <span class="material-symbols-outlined nav-icon text-sm">assignment</span>
+            <span class="font-label-md text-[10px] mt-1 leading-none text-center">Exams</span>
         </button>
     </nav>
 
@@ -1976,6 +2030,10 @@
                 if (tabId === 'manage') titleEl.textContent = 'Manage';
                 if (tabId === 'schedule') titleEl.textContent = 'Schedule';
                 if (tabId === 'attendance') titleEl.textContent = 'Attendance';
+                if (tabId === 'exams') {
+                    titleEl.textContent = 'Exams & Bubble Sheets';
+                    initAdminExamsView();
+                }
             }
 
             // Desktop Nav
@@ -6890,6 +6948,884 @@ function getAdminCenterCoords(centerName, address) {
             }
         }, 20000);
 
+        // ==================== ADMIN EXAMS & BUBBLE SHEETS CONTROLLER ====================
+        let adminExamsList = [];
+        let currentAnswerKeyExam = null;
+        let currentAnswerKeyModel = 'A';
+        let currentResultsExam = null;
+        let currentResultsList = [];
+
+        function initAdminExamsView() {
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('new_exam_date');
+            if (dateInput && !dateInput.value) {
+                dateInput.value = today;
+            }
+            loadAdminExams();
+        }
+
+        async function loadAdminExams() {
+            const loadingEl = document.getElementById('admin_exams_loading');
+            const gridEl = document.getElementById('admin_exams_grid');
+            if (!gridEl) return;
+
+            if (loadingEl) loadingEl.classList.remove('hidden');
+
+            try {
+                let exams = [];
+                if (typeof supabase !== 'undefined' && supabase) {
+                    try {
+                        const { data, error } = await supabase
+                            .from('exams')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+                        if (!error && Array.isArray(data)) {
+                            exams = data;
+                        }
+                    } catch (supaErr) {
+                        console.warn('Supabase fetch exams fallback to local:', supaErr);
+                    }
+                }
+
+                if (!exams.length) {
+                    try {
+                        const cached = localStorage.getItem('mr_kelany_exams');
+                        if (cached) exams = JSON.parse(cached);
+                    } catch (e) {}
+                }
+
+                // If completely empty, seed with initial sample exam so admin has instant ready-to-test blueprint
+                if (!exams.length) {
+                    const sampleExam = {
+                        id: 'sample-exam-01',
+                        title: 'امتحان الكيمياء الشامل - الباب الأول',
+                        subject: 'Chemistry',
+                        exam_date: new Date().toISOString().split('T')[0],
+                        center: 'All Centers',
+                        question_count: 30,
+                        mcq_score_per_q: 1,
+                        written_max_score: 20,
+                        total_score: 50,
+                        models: {
+                            'A': { 1:'A', 2:'B', 3:'C', 4:'D', 5:'A', 6:'C', 7:'B', 8:'A', 9:'D', 10:'B', 11:'A', 12:'B', 13:'C', 14:'D', 15:'A', 16:'B', 17:'C', 18:'D', 19:'A', 20:'B', 21:'C', 22:'D', 23:'A', 24:'B', 25:'C', 26:'D', 27:'A', 28:'B', 29:'C', 30:'D' },
+                            'B': { 1:'B', 2:'C', 3:'D', 4:'A', 5:'B', 6:'D', 7:'C', 8:'B', 9:'A', 10:'C', 11:'B', 12:'C', 13:'D', 14:'A', 15:'B', 16:'C', 17:'D', 18:'A', 19:'B', 20:'C', 21:'D', 22:'A', 23:'B', 24:'C', 25:'D', 26:'A', 27:'B', 28:'C', 29:'D', 30:'A' }
+                        },
+                        status: 'active',
+                        created_at: new Date().toISOString()
+                    };
+                    exams = [sampleExam];
+                }
+
+                // Cache locally for offline resilience
+                if (exams.length > 0) {
+                    try { localStorage.setItem('mr_kelany_exams', JSON.stringify(exams)); } catch(e) {}
+                }
+
+                adminExamsList = exams;
+                renderAdminExamsGrid();
+            } catch (err) {
+                console.error('Error loading admin exams:', err);
+                showToast('Error loading exams', 'error');
+            } finally {
+                if (loadingEl) loadingEl.classList.add('hidden');
+            }
+        }
+
+        function renderAdminExamsGrid() {
+            const gridEl = document.getElementById('admin_exams_grid');
+            if (!gridEl) return;
+
+            if (!adminExamsList || adminExamsList.length === 0) {
+                gridEl.innerHTML = `
+                    <div class="col-span-full py-12 px-4 text-center rounded-2xl border-2 border-dashed border-outline-variant bg-surface-container-low">
+                        <span class="material-symbols-outlined text-outline text-5xl mb-2">assignment_add</span>
+                        <h3 class="font-bold text-on-surface text-base">No Exams Created Yet (لا توجد امتحانات مسجلة)</h3>
+                        <p class="text-xs text-on-surface-variant max-w-md mx-auto mt-1 mb-4">
+                            Create an exam blueprint to automatically generate standard printable bubble sheets and configure answer keys.
+                        </p>
+                        <button type="button" onclick="openCreateExamModal()" class="px-4 py-2 bg-secondary hover:bg-secondary/90 text-white rounded-xl text-xs font-bold shadow-md inline-flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                            <span>Create Your First Exam</span>
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            gridEl.innerHTML = adminExamsList.map(exam => {
+                const qCount = exam.question_count || 30;
+                const mcqPts = exam.mcq_score_per_q || 1;
+                const writtenMax = exam.written_max_score || 0;
+                const totalScore = exam.total_score || (qCount * mcqPts + writtenMax);
+                const mcqTotal = qCount * mcqPts;
+                const modelsCount = exam.models ? Object.keys(exam.models).length : 1;
+                const modelsList = exam.models ? Object.keys(exam.models).join(', ') : 'A';
+                const isActive = exam.status !== 'closed';
+
+                return `
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                        <div>
+                            <!-- Header Badges -->
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${isActive ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-surface-container-high text-on-surface-variant'}">
+                                    ${isActive ? 'Active' : 'Closed / Archived'}
+                                </span>
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="toggleExamStatus('${exam.id}')" title="${isActive ? 'Close Exam' : 'Reactivate Exam'}" class="p-1 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-on-surface">
+                                        <span class="material-symbols-outlined text-[18px]">${isActive ? 'pause_circle' : 'play_circle'}</span>
+                                    </button>
+                                    <button type="button" onclick="deleteExam('${exam.id}')" title="Delete Exam" class="p-1 rounded-lg hover:bg-rose-50 text-rose-600 hover:text-rose-700">
+                                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Title & Details -->
+                            <h4 class="font-black text-on-surface text-base sm:text-lg leading-snug">${escapeHtml(exam.title)}</h4>
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-on-surface-variant font-medium">
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[15px] text-secondary">calendar_today</span>
+                                    <span>${exam.exam_date || exam.date || 'No Date'}</span>
+                                </span>
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[15px] text-secondary">location_on</span>
+                                    <span>${escapeHtml(exam.center || 'All Centers')}</span>
+                                </span>
+                            </div>
+
+                            <!-- Score Breakdown Badge Grid -->
+                            <div class="grid grid-cols-3 gap-2 mt-3.5 p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/60 text-center">
+                                <div>
+                                    <span class="text-[10px] text-on-surface-variant block font-medium">MCQs</span>
+                                    <strong class="text-xs font-bold text-on-surface">${qCount} Q (${mcqTotal} pts)</strong>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-on-surface-variant block font-medium">Written</span>
+                                    <strong class="text-xs font-bold text-on-surface">${writtenMax} pts</strong>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-on-surface-variant block font-medium">Total</span>
+                                    <strong class="text-xs font-black text-secondary">${totalScore} pts</strong>
+                                </div>
+                            </div>
+
+                            <div class="mt-2.5 text-[11px] text-on-surface-variant flex items-center justify-between">
+                                <span>Models: <strong class="text-on-surface">${modelsList}</strong> (${modelsCount} models)</span>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="pt-3 border-t border-surface-variant flex flex-col gap-2">
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" onclick="printExamBubbleSheet('${exam.id}')" class="w-full py-2 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-xs font-bold inline-flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary">print</span>
+                                    <span>Print Sheet (A4)</span>
+                                </button>
+                                <button type="button" onclick="openAnswerKeyModal('${exam.id}')" class="w-full py-2 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-xs font-bold inline-flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary">vpn_key</span>
+                                    <span>Answer Keys</span>
+                                </button>
+                            </div>
+                            <button type="button" onclick="openExamResultsModal('${exam.id}')" class="w-full py-2 px-3 rounded-xl bg-secondary-container hover:bg-secondary-container/80 text-on-secondary-container text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+                                <span class="material-symbols-outlined text-[16px]">leaderboard</span>
+                                <span>Results & Rankings (النتائج والترتيب)</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openCreateExamModal() {
+            const modal = document.getElementById('create_exam_modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                const dateInput = document.getElementById('new_exam_date');
+                if (dateInput && !dateInput.value) {
+                    dateInput.value = new Date().toISOString().split('T')[0];
+                }
+            }
+        }
+
+        function closeCreateExamModal() {
+            const modal = document.getElementById('create_exam_modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        async function saveNewExam(e) {
+            if (e && e.preventDefault) e.preventDefault();
+
+            const title = document.getElementById('new_exam_title').value.trim();
+            const subject = document.getElementById('new_exam_subject').value.trim() || 'Chemistry';
+            const date = document.getElementById('new_exam_date').value || new Date().toISOString().split('T')[0];
+            const center = document.getElementById('new_exam_center').value;
+            const qCount = parseInt(document.getElementById('new_exam_q_count').value, 10) || 30;
+            const mcqPts = parseFloat(document.getElementById('new_exam_mcq_pts').value) || 1;
+            const writtenMax = parseFloat(document.getElementById('new_exam_written_max').value) || 0;
+            const modelsCount = parseInt(document.getElementById('new_exam_models_count').value, 10) || 2;
+
+            if (!title) {
+                alert('Please enter an exam title.');
+                return;
+            }
+
+            const totalScore = (qCount * mcqPts) + writtenMax;
+            const modelLetters = ['A', 'B', 'C', 'D'].slice(0, modelsCount);
+            const modelsObj = {};
+
+            modelLetters.forEach(m => {
+                modelsObj[m] = {};
+                for (let q = 1; q <= qCount; q++) {
+                    modelsObj[m][q] = ['A', 'B', 'C', 'D'][(q - 1) % 4];
+                }
+            });
+
+            const newExam = {
+                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'exam_' + Date.now(),
+                title: title,
+                subject: subject,
+                exam_date: date,
+                center: center,
+                question_count: qCount,
+                mcq_score_per_q: mcqPts,
+                written_max_score: writtenMax,
+                total_score: totalScore,
+                models: modelsObj,
+                status: 'active',
+                created_at: new Date().toISOString()
+            };
+
+            // Save to Supabase
+            if (typeof supabase !== 'undefined' && supabase) {
+                try {
+                    await supabase.from('exams').insert([newExam]);
+                } catch (err) {
+                    console.warn('Supabase insert failed, saving to local:', err);
+                }
+            }
+
+            adminExamsList.unshift(newExam);
+            try {
+                localStorage.setItem('mr_kelany_exams', JSON.stringify(adminExamsList));
+            } catch(e) {}
+
+            renderAdminExamsGrid();
+            closeCreateExamModal();
+            showToast('Exam created successfully! (تم إنشاء الامتحان بنجاح)');
+            document.getElementById('create_exam_form').reset();
+        }
+
+        function printExamBubbleSheet(examId) {
+            const exam = adminExamsList.find(e => e.id === examId);
+            if (!exam) return;
+
+            if (typeof OMREngine === 'undefined' || !OMREngine.generatePrintableSheetHtml) {
+                alert('OMREngine is not loaded. Please refresh the page.');
+                return;
+            }
+
+            const normalized = {
+                title: exam.title,
+                subject: exam.subject,
+                center: exam.center,
+                date: exam.exam_date || exam.date,
+                question_count: exam.question_count || 30,
+                mcq_score_per_q: exam.mcq_score_per_q || 1,
+                written_max_score: exam.written_max_score || 20
+            };
+
+            const printableHtml = OMREngine.generatePrintableSheetHtml(normalized);
+            const printWin = window.open('', '_blank');
+            if (!printWin) {
+                alert('Please allow popups to print the bubble sheet.');
+                return;
+            }
+
+            printWin.document.open();
+            printWin.document.write(printableHtml);
+            printWin.document.close();
+        }
+
+        function openAnswerKeyModal(examId) {
+            currentAnswerKeyExam = adminExamsList.find(e => e.id === examId);
+            if (!currentAnswerKeyExam) return;
+
+            const modal = document.getElementById('answer_key_modal');
+            if (!modal) return;
+
+            document.getElementById('ak_modal_subtitle').textContent = `${currentAnswerKeyExam.title} (${currentAnswerKeyExam.question_count || 30} Questions)`;
+            
+            const models = currentAnswerKeyExam.models || { 'A': {} };
+            const modelLetters = Object.keys(models);
+            currentAnswerKeyModel = modelLetters[0] || 'A';
+
+            renderAnswerKeyModelTabs();
+            renderAnswerKeyQuestions();
+            modal.classList.remove('hidden');
+        }
+
+        function closeAnswerKeyModal() {
+            const modal = document.getElementById('answer_key_modal');
+            if (modal) modal.classList.add('hidden');
+            currentAnswerKeyExam = null;
+        }
+
+        function renderAnswerKeyModelTabs() {
+            const container = document.getElementById('ak_model_tabs');
+            if (!container || !currentAnswerKeyExam) return;
+
+            const models = currentAnswerKeyExam.models || { 'A': {} };
+            const modelLetters = Object.keys(models);
+
+            container.innerHTML = modelLetters.map(m => {
+                const isSelected = m === currentAnswerKeyModel;
+                return `
+                    <button type="button" onclick="selectAnswerKeyModel('${m}')" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isSelected ? 'bg-secondary text-white shadow-sm' : 'bg-surface-container hover:bg-surface-container-high text-on-surface'}">
+                        Model ${m} (نموذج ${m})
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectAnswerKeyModel(modelLetter) {
+            currentAnswerKeyModel = modelLetter;
+            renderAnswerKeyModelTabs();
+            renderAnswerKeyQuestions();
+        }
+
+        function renderAnswerKeyQuestions() {
+            const container = document.getElementById('ak_questions_container');
+            if (!container || !currentAnswerKeyExam) return;
+
+            const qCount = currentAnswerKeyExam.question_count || 30;
+            const modelKey = currentAnswerKeyExam.models && currentAnswerKeyExam.models[currentAnswerKeyModel] 
+                ? currentAnswerKeyExam.models[currentAnswerKeyModel] 
+                : {};
+
+            const opts = ['A', 'B', 'C', 'D'];
+            let html = '';
+
+            for (let q = 1; q <= qCount; q++) {
+                const selected = modelKey[q] || null;
+                html += `
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-surface border border-outline-variant/50 text-xs">
+                        <span class="font-bold w-6 text-on-surface">Q${q}</span>
+                        <div class="flex items-center gap-1.5">
+                            ${opts.map(opt => {
+                                const isMatch = selected === opt;
+                                return `
+                                    <button type="button" onclick="setAnswerKeyOption(${q}, '${opt}')" class="w-6 h-6 rounded-full text-[11px] font-black border transition-all ${isMatch ? 'bg-secondary text-white border-secondary shadow-sm scale-105' : 'bg-surface-container-high text-on-surface border-outline-variant hover:border-secondary'}">
+                                        ${opt}
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function setAnswerKeyOption(qNum, optLetter) {
+            if (!currentAnswerKeyExam) return;
+            if (!currentAnswerKeyExam.models) currentAnswerKeyExam.models = {};
+            if (!currentAnswerKeyExam.models[currentAnswerKeyModel]) currentAnswerKeyExam.models[currentAnswerKeyModel] = {};
+
+            currentAnswerKeyExam.models[currentAnswerKeyModel][qNum] = optLetter;
+            renderAnswerKeyQuestions();
+        }
+
+        function applyFastPaste() {
+            const input = document.getElementById('ak_fast_paste_input');
+            if (!input || !currentAnswerKeyExam) return;
+
+            const raw = input.value.trim().toUpperCase();
+            if (!raw) return;
+
+            const letters = raw.match(/[A-D]/g);
+            if (!letters || letters.length === 0) {
+                alert('No valid answer options (A, B, C, D) found in pasted text.');
+                return;
+            }
+
+            if (!currentAnswerKeyExam.models) currentAnswerKeyExam.models = {};
+            if (!currentAnswerKeyExam.models[currentAnswerKeyModel]) currentAnswerKeyExam.models[currentAnswerKeyModel] = {};
+
+            const qCount = currentAnswerKeyExam.question_count || 30;
+            letters.forEach((l, idx) => {
+                const qNum = idx + 1;
+                if (qNum <= qCount) {
+                    currentAnswerKeyExam.models[currentAnswerKeyModel][qNum] = l;
+                }
+            });
+
+            renderAnswerKeyQuestions();
+            input.value = '';
+            showToast(`Applied ${Math.min(letters.length, qCount)} answers for Model ${currentAnswerKeyModel}`);
+        }
+
+        async function saveAnswerKey() {
+            if (!currentAnswerKeyExam) return;
+
+            if (typeof supabase !== 'undefined' && supabase) {
+                try {
+                    await supabase.from('exams')
+                        .update({ models: currentAnswerKeyExam.models })
+                        .eq('id', currentAnswerKeyExam.id);
+                } catch (err) {
+                    console.warn('Supabase update answer key failed:', err);
+                }
+            }
+
+            const idx = adminExamsList.findIndex(e => e.id === currentAnswerKeyExam.id);
+            if (idx !== -1) {
+                adminExamsList[idx].models = currentAnswerKeyExam.models;
+            }
+
+            try {
+                localStorage.setItem('mr_kelany_exams', JSON.stringify(adminExamsList));
+            } catch(e) {}
+
+            renderAdminExamsGrid();
+            closeAnswerKeyModal();
+            showToast('Answer key updated successfully! (تم حفظ نموذج الإجابة)');
+        }
+
+        async function toggleExamStatus(examId) {
+            const exam = adminExamsList.find(e => e.id === examId);
+            if (!exam) return;
+
+            const newStatus = exam.status === 'closed' ? 'active' : 'closed';
+            exam.status = newStatus;
+
+            if (typeof supabase !== 'undefined' && supabase) {
+                try {
+                    await supabase.from('exams').update({ status: newStatus }).eq('id', examId);
+                } catch (e) {}
+            }
+
+            try { localStorage.setItem('mr_kelany_exams', JSON.stringify(adminExamsList)); } catch(e) {}
+            renderAdminExamsGrid();
+            showToast(`Exam marked as ${newStatus}`);
+        }
+
+        async function deleteExam(examId) {
+            if (!confirm('Are you sure you want to delete this exam? This will also remove associated rankings.')) return;
+
+            adminExamsList = adminExamsList.filter(e => e.id !== examId);
+
+            if (typeof supabase !== 'undefined' && supabase) {
+                try {
+                    await supabase.from('exams').delete().eq('id', examId);
+                } catch (e) {}
+            }
+
+            try {
+                localStorage.setItem('mr_kelany_exams', JSON.stringify(adminExamsList));
+                localStorage.removeItem('mr_kelany_exam_results_' + examId);
+            } catch(e) {}
+
+            renderAdminExamsGrid();
+            showToast('Exam deleted');
+        }
+
+        async function openExamResultsModal(examId) {
+            currentResultsExam = adminExamsList.find(e => e.id === examId);
+            if (!currentResultsExam) return;
+
+            const modal = document.getElementById('exam_results_modal');
+            if (!modal) return;
+
+            document.getElementById('res_modal_title').innerHTML = `
+                <span class="material-symbols-outlined text-secondary">leaderboard</span>
+                <span>${escapeHtml(currentResultsExam.title)} - Results</span>
+            `;
+
+            let results = [];
+            if (typeof supabase !== 'undefined' && supabase) {
+                try {
+                    const { data, error } = await supabase
+                        .from('exam_results')
+                        .select('*')
+                        .eq('exam_id', examId);
+                    if (!error && Array.isArray(data)) {
+                        results = data;
+                    }
+                } catch(e) {}
+            }
+
+            if (!results.length) {
+                try {
+                    const cached = localStorage.getItem('mr_kelany_exam_results_' + examId);
+                    if (cached) results = JSON.parse(cached);
+                } catch(e) {}
+            }
+
+            currentResultsList = results;
+
+            const centerFilter = document.getElementById('res_modal_center_filter');
+            if (centerFilter) {
+                const centersSet = new Set(results.map(r => r.center).filter(Boolean));
+                let optsHtml = '<option value="All Centers">All Centers (الكل)</option>';
+                centersSet.forEach(c => {
+                    optsHtml += `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`;
+                });
+                centerFilter.innerHTML = optsHtml;
+                centerFilter.value = 'All Centers';
+            }
+
+            renderModalResults();
+            modal.classList.remove('hidden');
+        }
+
+        function closeExamResultsModal() {
+            const modal = document.getElementById('exam_results_modal');
+            if (modal) modal.classList.add('hidden');
+            currentResultsExam = null;
+            currentResultsList = [];
+        }
+
+        function filterModalResults() {
+            renderModalResults();
+        }
+
+        function renderModalResults() {
+            if (!currentResultsExam) return;
+
+            const centerFilter = document.getElementById('res_modal_center_filter');
+            const selectedCenter = centerFilter ? centerFilter.value : 'All Centers';
+
+            let filtered = [...currentResultsList];
+            if (selectedCenter && selectedCenter !== 'All Centers') {
+                filtered = filtered.filter(r => r.center === selectedCenter);
+            }
+
+            filtered.sort((a, b) => (b.total_score || 0) - (a.total_score || 0));
+
+            const count = filtered.length;
+            const scores = filtered.map(r => r.total_score || 0);
+            const highest = count > 0 ? Math.max(...scores) : 0;
+            const lowest = count > 0 ? Math.min(...scores) : 0;
+            const avg = count > 0 ? (scores.reduce((a, b) => a + b, 0) / count).toFixed(1) : 0;
+
+            document.getElementById('kpi_total_students').textContent = count;
+            document.getElementById('kpi_highest_score').textContent = highest;
+            document.getElementById('kpi_lowest_score').textContent = lowest;
+            document.getElementById('kpi_avg_score').textContent = avg;
+
+            const tbody = document.getElementById('res_modal_tbody');
+            if (!tbody) return;
+
+            if (count === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="py-8 text-center text-on-surface-variant font-medium">
+                            No results recorded yet for this exam. Assistants can grade papers in the Assistant Scanner Portal.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const maxScore = currentResultsExam.total_score || 50;
+
+            tbody.innerHTML = filtered.map((r, idx) => {
+                const rank = idx + 1;
+                let rankBadge = `<span class="font-bold text-on-surface">#${rank}</span>`;
+                if (rank === 1) rankBadge = `<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 font-black text-[11px] border border-amber-500/30">🥇 1st</span>`;
+                else if (rank === 2) rankBadge = `<span class="px-2 py-0.5 rounded-full bg-slate-400/20 text-slate-700 dark:text-slate-300 font-black text-[11px] border border-slate-400/30">🥈 2nd</span>`;
+                else if (rank === 3) rankBadge = `<span class="px-2 py-0.5 rounded-full bg-amber-700/20 text-amber-800 dark:text-amber-300 font-black text-[11px] border border-amber-700/30">🥉 3rd</span>`;
+
+                const pct = Math.round(((r.total_score || 0) / maxScore) * 100);
+
+                return `
+                    <tr class="hover:bg-surface-container/50 transition-colors">
+                        <td class="py-2.5 px-3 text-center">${rankBadge}</td>
+                        <td class="py-2.5 px-3">
+                            <strong class="text-on-surface block font-bold">${escapeHtml(r.student_name || 'Student')}</strong>
+                            <span class="text-[10px] text-on-surface-variant">Code: ${escapeHtml(r.student_code || '---')}</span>
+                        </td>
+                        <td class="py-2.5 px-3 text-on-surface-variant text-[11px]">${escapeHtml(r.center || '---')}</td>
+                        <td class="py-2.5 px-3 text-center font-bold text-on-surface">${escapeHtml(r.model || 'A')}</td>
+                        <td class="py-2.5 px-3 text-center text-on-surface">${r.mcq_score != null ? r.mcq_score : '-'}</td>
+                        <td class="py-2.5 px-3 text-center text-on-surface">${r.written_score != null ? r.written_score : '-'}</td>
+                        <td class="py-2.5 px-3 text-center font-black text-secondary text-sm">${r.total_score != null ? r.total_score : 0}</td>
+                        <td class="py-2.5 px-3 text-center font-bold ${pct >= 85 ? 'text-emerald-600' : pct >= 65 ? 'text-amber-600' : 'text-rose-600'}">${pct}%</td>
+                        <td class="py-2.5 px-3 text-right">
+                            <button type="button" onclick="sendAdminWhatsApp('${encodeURIComponent(r.student_name || 'طالب')}', '${r.total_score || 0}', '${maxScore}', '${pct}', '${rank}', '${encodeURIComponent(r.center || '')}')" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 font-bold text-[11px] inline-flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">chat</span> WhatsApp
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function sendAdminWhatsApp(studentNameEnc, score, maxScore, pct, rank, centerEnc) {
+            const studentName = decodeURIComponent(studentNameEnc);
+            const center = decodeURIComponent(centerEnc);
+            const examTitle = currentResultsExam ? currentResultsExam.title : 'امتحان الكيمياء';
+
+            const msg = `السلام عليكم ورحمة الله وبركاته 🌟\n\nنتيجة الطالب: *${studentName}*\nفي: *${examTitle}*\nالسنتر: ${center}\n\nالدرجة: *${score} من ${maxScore}* (${pct}%)\nالترتيب: *المركز رقم #${rank}*\n\nمع تمنياتنا بدوام التفوق والنجاح! 🎓\nأ. أحمد الكيلاني - كيمياء الثانوية العامة`;
+
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+            window.open(url, '_blank');
+        }
+
+        function exportExamResultsCSV() {
+            if (!currentResultsExam || !currentResultsList.length) {
+                alert('No results available to export.');
+                return;
+            }
+
+            const headers = ['Rank', 'Student Name', 'Student Code', 'Center', 'Model', 'MCQ Score', 'Written Score', 'Total Score', 'Percentage'];
+            const maxScore = currentResultsExam.total_score || 50;
+
+            const rows = [...currentResultsList]
+                .sort((a, b) => (b.total_score || 0) - (a.total_score || 0))
+                .map((r, idx) => {
+                    const pct = Math.round(((r.total_score || 0) / maxScore) * 100);
+                    return [
+                        idx + 1,
+                        `"${(r.student_name || '').replace(/"/g, '""')}"`,
+                        `"${r.student_code || ''}"`,
+                        `"${(r.center || '').replace(/"/g, '""')}"`,
+                        r.model || 'A',
+                        r.mcq_score != null ? r.mcq_score : 0,
+                        r.written_score != null ? r.written_score : 0,
+                        r.total_score != null ? r.total_score : 0,
+                        `${pct}%`
+                    ].join(',');
+                });
+
+            const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${(currentResultsExam.title || 'exam_results').replace(/\s+/g, '_')}_rankings.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+
     </script>
+
+    <!-- ================= CREATE EXAM MODAL ================= -->
+    <div id="create_exam_modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-surface rounded-2xl max-w-lg w-full p-5 sm:p-6 border border-outline-variant shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-surface-variant">
+                <h3 class="font-bold text-base sm:text-lg flex items-center gap-2">
+                    <span class="material-symbols-outlined text-secondary">add_circle</span>
+                    <span>Create New Exam (إنشاء امتحان جديد)</span>
+                </h3>
+                <button type="button" onclick="closeCreateExamModal()" class="text-on-surface-variant hover:text-on-surface p-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <form id="create_exam_form" onsubmit="saveNewExam(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-bold text-on-surface mb-1">Exam Title (عنوان الامتحان):</label>
+                    <input type="text" id="new_exam_title" required placeholder="e.g. امتحان الكيمياء الشامل - الباب الثاني" 
+                        class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-on-surface mb-1">Subject (المادة):</label>
+                        <input type="text" id="new_exam_subject" value="Chemistry" 
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-on-surface mb-1">Date (التاريخ):</label>
+                        <input type="date" id="new_exam_date" required 
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary"/>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-on-surface mb-1">Target Center (السنتر المستهدف):</label>
+                    <select id="new_exam_center" class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary">
+                        <option value="All Centers">All Centers (جميع السناتر)</option>
+                        <option value="الاوائل (حدايق القبه)">الاوائل (حدايق القبه)</option>
+                        <option value="First Elharam">First Elharam</option>
+                        <option value="i Learn Helwan">i Learn Helwan</option>
+                        <option value="Future soft (زهراء مدينه نصر)">Future soft</option>
+                        <option value="Dar Elsaaada">Dar Elsaaada</option>
+                        <option value="Newstar (المعادي)">Newstar (المعادي)</option>
+                        <option value="Capital (مصر الجديده)">Capital</option>
+                        <option value="Learn ELdokki">Learn ELdokki</option>
+                        <option value="Top Academy (التجمع الاول )">Top Academy</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2.5 pt-1">
+                    <div>
+                        <label class="block text-[11px] font-bold text-on-surface mb-1">MCQ Count:</label>
+                        <select id="new_exam_q_count" class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold">
+                            <option value="15">15 Questions</option>
+                            <option value="20">20 Questions</option>
+                            <option value="25">25 Questions</option>
+                            <option value="30" selected>30 Questions</option>
+                            <option value="40">40 Questions</option>
+                            <option value="50">50 Questions</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-on-surface mb-1">Points / MCQ:</label>
+                        <input type="number" id="new_exam_mcq_pts" min="0.5" step="0.5" value="1" 
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold text-center"/>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-on-surface mb-1">Written Max:</label>
+                        <input type="number" id="new_exam_written_max" min="0" step="1" value="20" 
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold text-center"/>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-on-surface mb-1">Number of Exam Models (النماذج):</label>
+                    <select id="new_exam_models_count" class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2.5 text-sm font-semibold">
+                        <option value="1">Model A Only (نموذج واحد)</option>
+                        <option value="2" selected>Models A & B (نموذجين لمنع الغش)</option>
+                        <option value="3">Models A, B, C (3 نماذج)</option>
+                        <option value="4">Models A, B, C, D (4 نماذج)</option>
+                    </select>
+                </div>
+
+                <div class="pt-3 flex gap-2">
+                    <button type="button" onclick="closeCreateExamModal()" class="flex-1 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold text-on-surface">Cancel</button>
+                    <button type="submit" id="btn_submit_create_exam" class="flex-1 py-2.5 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-xs shadow-md">Create Exam</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= ANSWER KEY MODAL ================= -->
+    <div id="answer_key_modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-surface rounded-2xl max-w-2xl w-full p-5 sm:p-6 border border-outline-variant shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-surface-variant">
+                <div>
+                    <h3 id="ak_modal_title" class="font-bold text-base sm:text-lg flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary">vpn_key</span>
+                        <span>Answer Key Editor (نموذج الإجابة الصحيحة)</span>
+                    </h3>
+                    <p id="ak_modal_subtitle" class="text-xs text-on-surface-variant mt-0.5">Click the correct bubble for each question</p>
+                </div>
+                <button type="button" onclick="closeAnswerKeyModal()" class="text-on-surface-variant hover:text-on-surface p-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <!-- Model Tabs (A, B, C, D) -->
+            <div id="ak_model_tabs" class="flex items-center gap-2 border-b border-surface-variant pb-2">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Fast Paste String Option -->
+            <div class="p-3 rounded-xl bg-surface-container-low border border-outline-variant/60 flex items-center gap-2 text-xs">
+                <span class="font-bold shrink-0">Fast Paste (نسخ ولصق):</span>
+                <input type="text" id="ak_fast_paste_input" placeholder="e.g. A,B,C,D,A,A..." class="flex-1 bg-surface-container-lowest border border-outline-variant rounded-lg p-1.5 text-xs font-mono uppercase"/>
+                <button type="button" onclick="applyFastPaste()" class="px-3 py-1.5 bg-surface-container hover:bg-surface-container-high rounded-lg font-bold">Apply</button>
+            </div>
+
+            <!-- Interactive Questions Grid -->
+            <div id="ak_questions_container" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-surface-container-low border border-outline-variant/60 max-h-72 overflow-y-auto">
+                <!-- Dynamically populated -->
+            </div>
+
+            <div class="pt-2 flex justify-end gap-2">
+                <button type="button" onclick="closeAnswerKeyModal()" class="px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold">Cancel</button>
+                <button type="button" onclick="saveAnswerKey()" class="px-5 py-2.5 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-xs shadow-md flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[17px]">save</span>
+                    <span>Save Answer Key</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= EXAM RESULTS & RANKINGS MODAL ================= -->
+    <div id="exam_results_modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-surface rounded-2xl max-w-4xl w-full p-5 sm:p-6 border border-outline-variant shadow-2xl flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-surface-variant">
+                <div>
+                    <h3 id="res_modal_title" class="font-bold text-base sm:text-lg flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary">leaderboard</span>
+                        <span>Student Rankings & Results (النتائج والترتيب)</span>
+                    </h3>
+                    <p id="res_modal_subtitle" class="text-xs text-on-surface-variant mt-0.5">Full grade breakdown and performance statistics</p>
+                </div>
+                <button type="button" onclick="closeExamResultsModal()" class="text-on-surface-variant hover:text-on-surface p-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <!-- Filter & Export Controls -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-on-surface-variant">Filter Center:</span>
+                    <select id="res_modal_center_filter" onchange="filterModalResults()" class="bg-surface-container-low border border-outline-variant rounded-xl text-xs font-bold p-2">
+                        <option value="All Centers">All Centers (الكل)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="exportExamResultsCSV()" class="px-3.5 py-2 rounded-xl bg-secondary-container hover:bg-secondary-container/80 text-on-secondary-container font-bold text-xs inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition-all">
+                        <span class="material-symbols-outlined text-[16px]">file_download</span>
+                        <span>Export to Excel (CSV)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary KPI Stats -->
+            <div class="grid grid-cols-4 gap-2.5 text-center">
+                <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
+                    <span class="text-[10.5px] font-semibold text-on-surface-variant block">Students</span>
+                    <strong id="kpi_total_students" class="text-lg sm:text-xl font-black text-on-surface">0</strong>
+                </div>
+                <div class="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                    <span class="text-[10.5px] font-semibold text-emerald-800 dark:text-emerald-300 block">Highest</span>
+                    <strong id="kpi_highest_score" class="text-lg sm:text-xl font-black text-emerald-700 dark:text-emerald-400">0</strong>
+                </div>
+                <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
+                    <span class="text-[10.5px] font-semibold text-on-surface-variant block">Average</span>
+                    <strong id="kpi_avg_score" class="text-lg sm:text-xl font-black text-secondary">0</strong>
+                </div>
+                <div class="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                    <span class="text-[10.5px] font-semibold text-rose-800 dark:text-rose-300 block">Lowest</span>
+                    <strong id="kpi_lowest_score" class="text-lg sm:text-xl font-black text-rose-700 dark:text-rose-400">0</strong>
+                </div>
+            </div>
+
+            <!-- Rankings Table -->
+            <div class="overflow-x-auto rounded-xl border border-outline-variant/60">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-surface-container text-on-surface-variant font-bold border-b border-outline-variant/60">
+                        <tr>
+                            <th class="py-2.5 px-3 text-center">Rank</th>
+                            <th class="py-2.5 px-3">Student Name</th>
+                            <th class="py-2.5 px-3">Center</th>
+                            <th class="py-2.5 px-3 text-center">Model</th>
+                            <th class="py-2.5 px-3 text-center">MCQ</th>
+                            <th class="py-2.5 px-3 text-center">Written</th>
+                            <th class="py-2.5 px-3 text-center font-bold">Total</th>
+                            <th class="py-2.5 px-3 text-center">%</th>
+                            <th class="py-2.5 px-3 text-right">WhatsApp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="res_modal_tbody" class="divide-y divide-outline-variant/40 font-medium">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
