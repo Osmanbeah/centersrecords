@@ -329,6 +329,20 @@
             border-color: #3b82f6;
         }
 
+                /* 4-Corner Fiducial Markers for Perspective Homography */
+        .corner-marker {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: #000000;
+            border-radius: 1px;
+            z-index: 10;
+        }
+        .corner-marker-tl { top: 4mm; left: 5mm; }
+        .corner-marker-tr { top: 4mm; right: 5mm; }
+        .corner-marker-bl { bottom: 4mm; left: 5mm; }
+        .corner-marker-br { bottom: 4mm; right: 5mm; }
+
         /* Sheet Page Container - Full A4 Proportions */
         .sheet-wrapper {
             padding: 20px;
@@ -737,6 +751,11 @@
     <!-- Sheet Container -->
     <div class="sheet-wrapper" id="sheet_container">
         <div class="bubble-sheet-page" id="sheet_page_1">
+            <!-- 4-Corner Homography Perspective Registration Anchors -->
+            <div class="corner-marker corner-marker-tl"></div>
+            <div class="corner-marker corner-marker-tr"></div>
+            <div class="corner-marker corner-marker-bl"></div>
+            <div class="corner-marker corner-marker-br"></div>
             <!-- 1. Header Row -->
             <div class="sheet-header">
                 <div class="exam-title-group">
@@ -903,49 +922,167 @@
          * Input: HTMLCanvasElement or HTMLImageElement
          * Output: { success, model, studentCode, answers: { 1: 'A', 2: 'B', ... }, confidence }
          */
-                scanImage(canvas, questionCount = 30) {
-            const ctx = canvas.getContext('2d');
+                        /**
+         * Image Quality Assessment Gate
+         * Rejects blurry, overly dark, or low-resolution images
+         */
+        checkQuality(canvas) {
             const w = canvas.width;
             const h = canvas.height;
+            if (w < 600 || h < 800) {
+                return {
+                    passed: false,
+                    reason: "LOW_RESOLUTION",
+                    message: "Image resolution is too low for accurate OMR detection (minimum 600x800). Please capture a closer photo.",
+                    details: { width: w, height: h }
+                };
+            }
 
-            const imgData = ctx.getImageData(0, 0, w, h);
-            const data = imgData.data;
+            const ctx = canvas.getContext('2d');
+            // Sample down to max 600x800 for instant quality calculation
+            const sampleW = Math.min(w, 600);
+            const sampleH = Math.min(h, 800);
+            const offscreen = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+            let sampleData;
+            
+            if (offscreen) {
+                offscreen.width = sampleW;
+                offscreen.height = sampleH;
+                const octx = offscreen.getContext('2d');
+                octx.drawImage(canvas, 0, 0, sampleW, sampleH);
+                sampleData = octx.getImageData(0, 0, sampleW, sampleH).data;
+            } else {
+                sampleData = ctx.getImageData(0, 0, sampleW, sampleH).data;
+            }
 
-            // 1. Grayscale & Fast Histogram Normalization
-            const gray = new Uint8Array(w * h);
-            const hist = new Int32Array(256);
+            // Convert sample to grayscale and calculate mean luminance
+            const gray = new Uint8Array(sampleW * sampleH);
             let sumLum = 0;
-            for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-                const lum = Math.round((data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000);
+            for (let i = 0, j = 0; i < sampleData.length; i += 4, j++) {
+                const lum = Math.round((sampleData[i] * 299 + sampleData[i + 1] * 587 + sampleData[i + 2] * 114) / 1000);
                 gray[j] = lum;
-                hist[lum]++;
                 sumLum += lum;
             }
-            const avgLum = sumLum / (w * h);
+            const meanLum = sumLum / gray.length;
 
-            // Compute 10th and 85th percentiles to adaptively handle shadows and ambient light
-            const totalPixels = w * h;
-            let count = 0;
-            let p10 = 40, p85 = 200;
-            for (let l = 0; l < 256; l++) {
-                count += hist[l];
-                if (count >= totalPixels * 0.10 && p10 === 40) p10 = l;
-                if (count >= totalPixels * 0.85) { p85 = l; break; }
+            if (meanLum < 38) {
+                return {
+                    passed: false,
+                    reason: "TOO_DARK",
+                    message: "The captured image is too dark. Please scan under good lighting or turn on your device flash.",
+                    details: { meanLum, width: w, height: h }
+                };
+            }
+            if (meanLum > 250) {
+                return {
+                    passed: false,
+                    reason: "OVEREXPOSED",
+                    message: "The image is overexposed or blank white. Please adjust camera exposure and retake.",
+                    details: { meanLum, width: w, height: h }
+                };
             }
 
-            // Dark threshold for solid black registration marks (fiducials)
-            const darkThresh = Math.min(avgLum * 0.65, p85 * 0.52);
+            // Laplacian Variance for Blur Detection
+            // Fast 3x3 Laplacian kernel: [0, 1, 0, 1, -4, 1, 0, 1, 0]
+            let lapSum = 0;
+            let lapSqSum = 0;
+            let edgePixels = 0;
+            const stride = 2; // sample every 2nd pixel for maximum speed
 
-            // 2. High-Speed Registration Square Fiducial Detection
-            const minBlob = Math.max(6, Math.round(w * 0.005));
-            const maxBlob = Math.max(50, Math.round(w * 0.050));
-            const visited = new Uint8Array(w * h);
+            for (let y = 1; y < sampleH - 1; y += stride) {
+                const row = y * sampleW;
+                for (let x = 1; x < sampleW - 1; x += stride) {
+                    const center = gray[row + x];
+                    const lap = gray[row + x - 1] + gray[row + x + 1] + gray[row - sampleW + x] + gray[row + sampleW + x] - (center * 4);
+                    lapSum += lap;
+                    lapSqSum += (lap * lap);
+                    edgePixels++;
+                }
+            }
+
+            const lapMean = lapSum / edgePixels;
+            const lapVariance = (lapSqSum / edgePixels) - (lapMean * lapMean);
+
+            if (lapVariance < 28.0) {
+                return {
+                    passed: false,
+                    reason: "TOO_BLURRY",
+                    message: "The image is blurry or out of focus. Please hold your camera steady and retake.",
+                    details: { blurVariance: Math.round(lapVariance), meanLum: Math.round(meanLum), width: w, height: h }
+                };
+            }
+
+            return {
+                passed: true,
+                details: { blurVariance: Math.round(lapVariance), meanLum: Math.round(meanLum), width: w, height: h }
+            };
+        },
+
+        /**
+         * Solves 3x3 Perspective Homography Matrix using Gaussian Elimination
+         */
+        getPerspectiveTransform(src, dst) {
+            const A = [];
+            const b = [];
+            for (let i = 0; i < 4; i++) {
+                const sx = src[i].x, sy = src[i].y;
+                const dx = dst[i].x, dy = dst[i].y;
+                A.push([sx, sy, 1, 0, 0, 0, -dx * sx, -dx * sy]);
+                b.push(dx);
+                A.push([0, 0, 0, sx, sy, 1, -dy * sx, -dy * sy]);
+                b.push(dy);
+            }
+            
+            const n = 8;
+            for (let i = 0; i < n; i++) {
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+                }
+                const tmpA = A[i]; A[i] = A[maxRow]; A[maxRow] = tmpA;
+                const tmpB = b[i]; b[i] = b[maxRow]; b[maxRow] = tmpB;
+                
+                const pivot = A[i][i];
+                if (Math.abs(pivot) < 1e-10) continue;
+                for (let j = i; j < n; j++) A[i][j] /= pivot;
+                b[i] /= pivot;
+                
+                for (let k = 0; k < n; k++) {
+                    if (k === i) continue;
+                    const factor = A[k][i];
+                    for (let j = i; j < n; j++) A[k][j] -= factor * A[i][j];
+                    b[k] -= factor * b[i];
+                }
+            }
+            return [b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], 1.0];
+        },
+
+        /**
+         * Perspective Rectification: Warps skewed photos to standard 1200x1697 A4 canvas
+         */
+        rectifySheet(sourceCanvas, targetW = 1200, targetH = 1697) {
+            const srcW = sourceCanvas.width;
+            const srcH = sourceCanvas.height;
+            const srcCtx = sourceCanvas.getContext('2d');
+            const srcData = srcCtx.getImageData(0, 0, srcW, srcH).data;
+
+            // Compute grayscale
+            const gray = new Uint8Array(srcW * srcH);
+            for (let i = 0, j = 0; i < srcData.length; i += 4, j++) {
+                gray[j] = Math.round((srcData[i] * 299 + srcData[i + 1] * 587 + srcData[i + 2] * 114) / 1000);
+            }
+
+            // Find candidate black fiducial squares
+            const minBlob = Math.max(6, Math.round(srcW * 0.006));
+            const maxBlob = Math.max(50, Math.round(srcW * 0.050));
+            const visited = new Uint8Array(srcW * srcH);
             const candidateDots = [];
-
             const step = Math.max(3, Math.floor(minBlob / 2));
-            for (let y = step; y < h - step; y += step) {
-                for (let x = step; x < w - step; x += step) {
-                    const idx = y * w + x;
+            const darkThresh = 80;
+
+            for (let y = step; y < srcH - step; y += step) {
+                for (let x = step; x < srcW - step; x += step) {
+                    const idx = y * srcW + x;
                     if (visited[idx] || gray[idx] >= darkThresh) continue;
 
                     let minX = x, maxX = x, minY = y, maxY = y;
@@ -955,8 +1092,8 @@
 
                     while (queue.length > 0 && queue.length < 3500) {
                         const curr = queue.pop();
-                        const cy = Math.floor(curr / w);
-                        const cx = curr % w;
+                        const cy = Math.floor(curr / srcW);
+                        const cx = curr % srcW;
                         blobPixels++;
 
                         if (cx < minX) minX = cx;
@@ -964,10 +1101,10 @@
                         if (cy < minY) minY = cy;
                         if (cy > maxY) maxY = cy;
 
-                        const neighbors = [curr - 1, curr + 1, curr - w, curr + w];
+                        const neighbors = [curr - 1, curr + 1, curr - srcW, curr + srcW];
                         for (let k = 0; k < 4; k++) {
                             const nIdx = neighbors[k];
-                            if (nIdx >= 0 && nIdx < totalPixels && !visited[nIdx]) {
+                            if (nIdx >= 0 && nIdx < visited.length && !visited[nIdx]) {
                                 visited[nIdx] = 1;
                                 if (gray[nIdx] < darkThresh) {
                                     queue.push(nIdx);
@@ -981,197 +1118,329 @@
                     const aspect = bw / Math.max(1, bh);
                     const fillDensity = blobPixels / (bw * bh);
 
+                    // High fill density (> 0.80) to select squares and exclude circular bubbles
                     if (bw >= minBlob && bw <= maxBlob &&
                         bh >= minBlob && bh <= maxBlob &&
-                        aspect >= 0.65 && aspect <= 1.45 &&
-                        fillDensity >= 0.84) {
+                        aspect >= 0.70 && aspect <= 1.40 &&
+                        fillDensity >= 0.80) {
                         candidateDots.push({
-                            cx: (minX + maxX) / 2,
-                            cy: (minY + maxY) / 2,
-                            w: bw,
-                            h: bh
+                            x: (minX + maxX) / 2,
+                            y: (minY + maxY) / 2
                         });
                     }
                 }
             }
 
-            // Cluster candidate dots into vertical columns
-            candidateDots.sort((a, b) => a.cx - b.cx);
-            const rawCols = [];
-            const colClusterDist = w * 0.035;
+            // Create target output canvas
+            const outCanvas = (typeof document !== 'undefined') ? document.createElement('canvas') : {
+                width: targetW,
+                height: targetH,
+                getContext: () => ({ getImageData: () => ({ data: new Uint8ClampedArray(targetW * targetH * 4) }) })
+            };
+            outCanvas.width = targetW;
+            outCanvas.height = targetH;
+            const outCtx = outCanvas.getContext('2d');
 
-            for (const dot of candidateDots) {
-                let matched = false;
-                for (const col of rawCols) {
-                    if (Math.abs(col.x - dot.cx) < colClusterDist) {
-                        col.dots.push(dot);
-                        col.x = col.dots.reduce((s, d) => s + d.cx, 0) / col.dots.length;
-                        matched = true;
-                        break;
+            // If we found at least 4 distinct corners, compute homography
+            if (candidateDots.length >= 4) {
+                // Find 4 extreme corners: TL, TR, BR, BL
+                let tl = candidateDots[0], tr = candidateDots[0], br = candidateDots[0], bl = candidateDots[0];
+                let minSum = Infinity, maxSum = -Infinity;
+                let minDiff = Infinity, maxDiff = -Infinity;
+
+                for (const pt of candidateDots) {
+                    const s = pt.x + pt.y;
+                    const d = pt.x - pt.y;
+                    if (s < minSum) { minSum = s; tl = pt; }
+                    if (s > maxSum) { maxSum = s; br = pt; }
+                    if (d > maxDiff) { maxDiff = d; tr = pt; }
+                    if (d < minDiff) { minDiff = d; bl = pt; }
+                }
+
+                // Desired destination corners in 1200x1697 target canvas
+                const dstCorners = [
+                    { x: 60, y: 60 },
+                    { x: targetW - 60, y: 60 },
+                    { x: targetW - 60, y: targetH - 60 },
+                    { x: 60, y: targetH - 60 }
+                ];
+                const srcCorners = [tl, tr, br, bl];
+
+                // Inverse homography: maps each pixel in target (dx, dy) back to source (sx, sy)
+                const H_inv = this.getPerspectiveTransform(dstCorners, srcCorners);
+                const outImgData = outCtx.createImageData(targetW, targetH);
+                const outData = outImgData.data;
+
+                // Bilinear backward mapping
+                for (let dy = 0; dy < targetH; dy++) {
+                    const rowOffset = dy * targetW * 4;
+                    for (let dx = 0; dx < targetW; dx++) {
+                        const denom = H_inv[6] * dx + H_inv[7] * dy + H_inv[8];
+                        const sx = (H_inv[0] * dx + H_inv[1] * dy + H_inv[2]) / denom;
+                        const sy = (H_inv[3] * dx + H_inv[4] * dy + H_inv[5]) / denom;
+
+                        const px = Math.floor(sx);
+                        const py = Math.floor(sy);
+
+                        const outIdx = rowOffset + dx * 4;
+
+                        if (px >= 0 && px < srcW - 1 && py >= 0 && py < srcH - 1) {
+                            const fx = sx - px;
+                            const fy = sy - py;
+                            const idx00 = (py * srcW + px) * 4;
+                            const idx10 = idx00 + 4;
+                            const idx01 = ((py + 1) * srcW + px) * 4;
+                            const idx11 = idx01 + 4;
+
+                            // Bilinear interpolation for R, G, B
+                            for (let c = 0; c < 3; c++) {
+                                const c0 = srcData[idx00 + c] * (1 - fx) + srcData[idx10 + c] * fx;
+                                const c1 = srcData[idx01 + c] * (1 - fx) + srcData[idx11 + c] * fx;
+                                outData[outIdx + c] = Math.round(c0 * (1 - fy) + c1 * fy);
+                            }
+                            outData[outIdx + 3] = 255;
+                        } else {
+                            outData[outIdx] = 250;
+                            outData[outIdx + 1] = 250;
+                            outData[outIdx + 2] = 250;
+                            outData[outIdx + 3] = 255;
+                        }
                     }
                 }
-                if (!matched) {
-                    rawCols.push({ x: dot.cx, dots: [dot] });
-                }
-            }
-
-            // Valid registration columns must have at least 2 dots
-            const validCols = rawCols.filter(c => { if (c.dots.length < 3) return false; const ys = c.dots.map(d => d.cy); return (Math.max(...ys) - Math.min(...ys)) > (h * 0.20); });
-            validCols.sort((a, b) => a.x - b.x);
-
-            // Determine Grid Geometry
-            let gridTopY, gridBotY, regColX;
-
-            const qCount = Math.max(10, Math.min(60, questionCount));
-            const numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
-            const expectedCols = numMcqCols + 2; // Col 0: Roll Left, Col 1: Roll Right/MCQ1 Left, ...
-
-            if (validCols.length >= 2) {
-                // If we found valid columns, calculate bounding Y
-                const allDots = validCols.flatMap(c => c.dots);
-                allDots.sort((a, b) => a.cy - b.cy);
-                gridTopY = allDots[0].cy;
-                gridBotY = allDots[allDots.length - 1].cy;
-                
-                if (validCols.length >= expectedCols) {
-                    regColX = validCols.slice(0, expectedCols).map(c => c.x);
-                } else {
-                    // Interpolate missing columns from found columns
-                    const firstX = validCols[0].x;
-                    const lastX = validCols[validCols.length - 1].x;
-                    const totalSpan = lastX - firstX;
-                    const stepX = totalSpan / (expectedCols - 1);
-                    regColX = [];
-                    for (let c = 0; c < expectedCols; c++) {
-                        regColX.push(firstX + c * stepX);
-                    }
-                }
+                outCtx.putImageData(outImgData, 0, 0);
+                return { rectifiedCanvas: outCanvas, wasRectified: true, corners: srcCorners };
             } else {
-                // Fallback: Proportional Sheet Framing
-                // Sheet grid occupies horizontal 6% to 94%, vertical 28% to 92%
-                gridTopY = Math.round(h * 0.28);
-                gridBotY = Math.round(h * 0.90);
-                const leftX = Math.round(w * 0.08);
-                const rightX = Math.round(w * 0.92);
-                const stepX = (rightX - leftX) / (expectedCols - 1);
-                regColX = [];
-                for (let c = 0; c < expectedCols; c++) {
-                    regColX.push(leftX + c * stepX);
-                }
+                // Fallback: draw directly centered with aspect fit
+                outCtx.fillStyle = '#fafafa';
+                outCtx.fillRect(0, 0, targetW, targetH);
+                const scale = Math.min(targetW / srcW, targetH / srcH);
+                const dw = srcW * scale;
+                const dh = srcH * scale;
+                const dx = (targetW - dw) / 2;
+                const dy = (targetH - dh) / 2;
+                outCtx.drawImage(sourceCanvas, dx, dy, dw, dh);
+                return { rectifiedCanvas: outCanvas, wasRectified: false, corners: null };
+            }
+        },
+
+        /**
+         * Multi-Feature Bubble Core Extraction
+         * Extracts inner core pixels, border-excluded fill ratio, variance and net contrast
+         */
+        analyzeBubbleCore(gray, cx, cy, w, h, rInner = 6) {
+            if (cx < rInner || cx >= w - rInner || cy < rInner || cy >= h - rInner) {
+                return { fillRatio: 0, netContrast: 0, variance: 0, paperLevel: 245 };
             }
 
-            const gridH = gridBotY - gridTopY;
-            const bubbleSampleRadius = Math.max(4, Math.round(w * 0.007));
+            // 1. Inner core patch (strictly inside bubble circle)
+            let coreSum = 0;
+            let coreSqSum = 0;
+            let coreCount = 0;
+            const r2 = rInner * rInner;
 
-            // Helper: Sample average darkness in a circle
-            function getCircleMeanDarkness(cx, cy, r) {
-                let darkSum = 0;
-                let count = 0;
-                const r2 = r * r;
-                for (let dy = -r; dy <= r; dy++) {
-                    for (let dx = -r; dx <= r; dx++) {
-                        if (dx * dx + dy * dy <= r2) {
-                            const px = Math.round(cx + dx);
-                            const py = Math.round(cy + dy);
-                            if (px >= 0 && px < w && py >= 0 && py < h) {
-                                darkSum += (255 - gray[py * w + px]);
-                                count++;
-                            }
+            for (let dy = -rInner; dy <= rInner; dy++) {
+                const py = cy + dy;
+                const row = py * w;
+                for (let dx = -rInner; dx <= rInner; dx++) {
+                    if (dx * dx + dy * dy <= r2) {
+                        const px = cx + dx;
+                        const lum = gray[row + px];
+                        coreSum += lum;
+                        coreSqSum += (lum * lum);
+                        coreCount++;
+                    }
+                }
+            }
+            const coreMeanLum = coreCount > 0 ? (coreSum / coreCount) : 255;
+            const coreMeanSq = coreCount > 0 ? (coreSqSum / coreCount) : 0;
+            const variance = Math.max(0, coreMeanSq - (coreMeanLum * coreMeanLum));
+
+            // 2. Local paper background (annulus gap around bubble: radius 12 to 17)
+            let paperSum = 0;
+            let paperCount = 0;
+            const rAnnulusInner2 = 12 * 12;
+            const rAnnulusOuter2 = 17 * 17;
+
+            for (let dy = -17; dy <= 17; dy += 2) {
+                const py = cy + dy;
+                if (py < 0 || py >= h) continue;
+                const row = py * w;
+                for (let dx = -17; dx <= 17; dx += 2) {
+                    const dist2 = dx * dx + dy * dy;
+                    if (dist2 >= rAnnulusInner2 && dist2 <= rAnnulusOuter2) {
+                        const px = cx + dx;
+                        if (px >= 0 && px < w) {
+                            paperSum += gray[row + px];
+                            paperCount++;
                         }
                     }
                 }
-                return count > 0 ? (darkSum / count) : 0;
             }
+            const paperLevel = paperCount > 0 ? (paperSum / paperCount) : 245;
 
-            // Helper: Sample bubble with local peak snapping (±6px search)
-            function sampleBubbleValue(estX, estY) {
-                let bestDark = 0;
-                let snapX = estX;
-                let snapY = estY;
-                const searchR = Math.max(3, Math.round(w * 0.006));
+            // 3. Measure filled pixels inside core (pixels significantly darker than paper)
+            const fillThresh = paperLevel * 0.72;
+            let filledCount = 0;
 
-                for (let dy = -searchR; dy <= searchR; dy += 2) {
-                    for (let dx = -searchR; dx <= searchR; dx += 2) {
-                        const px = Math.round(estX + dx);
-                        const py = Math.round(estY + dy);
-                        if (px >= 0 && px < w && py >= 0 && py < h) {
-                            const dark = 255 - gray[py * w + px];
-                            if (dark > bestDark) {
-                                bestDark = dark;
-                                snapX = px;
-                                snapY = py;
-                            }
+            for (let dy = -rInner; dy <= rInner; dy++) {
+                const py = cy + dy;
+                const row = py * w;
+                for (let dx = -rInner; dx <= rInner; dx++) {
+                    if (dx * dx + dy * dy <= r2) {
+                        const px = cx + dx;
+                        if (gray[row + px] < fillThresh) {
+                            filledCount++;
                         }
                     }
                 }
+            }
+            const fillRatio = coreCount > 0 ? (filledCount / coreCount) : 0;
 
-                // Sample inner bubble darkness
-                const bubbleDark = getCircleMeanDarkness(snapX, snapY, bubbleSampleRadius);
+            const meanDarkness = 255.0 - coreMeanLum;
+            const paperDarkness = 255.0 - paperLevel;
+            const netContrast = Math.max(0, meanDarkness - paperDarkness);
 
-                // Sample paper reference baseline (just above the bubble)
-                const paperDark = getCircleMeanDarkness(snapX, Math.max(0, snapY - bubbleSampleRadius * 2.2), Math.max(3, Math.round(bubbleSampleRadius * 0.7)));
+            return { fillRatio, netContrast, variance, paperLevel };
+        },
 
-                // Net contrast
-                return Math.max(0, bubbleDark - paperDark);
+        /**
+         * 4-State Question Answer Classification
+         * Assigns states: SELECTED, EMPTY, MULTIPLE, UNCERTAIN
+         */
+        classifyQuestion(gray, optionCoords, w, h) {
+            const opts = ['A', 'B', 'C', 'D'];
+            const scores = [];
+
+            for (const opt of opts) {
+                const coord = optionCoords[opt];
+                const res = this.analyzeBubbleCore(gray, Math.round(coord.x), Math.round(coord.y), w, h, 6);
+                const score = (res.fillRatio * 0.6) + (Math.min(1.0, res.netContrast / 100.0) * 0.4);
+                scores.push({
+                    opt: opt,
+                    fill: res.fillRatio,
+                    contrast: res.netContrast,
+                    variance: res.variance,
+                    score: score
+                });
             }
 
-            // 3. Read MCQ Questions
-            const detectedAnswers = {};
+            scores.sort((a, b) => b.score - a.score);
+            const best = scores[0];
+            const second = scores[1];
+
+            // 1. EMPTY: No shaded bubble
+            if (best.score < 0.22 && best.fill < 0.25) {
+                return {
+                    state: 'EMPTY',
+                    selected: null,
+                    confidence: Math.round((1.0 - best.score) * 100) / 100,
+                    scores: scores
+                };
+            }
+
+            // 2. MULTIPLE: Two or more clearly marked answers
+            if (best.score >= 0.38 && second.score >= 0.36 && (best.score - second.score) < 0.12) {
+                return {
+                    state: 'MULTIPLE',
+                    selected: [best.opt, second.opt],
+                    confidence: Math.round(second.score * 100) / 100,
+                    scores: scores
+                };
+            }
+
+            // 3. UNCERTAIN: Erasure residue smudge (high variance), faint fill, or narrow margin
+            if ((best.score >= 0.22 && best.score < 0.40) ||
+                (best.variance > 700 && best.fill < 0.45) ||
+                ((best.score - second.score) < 0.16 && best.score < 0.55)) {
+                return {
+                    state: 'UNCERTAIN',
+                    selected: best.opt,
+                    confidence: Math.round(best.score * 100) / 100,
+                    scores: scores
+                };
+            }
+
+            // 4. SELECTED: One clearly marked answer
+            const margin = best.score - second.score;
+            const confidence = Math.min(0.99, Math.max(0.80, 0.70 + margin * 0.5));
+            return {
+                state: 'SELECTED',
+                selected: best.opt,
+                confidence: Math.round(confidence * 100) / 100,
+                scores: scores
+            };
+        },
+
+        /**
+         * Production OMR Engine Master Scan Pipeline
+         * Input: HTMLCanvasElement or Image
+         * Output: Complete scan report with quality, rectified canvas, confidence, and 4-state classifications
+         */
+        scanImage(canvas, questionCount = 30) {
+            // Step 1: Quality Gate
+            const quality = this.checkQuality(canvas);
+            if (!quality.passed) {
+                return {
+                    success: false,
+                    error: quality.reason,
+                    message: quality.message,
+                    details: quality.details
+                };
+            }
+
+            // Step 2: Perspective Rectification
+            const TARGET_W = 1200;
+            const TARGET_H = 1697;
+            const { rectifiedCanvas, wasRectified } = this.rectifySheet(canvas, TARGET_W, TARGET_H);
+
+            const rCtx = rectifiedCanvas.getContext('2d');
+            const rData = rCtx.getImageData(0, 0, TARGET_W, TARGET_H).data;
+            const gray = new Uint8Array(TARGET_W * TARGET_H);
+            for (let i = 0, j = 0; i < rData.length; i += 4, j++) {
+                gray[j] = Math.round((rData[i] * 299 + rData[i + 1] * 587 + rData[i + 2] * 114) / 1000);
+            }
+
+            // Step 3: Compute Calibrated Coordinates on Rectified Canvas
+            const qCount = Math.max(1, Math.min(100, parseInt(questionCount, 10) || 30));
+            const numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
             const qPerCol = Math.ceil(qCount / numMcqCols);
-            const numBlocks = Math.ceil(qPerCol / 5);
-            const blockH = gridH / numBlocks;
-            const optLetters = ['A', 'B', 'C', 'D'];
-            const optOffsets = [0.32, 0.49, 0.66, 0.83];
 
-            for (let q = 1; q <= qCount; q++) {
-                const colIdx = Math.floor((q - 1) / qPerCol);
-                const inCol = (q - 1) % qPerCol;
-                const blockIdx = Math.floor(inCol / 5);
-                const posInBlock = inCol % 5;
+            const gridTopY = 480;
+            const gridBotY = 1550;
+            const gridH = gridBotY - gridTopY;
 
-                const xLeft = regColX[colIdx + 1] || regColX[1];
-                const xRight = regColX[colIdx + 2] || (xLeft + (xLeft - regColX[colIdx]));
-                const colW = xRight - xLeft;
+            // Step 4: Read Model (A, B, C, D)
+            const modelY = 340;
+            const modelStartX = 250;
+            const modelStepX = 40;
+            const modelCoords = {
+                'A': { x: modelStartX, y: modelY },
+                'B': { x: modelStartX + modelStepX, y: modelY },
+                'C': { x: modelStartX + modelStepX * 2, y: modelY },
+                'D': { x: modelStartX + modelStepX * 3, y: modelY }
+            };
+            const modelRes = this.classifyQuestion(gray, modelCoords, TARGET_W, TARGET_H);
+            const detectedModel = (modelRes.state === 'SELECTED') ? modelRes.selected : 'A';
 
-                const yRow = gridTopY + (blockIdx * blockH) + blockH * (0.16 + posInBlock * 0.145);
+            // Step 5: Read Student Roll No (5 Digits)
+            const rollDigits = 5;
+            const rollStartX = 145;
+            const rollStepX = 35;
+            const rollStartY = gridTopY + Math.round(gridH * 0.16);
+            const rollStepY = (gridH * 0.76) / 9.0;
 
-                const scores = [];
-                for (let o = 0; o < 4; o++) {
-                    const bx = xLeft + (colW * optOffsets[o]);
-                    const netDark = sampleBubbleValue(bx, yRow);
-                    scores.push({ opt: optLetters[o], score: netDark });
-                }
-
-                scores.sort((a, b) => b.score - a.score);
-                                const best = scores[0];
-                const second = scores[1];
-
-                // Shaded answer threshold: net darkness > 28 and clearly darker than second option
-                if (best.score > 28 && (best.score - second.score) > 14) {
-                    detectedAnswers[q] = { selected: best.opt, ambiguous: false };
-                } else if (best.score > 28 && second.score > 25 && (best.score - second.score) <= 14) {
-                    detectedAnswers[q] = { selected: best.opt, ambiguous: true, second: second.opt };
-                } else {
-                    detectedAnswers[q] = { selected: null, ambiguous: false };
-                }
-            }
-
-            // 4. Read Student Roll No (ID)
             const idDigits = [];
-            const rollLeft = regColX[0];
-            const rollRight = regColX[1] || (rollLeft + w * 0.25);
-            const rollW = rollRight - rollLeft;
-
-            for (let col = 0; col < 5; col++) {
-                const bx = rollLeft + rollW * (0.30 + col * 0.145);
+            for (let c = 0; c < rollDigits; c++) {
+                const cx = rollStartX + c * rollStepX;
                 const digitScores = [];
                 for (let d = 0; d <= 9; d++) {
-                    const by = gridTopY + gridH * (0.16 + d * 0.076);
-                    const netDark = sampleBubbleValue(bx, by);
-                    digitScores.push({ digit: d, score: netDark });
+                    const cy = Math.round(rollStartY + d * rollStepY);
+                    const res = this.analyzeBubbleCore(gray, cx, cy, TARGET_W, TARGET_H, 6);
+                    const s = (res.fillRatio * 0.6) + (Math.min(1.0, res.netContrast / 100.0) * 0.4);
+                    digitScores.push({ digit: d, score: s });
                 }
                 digitScores.sort((a, b) => b.score - a.score);
-                if (digitScores[0].score > 28 && (digitScores[0].score - digitScores[1].score) > 12) {
+                if (digitScores[0].score > 0.28 && (digitScores[0].score - digitScores[1].score) > 0.12) {
                     idDigits.push(digitScores[0].digit);
                 } else {
                     idDigits.push('?');
@@ -1179,29 +1448,117 @@
             }
             const detectedStudentCode = idDigits.join('');
 
-            // 5. Read Exam Model (A, B, C, D)
-            const modelY = Math.max(10, gridTopY - gridH * 0.25);
-            const modelScores = [];
-            for (let o = 0; o < 4; o++) {
-                const mx = rollLeft + (rollW * (0.30 + o * 0.18));
-                const netDark = sampleBubbleValue(mx, modelY);
-                modelScores.push({ opt: optLetters[o], score: netDark });
+            // Step 6: Read MCQ Questions with 4-State Classifier
+            const detectedAnswers = {};
+            const numBlocks = Math.ceil(qPerCol / 5);
+            const blockH = gridH / Math.max(1, numBlocks);
+            const unitH = blockH / 6.4;
+            const optOffsets = [0.32, 0.49, 0.66, 0.83];
+
+            // Calibrated column X boundaries for 1, 2, 3, or 4 columns
+            let regX;
+            if (numMcqCols === 1) regX = [100, 480, 1100];
+            else if (numMcqCols === 2) regX = [100, 420, 800, 1100];
+            else if (numMcqCols === 3) regX = [80, 340, 620, 900, 1120];
+            else regX = [60, 290, 530, 770, 1010, 1140];
+
+            let uncertainCount = 0;
+            let multipleCount = 0;
+            let emptyCount = 0;
+            let totalConfidence = 0;
+
+            for (let q = 1; q <= qCount; q++) {
+                const colIdx = Math.floor((q - 1) / qPerCol);
+                const inCol = (q - 1) % qPerCol;
+                const blockIdx = Math.floor(inCol / 5);
+                const posInBlock = inCol % 5;
+
+                const xLeft = regX[colIdx + 1] || regX[1];
+                const xRight = regX[colIdx + 2] || (xLeft + 300);
+                const colW = xRight - xLeft;
+
+                const qy = Math.round(gridTopY + (blockIdx * blockH) + (0.9 * unitH) + (posInBlock * unitH));
+                const qCoords = {
+                    'A': { x: Math.round(xLeft + colW * optOffsets[0]), y: qy },
+                    'B': { x: Math.round(xLeft + colW * optOffsets[1]), y: qy },
+                    'C': { x: Math.round(xLeft + colW * optOffsets[2]), y: qy },
+                    'D': { x: Math.round(xLeft + colW * optOffsets[3]), y: qy }
+                };
+
+                const classRes = this.classifyQuestion(gray, qCoords, TARGET_W, TARGET_H);
+                detectedAnswers[q] = classRes;
+
+                totalConfidence += classRes.confidence;
+                if (classRes.state === 'UNCERTAIN') uncertainCount++;
+                else if (classRes.state === 'MULTIPLE') multipleCount++;
+                else if (classRes.state === 'EMPTY') emptyCount++;
             }
-            modelScores.sort((a, b) => b.score - a.score);
-            const detectedModel = (modelScores[0].score > 25 && (modelScores[0].score - modelScores[1].score) > 10) ? modelScores[0].opt : 'A';
+
+            const overallConfidence = Math.round((totalConfidence / qCount) * 100);
+
+            // Step 7: Create Annotated Human Review Overlay Canvas
+            const overlayCanvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+            if (overlayCanvas) {
+                overlayCanvas.width = TARGET_W;
+                overlayCanvas.height = TARGET_H;
+                const octx = overlayCanvas.getContext('2d');
+                octx.drawImage(rectifiedCanvas, 0, 0);
+
+                // Draw highlighted boxes and overlays
+                for (let q = 1; q <= qCount; q++) {
+                    const ans = detectedAnswers[q];
+                    const colIdx = Math.floor((q - 1) / qPerCol);
+                    const inCol = (q - 1) % qPerCol;
+                    const blockIdx = Math.floor(inCol / 5);
+                    const posInBlock = inCol % 5;
+                    const xLeft = regX[colIdx + 1];
+                    const xRight = regX[colIdx + 2];
+                    const colW = xRight - xLeft;
+                    const qy = Math.round(gridTopY + (blockIdx * blockH) + (0.9 * unitH) + (posInBlock * unitH));
+
+                    if (ans.state === 'SELECTED') {
+                        const optIdx = ['A', 'B', 'C', 'D'].indexOf(ans.selected);
+                        if (optIdx >= 0) {
+                            const bx = Math.round(xLeft + colW * optOffsets[optIdx]);
+                            octx.strokeStyle = '#10b981';
+                            octx.lineWidth = 3;
+                            octx.beginPath();
+                            octx.arc(bx, qy, 14, 0, 2 * Math.PI);
+                            octx.stroke();
+                        }
+                    } else if (ans.state === 'UNCERTAIN') {
+                        octx.strokeStyle = '#f59e0b';
+                        octx.lineWidth = 2.5;
+                        octx.setLineDash([4, 4]);
+                        octx.strokeRect(xLeft - 10, qy - 12, colW + 20, 24);
+                        octx.setLineDash([]);
+                    } else if (ans.state === 'MULTIPLE') {
+                        octx.strokeStyle = '#ef4444';
+                        octx.lineWidth = 2.5;
+                        octx.strokeRect(xLeft - 10, qy - 12, colW + 20, 24);
+                    }
+                }
+            }
 
             return {
                 success: true,
                 model: detectedModel,
                 studentCode: detectedStudentCode,
                 answers: detectedAnswers,
-                detectedRegDots: candidateDots.length,
+                quality: quality.details,
+                overallConfidence: overallConfidence,
+                uncertainCount: uncertainCount,
+                multipleCount: multipleCount,
+                emptyCount: emptyCount,
+                wasRectified: wasRectified,
+                rectifiedCanvas: rectifiedCanvas,
+                annotatedCanvas: overlayCanvas,
                 scannedAt: new Date().toISOString()
             };
         }
     };
 
-        global.OMREngine = OMR;
+    global.OMREngine = OMR;
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = OMR;
     }
