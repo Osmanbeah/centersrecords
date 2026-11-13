@@ -25,8 +25,8 @@
          * Calculates coordinates layout for a given question count
          */
         getLayout(questionCount = 30) {
-            const qCount = Math.max(10, Math.min(60, questionCount));
-            const cols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
+            const qCount = Math.max(1, Math.min(100, parseInt(questionCount, 10) || 30));
+            const cols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
             const qPerCol = Math.ceil(qCount / cols);
 
             return {
@@ -76,7 +76,7 @@
             const subject = exam.subject || 'Chemistry';
             const center = exam.center || 'All Centers';
             const date = exam.exam_date || exam.date || new Date().toISOString().split('T')[0];
-            const qCount = Math.max(10, Math.min(60, exam.question_count || 30));
+            const qCount = Math.max(1, Math.min(100, parseInt(exam.question_count, 10) || 30));
             const mcqPerQ = exam.mcq_score_per_q || 1;
             const writtenMax = exam.written_max_score != null ? exam.written_max_score : 20;
             const totalScore = exam.total_score || ((qCount * mcqPerQ) + parseFloat(writtenMax));
@@ -100,8 +100,8 @@
             const rollTitle = cfg.roll_title || 'Roll No (كود الطالب)';
             const footerNote = cfg.footer_note || 'تعليمات التظليل: ● تظليل كامل (صحيح) | ✕ ✗ غير صحيح - لا تطوِ الورقة أو تكتب في الهوامش';
 
-            // Determine MCQ columns (1 col for <=20, 2 cols for 21-40, 3 cols for 41-60)
-            const numCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
+            // Determine MCQ columns dynamically based on question count
+            const numCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
             const qPerCol = Math.ceil(qCount / numCols);
 
             // Calculate exact number of registration dots needed based on question blocks

@@ -6973,14 +6973,45 @@ function getAdminCenterCoords(centerName, address) {
 
             try {
                 let exams = [];
-                if (typeof supabase !== 'undefined' && supabase) {
+                const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+                if (client) {
                     try {
-                        const { data, error } = await supabase
+                        const { data, error } = await client
                             .from('exams')
                             .select('*')
                             .order('created_at', { ascending: false });
                         if (!error && Array.isArray(data)) {
                             exams = data;
+
+                            // Sync any local exams created previously that didn't upload to Supabase
+                            try {
+                                const cached = JSON.parse(localStorage.getItem('mr_kelany_exams') || '[]');
+                                const cloudIds = new Set(exams.map(e => String(e.id)));
+                                for (const localEx of cached) {
+                                    if (localEx && localEx.title && localEx.id !== 'sample-exam-01' && !cloudIds.has(String(localEx.id))) {
+                                        const syncPayload = {
+                                            title: localEx.title,
+                                            subject: localEx.subject || 'Chemistry',
+                                            exam_date: localEx.exam_date || localEx.date || new Date().toISOString().split('T')[0],
+                                            center: localEx.center || 'All Centers',
+                                            question_count: localEx.question_count || 30,
+                                            mcq_score_per_q: localEx.mcq_score_per_q || 1,
+                                            written_max_score: localEx.written_max_score != null ? localEx.written_max_score : 20,
+                                            total_score: localEx.total_score || 50,
+                                            models: localEx.models || {},
+                                            status: localEx.status || 'active'
+                                        };
+                                        const { data: insData, error: insErr } = await client.from('exams').insert([syncPayload]).select();
+                                        if (!insErr && insData && insData[0]) {
+                                            exams.unshift(insData[0]);
+                                            cloudIds.add(String(insData[0].id));
+                                        }
+                                    }
+                                }
+                            } catch (syncErr) {
+                                console.warn('Local exams sync error:', syncErr);
+                            }
+                            try { localStorage.setItem('mr_kelany_exams', JSON.stringify(exams)); } catch (e) {}
                         }
                     } catch (supaErr) {
                         console.warn('Supabase fetch exams fallback to local:', supaErr);
@@ -7165,7 +7196,8 @@ function getAdminCenterCoords(centerName, address) {
             const center = document.getElementById('new_exam_center').value;
             const qCount = parseInt(document.getElementById('new_exam_q_count').value, 10) || 30;
             const mcqPts = parseFloat(document.getElementById('new_exam_mcq_pts').value) || 1;
-            const writtenMax = parseFloat(document.getElementById('new_exam_written_max').value) || 0;
+            const writtenMaxVal = document.getElementById('new_exam_written_max').value;
+            const writtenMax = writtenMaxVal !== '' ? (parseFloat(writtenMaxVal) || 0) : 0;
             const modelsCount = parseInt(document.getElementById('new_exam_models_count').value, 10) || 2;
 
             if (!title) {
@@ -7184,8 +7216,7 @@ function getAdminCenterCoords(centerName, address) {
                 }
             });
 
-            const newExam = {
-                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'exam_' + Date.now(),
+            let newExam = {
                 title: title,
                 subject: subject,
                 exam_date: date,
@@ -7195,17 +7226,27 @@ function getAdminCenterCoords(centerName, address) {
                 written_max_score: writtenMax,
                 total_score: totalScore,
                 models: modelsObj,
-                status: 'active',
-                created_at: new Date().toISOString()
+                status: 'active'
             };
 
-            // Save to Supabase
-            if (typeof supabase !== 'undefined' && supabase) {
+            // Save to Supabase using supabaseClient
+            const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+            if (client) {
                 try {
-                    await supabase.from('exams').insert([newExam]);
+                    const { data, error } = await client.from('exams').insert([newExam]).select();
+                    if (error) {
+                        console.error('Supabase exam insert error:', error);
+                    } else if (data && data[0]) {
+                        newExam = data[0];
+                    }
                 } catch (err) {
                     console.warn('Supabase insert failed, saving to local:', err);
                 }
+            }
+
+            if (!newExam.id) {
+                newExam.id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : '00000000-0000-4000-8000-' + String(Date.now()).slice(-12).padStart(12, '0');
+                newExam.created_at = new Date().toISOString();
             }
 
             adminExamsList.unshift(newExam);
@@ -7217,6 +7258,17 @@ function getAdminCenterCoords(centerName, address) {
             closeCreateExamModal();
             showToast('Exam created successfully! (تم إنشاء الامتحان بنجاح)');
             document.getElementById('create_exam_form').reset();
+
+            // Realtime broadcast to assistant portal (<50ms)
+            if (window.adminArrivalsChannel) {
+                try {
+                    window.adminArrivalsChannel.send({
+                        type: 'broadcast',
+                        event: 'exam_updated',
+                        payload: { action: 'create', exam: newExam }
+                    });
+                } catch(e) {}
+            }
         }
 
         function printExamBubbleSheet(examId) {
@@ -7372,9 +7424,10 @@ function getAdminCenterCoords(centerName, address) {
         async function saveAnswerKey() {
             if (!currentAnswerKeyExam) return;
 
-            if (typeof supabase !== 'undefined' && supabase) {
+            const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+            if (client) {
                 try {
-                    await supabase.from('exams')
+                    await client.from('exams')
                         .update({ models: currentAnswerKeyExam.models })
                         .eq('id', currentAnswerKeyExam.id);
                 } catch (err) {
@@ -7394,6 +7447,16 @@ function getAdminCenterCoords(centerName, address) {
             renderAdminExamsGrid();
             closeAnswerKeyModal();
             showToast('Answer key updated successfully! (تم حفظ نموذج الإجابة)');
+
+            if (window.adminArrivalsChannel) {
+                try {
+                    window.adminArrivalsChannel.send({
+                        type: 'broadcast',
+                        event: 'exam_updated',
+                        payload: { action: 'key', examId: currentAnswerKeyExam.id }
+                    });
+                } catch(e) {}
+            }
         }
 
         async function toggleExamStatus(examId) {
@@ -7403,15 +7466,26 @@ function getAdminCenterCoords(centerName, address) {
             const newStatus = exam.status === 'closed' ? 'active' : 'closed';
             exam.status = newStatus;
 
-            if (typeof supabase !== 'undefined' && supabase) {
+            const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+            if (client) {
                 try {
-                    await supabase.from('exams').update({ status: newStatus }).eq('id', examId);
+                    await client.from('exams').update({ status: newStatus }).eq('id', examId);
                 } catch (e) {}
             }
 
             try { localStorage.setItem('mr_kelany_exams', JSON.stringify(adminExamsList)); } catch(e) {}
             renderAdminExamsGrid();
             showToast(`Exam marked as ${newStatus}`);
+
+            if (window.adminArrivalsChannel) {
+                try {
+                    window.adminArrivalsChannel.send({
+                        type: 'broadcast',
+                        event: 'exam_updated',
+                        payload: { action: 'status', examId: examId, status: newStatus }
+                    });
+                } catch(e) {}
+            }
         }
 
         async function deleteExam(examId) {
@@ -7419,10 +7493,14 @@ function getAdminCenterCoords(centerName, address) {
 
             adminExamsList = adminExamsList.filter(e => e.id !== examId);
 
-            if (typeof supabase !== 'undefined' && supabase) {
+            const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+            if (client) {
                 try {
-                    await supabase.from('exams').delete().eq('id', examId);
-                } catch (e) {}
+                    const { error } = await client.from('exams').delete().eq('id', examId);
+                    if (error) console.error("Supabase delete exam error:", error);
+                } catch (e) {
+                    console.warn("Supabase delete exam failed:", e);
+                }
             }
 
             try {
@@ -7432,6 +7510,17 @@ function getAdminCenterCoords(centerName, address) {
 
             renderAdminExamsGrid();
             showToast('Exam deleted');
+
+            // Realtime broadcast to assistant portal (<50ms)
+            if (window.adminArrivalsChannel) {
+                try {
+                    window.adminArrivalsChannel.send({
+                        type: 'broadcast',
+                        event: 'exam_updated',
+                        payload: { action: 'delete', examId: examId }
+                    });
+                } catch(e) {}
+            }
         }
 
         async function openExamResultsModal(examId) {
@@ -7447,9 +7536,10 @@ function getAdminCenterCoords(centerName, address) {
             `;
 
             let results = [];
-            if (typeof supabase !== 'undefined' && supabase) {
+            const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+            if (client) {
                 try {
-                    const { data, error } = await supabase
+                    const { data, error } = await client
                         .from('exam_results')
                         .select('*')
                         .eq('exam_id', examId);
@@ -7701,9 +7791,10 @@ function getAdminCenterCoords(centerName, address) {
 
             exam.sheet_config = sheetConfig;
 
-            if (typeof supabase !== 'undefined' && supabase) {
+            const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+            if (client) {
                 try {
-                    await supabase.from('exams')
+                    await client.from('exams')
                         .update({ sheet_config: sheetConfig })
                         .eq('id', currentConfigExamId);
                 } catch(err) {
@@ -7782,27 +7873,21 @@ function getAdminCenterCoords(centerName, address) {
 
                 <div class="grid grid-cols-3 gap-2.5 pt-1">
                     <div>
-                        <label class="block text-[11px] font-bold text-on-surface mb-1">MCQ Count:</label>
-                        <select id="new_exam_q_count" class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold">
-                            <option value="15">15 Questions</option>
-                            <option value="20">20 Questions</option>
-                            <option value="25">25 Questions</option>
-                            <option value="30" selected>30 Questions</option>
-                            <option value="40">40 Questions</option>
-                            <option value="50">50 Questions</option>
-                        </select>
+                        <label class="block text-[11px] font-bold text-on-surface mb-1">MCQ Count (الأسئلة):</label>
+                        <input type="number" id="new_exam_q_count" min="1" max="100" step="1" value="30" placeholder="e.g. 30" required
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold text-center focus:border-secondary focus:ring-1 focus:ring-secondary"/>
                     </div>
 
                     <div>
                         <label class="block text-[11px] font-bold text-on-surface mb-1">Points / MCQ:</label>
-                        <input type="number" id="new_exam_mcq_pts" min="0.5" step="0.5" value="1" 
-                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold text-center"/>
+                        <input type="number" id="new_exam_mcq_pts" min="0.25" step="any" value="1" placeholder="1"
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold text-center focus:border-secondary focus:ring-1 focus:ring-secondary"/>
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold text-on-surface mb-1">Written Max:</label>
-                        <input type="number" id="new_exam_written_max" min="0" step="1" value="20" 
-                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold text-center"/>
+                        <label class="block text-[11px] font-bold text-on-surface mb-1">Written Max (المقالي):</label>
+                        <input type="number" id="new_exam_written_max" min="0" step="any" value="20" placeholder="e.g. 20"
+                            class="w-full bg-surface-container-low border border-outline-variant rounded-xl p-2 text-xs font-bold text-center focus:border-secondary focus:ring-1 focus:ring-secondary"/>
                     </div>
                 </div>
 

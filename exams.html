@@ -435,59 +435,66 @@
         // --- Load Exams from Supabase / Local Fallback ---
         async function loadExams() {
             const selectEl = document.getElementById('active_exam_select');
-            selectEl.innerHTML = `<option value="">Loading exams...</option>`;
+            if (selectEl) selectEl.innerHTML = `<option value="">Loading exams...</option>`;
 
+            let cloudFetched = false;
             try {
                 if (supabaseClient) {
                     const { data, error } = await supabaseClient.from('exams').select('*').order('created_at', { ascending: false });
-                    if (!error && data && data.length > 0) {
+                    if (!error && Array.isArray(data)) {
+                        cloudFetched = true;
                         allExams = data.filter(e => e.status === 'active');
+                        try { localStorage.setItem('mr_kelany_exams', JSON.stringify(data)); } catch(e) {}
                     }
                 }
             } catch(e) {
                 console.warn("Supabase exams load fallback:", e);
             }
 
-            // Fallback: Check local storage
-            if (allExams.length === 0) {
+            // Fallback: Check local storage only if offline or network error
+            if (!cloudFetched && allExams.length === 0) {
                 try {
                     const cached = JSON.parse(localStorage.getItem('mr_kelany_exams') || '[]');
                     if (cached.length > 0) allExams = cached.filter(e => e.status === 'active');
                 } catch(e) {}
             }
 
-            // If still no exams, create a sample active exam
-            if (allExams.length === 0) {
-                const sampleExam = {
-                    id: 'sample-exam-01',
-                    title: 'امتحان الكيمياء الشامل - الباب الأول',
-                    subject: 'Chemistry',
-                    exam_date: new Date().toISOString().split('T')[0],
-                    center: 'All Centers',
-                    question_count: 30,
-                    mcq_score_per_q: 1,
-                    written_max_score: 20,
-                    total_score: 50,
-                    models: {
-                        'A': { 1:'A', 2:'B', 3:'C', 4:'D', 5:'A', 6:'C', 7:'B', 8:'A', 9:'D', 10:'B', 11:'A', 12:'B', 13:'C', 14:'D', 15:'A', 16:'B', 17:'C', 18:'D', 19:'A', 20:'B', 21:'C', 22:'D', 23:'A', 24:'B', 25:'C', 26:'D', 27:'A', 28:'B', 29:'C', 30:'D' },
-                        'B': { 1:'B', 2:'C', 3:'D', 4:'A', 5:'B', 6:'D', 7:'C', 8:'B', 9:'A', 10:'C', 11:'B', 12:'C', 13:'D', 14:'A', 15:'B', 16:'C', 17:'D', 18:'A', 19:'B', 20:'C', 21:'D', 22:'A', 23:'B', 24:'C', 25:'D', 26:'A', 27:'B', 28:'C', 29:'D', 30:'A' }
-                    },
-                    status: 'active'
-                };
-                allExams = [sampleExam];
-                try { localStorage.setItem('mr_kelany_exams', JSON.stringify(allExams)); } catch(e) {}
-            }
+            if (!selectEl) return;
 
             if (allExams.length === 0) {
-                selectEl.innerHTML = `<option value="">No active exams found</option>`;
+                selectEl.innerHTML = `<option value="">No active exams found (لا توجد امتحانات مفعلة)</option>`;
+                currentExam = null;
+                const titleEl = document.getElementById('banner_exam_title');
+                if (titleEl) titleEl.textContent = 'No Active Exam Selected';
                 return;
             }
 
+            // Preserve currently selected exam if still available
+            const prevSelectedId = currentExam ? currentExam.id : '';
             selectEl.innerHTML = allExams.map(ex => `
-                <option value="${ex.id}">${ex.title} (${ex.question_count} Qs • ${ex.total_score || 50} pts)</option>
+                <option value="${ex.id}" ${ex.id === prevSelectedId ? 'selected' : ''}>${escapeHtml(ex.title)} (${ex.question_count} Qs • ${ex.total_score || 50} pts)</option>
             `).join('');
 
             onExamSelected();
+        }
+
+        // --- Realtime Exam Sync Listener ---
+        if (supabaseClient) {
+            try {
+                const examsChannel = supabaseClient.channel('assistant_arrivals');
+                examsChannel.on('broadcast', { event: 'exam_updated' }, async ({ payload }) => {
+                    console.log('Realtime exam update received from admin:', payload);
+                    await loadExams();
+                    if (payload && payload.action === 'create') {
+                        showToast('New exam created by admin! (تمت إضافة امتحان جديد)', 'success');
+                    } else if (payload && payload.action === 'delete') {
+                        showToast('Exam list updated by admin', 'info');
+                    }
+                });
+                examsChannel.subscribe();
+            } catch(e) {
+                console.warn("Could not subscribe to exam updates channel:", e);
+            }
         }
 
         function onExamSelected() {

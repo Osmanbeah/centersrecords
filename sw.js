@@ -1,5 +1,5 @@
 // Service Worker for Centers Record (Offline PWA)
-const CACHE_NAME = 'centers-record-v41';
+const CACHE_NAME = 'centers-record-v42';
 
 const STATIC_ASSETS = [
     './',
