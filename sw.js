@@ -2,7 +2,7 @@
 
 
 
-const CACHE_NAME = 'centers-record-v47';
+const CACHE_NAME = 'centers-record-v48';
 
 
 
