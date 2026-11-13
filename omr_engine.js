@@ -2344,44 +2344,93 @@
 
 
 
-            // If we found at least 4 distinct corners, compute homography
-
+            // Robust Quadrilateral Detection (EvalBee-Style) to prevent mixing outer & inner fiducials
+            let bestQuad = null;
             if (candidateDots.length >= 4) {
+                function isValidQuad(tl, tr, br, bl) {
+                    const wTop = Math.hypot(tr.x - tl.x, tr.y - tl.y);
+                    const wBot = Math.hypot(br.x - bl.x, br.y - bl.y);
+                    const hLeft = Math.hypot(bl.x - tl.x, bl.y - tl.y);
+                    const hRight = Math.hypot(br.x - tr.x, br.y - tr.y);
 
-                // Find 4 extreme corners: TL, TR, BR, BL
+                    if (Math.min(wTop, wBot, hLeft, hRight) < 40) return false;
+                    if (Math.min(wTop, wBot) / Math.max(wTop, wBot) < 0.65) return false;
+                    if (Math.min(hLeft, hRight) / Math.max(hLeft, hRight) < 0.65) return false;
 
-                let tl = candidateDots[0], tr = candidateDots[0], br = candidateDots[0], bl = candidateDots[0];
+                    const angTop = Math.atan2(tr.y - tl.y, tr.x - tl.x);
+                    const angBot = Math.atan2(br.y - bl.y, br.x - bl.x);
+                    let diffH = Math.abs(angTop - angBot);
+                    if (diffH > Math.PI) diffH = 2 * Math.PI - diffH;
+                    if (diffH > 0.28) return false; // Max ~16 deg divergence
 
-                let minSum = Infinity, maxSum = -Infinity;
+                    const angLeft = Math.atan2(bl.x - tl.x, bl.y - tl.y);
+                    const angRight = Math.atan2(br.x - tr.x, br.y - tr.y);
+                    let diffV = Math.abs(angLeft - angRight);
+                    if (diffV > Math.PI) diffV = 2 * Math.PI - diffV;
+                    if (diffV > 0.28) return false; // Max ~16 deg divergence
 
-                let minDiff = Infinity, maxDiff = -Infinity;
-
-
-
-                for (const pt of candidateDots) {
-
-                    const s = pt.x + pt.y;
-
-                    const d = pt.x - pt.y;
-
-                    if (s < minSum) { minSum = s; tl = pt; }
-
-                    if (s > maxSum) { maxSum = s; br = pt; }
-
-                    if (d > maxDiff) { maxDiff = d; tr = pt; }
-
-                    if (d < minDiff) { minDiff = d; bl = pt; }
-
+                    return true;
                 }
 
+                // 1. Test extreme 4 points
+                let tl = candidateDots[0], tr = candidateDots[0], br = candidateDots[0], bl = candidateDots[0];
+                let minSum = Infinity, maxSum = -Infinity;
+                let minDiff = Infinity, maxDiff = -Infinity;
 
+                for (const pt of candidateDots) {
+                    const s = pt.x + pt.y;
+                    const d = pt.x - pt.y;
+                    if (s < minSum) { minSum = s; tl = pt; }
+                    if (s > maxSum) { maxSum = s; br = pt; }
+                    if (d > maxDiff) { maxDiff = d; tr = pt; }
+                    if (d < minDiff) { minDiff = d; bl = pt; }
+                }
 
+                if (isValidQuad(tl, tr, br, bl)) {
+                    bestQuad = [tl, tr, br, bl];
+                } else {
+                    // 2. Fallback: Search among candidate dots to avoid mixing outer & inner markers
+                    const sortedY = candidateDots.slice().sort((a, b) => a.y - b.y);
+                    const half = Math.floor(sortedY.length / 2);
+                    const topHalf = sortedY.slice(0, half).sort((a, b) => a.x - b.x);
+                    const botHalf = sortedY.slice(half).sort((a, b) => a.x - b.x);
+
+                    const topCandL = topHalf.slice(0, Math.min(3, topHalf.length));
+                    const topCandR = topHalf.slice(-Math.min(3, topHalf.length));
+                    const botCandL = botHalf.slice(0, Math.min(3, botHalf.length));
+                    const botCandR = botHalf.slice(-Math.min(3, botHalf.length));
+
+                    let maxArea = 0;
+                    for (const cTl of topCandL) {
+                        for (const cTr of topCandR) {
+                            if (cTl === cTr) continue;
+                            for (const cBr of botCandR) {
+                                for (const cBl of botCandL) {
+                                    if (cBr === cBl || cTl === cBl || cTr === cBr) continue;
+                                    if (isValidQuad(cTl, cTr, cBr, cBl)) {
+                                        const area = 0.5 * Math.abs(
+                                            (cTl.x * cTr.y - cTl.y * cTr.x) +
+                                            (cTr.x * cBr.y - cTr.y * cBr.x) +
+                                            (cBr.x * cBl.y - cBr.y * cBl.x) +
+                                            (cBl.x * cTl.y - cBl.y * cTl.x)
+                                        );
+                                        if (area > maxArea) {
+                                            maxArea = area;
+                                            bestQuad = [cTl, cTr, cBr, cBl];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (bestQuad) {
+                const [tl, tr, br, bl] = bestQuad;
                 // Geometric dimensions of detected corner quadrilateral
-
                 const boxW = Math.max(Math.hypot(tr.x - tl.x, tr.y - tl.y), Math.hypot(br.x - bl.x, br.y - bl.y));
-
                 const boxH = Math.max(Math.hypot(bl.x - tl.x, bl.y - tl.y), Math.hypot(br.x - tr.x, br.y - tr.y));
-
                 const aspect = boxW / Math.max(1, boxH);
 
 
@@ -2576,303 +2625,166 @@
 
          */
 
-        analyzeBubbleCore(gray, cx, cy, w, h, rInner = 6) {
-
-            if (cx < rInner || cx >= w - rInner || cy < rInner || cy >= h - rInner) {
-
-                return { fillRatio: 0, netContrast: 0, variance: 0, paperLevel: 245 };
-
+        analyzeBubbleCore(gray, cx, cy, w, h, rInner = 6, searchR = 6) {
+            if (cx < rInner + searchR || cx >= w - (rInner + searchR) ||
+                cy < rInner + searchR || cy >= h - (rInner + searchR)) {
+                return { fillRatio: 0, netContrast: 0, variance: 0, paperLevel: 245, snappedX: cx, snappedY: cy };
             }
 
+            // 1. Search local window for darkest centroid (EvalBee-Style Local Snapping)
+            let bestX = cx;
+            let bestY = cy;
+            let maxDarkness = -1;
 
-
-            // 1. Inner core patch (strictly inside bubble circle)
-
-            let coreSum = 0;
-
-            let coreSqSum = 0;
-
-            let coreCount = 0;
-
-            const r2 = rInner * rInner;
-
-
-
-            for (let dy = -rInner; dy <= rInner; dy++) {
-
+            for (let dy = -searchR; dy <= searchR; dy += 2) {
                 const py = cy + dy;
-
-                const row = py * w;
-
-                for (let dx = -rInner; dx <= rInner; dx++) {
-
-                    if (dx * dx + dy * dy <= r2) {
-
-                        const px = cx + dx;
-
-                        const lum = gray[row + px];
-
-                        coreSum += lum;
-
-                        coreSqSum += (lum * lum);
-
-                        coreCount++;
-
+                for (let dx = -searchR; dx <= searchR; dx += 2) {
+                    const px = cx + dx;
+                    let patchSum = 0;
+                    for (let cdy = -2; cdy <= 2; cdy++) {
+                        const crow = (py + cdy) * w;
+                        for (let cdx = -2; cdx <= 2; cdx++) {
+                            patchSum += gray[crow + px + cdx];
+                        }
                     }
-
+                    const darkness = 255 - (patchSum / 25);
+                    if (darkness > maxDarkness) {
+                        maxDarkness = darkness;
+                        bestX = px;
+                        bestY = py;
+                    }
                 }
-
             }
 
-            const coreMeanLum = coreCount > 0 ? (coreSum / coreCount) : 255;
-
-            const coreMeanSq = coreCount > 0 ? (coreSqSum / coreCount) : 0;
-
-            const variance = Math.max(0, coreMeanSq - (coreMeanLum * coreMeanLum));
-
-
-
-            // 2. Local paper background (annulus gap around bubble: radius 12 to 17)
-
+            // 2. Measure local paper background annulus at snapped center (radius 12 to 17)
             let paperSum = 0;
-
             let paperCount = 0;
-
             const rAnnulusInner2 = 12 * 12;
-
             const rAnnulusOuter2 = 17 * 17;
 
-
-
             for (let dy = -17; dy <= 17; dy += 2) {
-
-                const py = cy + dy;
-
+                const py = bestY + dy;
                 if (py < 0 || py >= h) continue;
-
                 const row = py * w;
-
                 for (let dx = -17; dx <= 17; dx += 2) {
-
-                    const dist2 = dx * dx + dy * dy;
-
-                    if (dist2 >= rAnnulusInner2 && dist2 <= rAnnulusOuter2) {
-
-                        const px = cx + dx;
-
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 >= rAnnulusInner2 && d2 <= rAnnulusOuter2) {
+                        const px = bestX + dx;
                         if (px >= 0 && px < w) {
-
                             paperSum += gray[row + px];
-
                             paperCount++;
-
                         }
-
                     }
-
                 }
-
             }
 
-            const paperLevel = paperCount > 0 ? (paperSum / paperCount) : 245;
-
-
-
-            // 3. Measure filled pixels inside core (pixels significantly darker than paper)
-
+            const paperLevel = paperCount > 0 ? (paperSum / paperCount) : 245.0;
             const fillThresh = paperLevel * 0.72;
 
+            // 3. Measure core fill ratio & variance at snapped center
+            let coreSum = 0;
+            let coreSqSum = 0;
+            let coreCount = 0;
             let filledCount = 0;
-
-
+            const r2 = rInner * rInner;
 
             for (let dy = -rInner; dy <= rInner; dy++) {
-
-                const py = cy + dy;
-
+                const py = bestY + dy;
                 const row = py * w;
-
                 for (let dx = -rInner; dx <= rInner; dx++) {
-
                     if (dx * dx + dy * dy <= r2) {
-
-                        const px = cx + dx;
-
-                        if (gray[row + px] < fillThresh) {
-
+                        const px = bestX + dx;
+                        const lum = gray[row + px];
+                        coreSum += lum;
+                        coreSqSum += (lum * lum);
+                        coreCount++;
+                        if (lum < fillThresh) {
                             filledCount++;
-
                         }
-
                     }
-
                 }
-
             }
 
+            const coreMeanLum = coreCount > 0 ? (coreSum / coreCount) : 255.0;
+            const variance = coreCount > 0 ? Math.max(0, (coreSqSum / coreCount) - (coreMeanLum * coreMeanLum)) : 0;
             const fillRatio = coreCount > 0 ? (filledCount / coreCount) : 0;
-
-
-
             const meanDarkness = 255.0 - coreMeanLum;
-
             const paperDarkness = 255.0 - paperLevel;
-
             const netContrast = Math.max(0, meanDarkness - paperDarkness);
 
-
-
-            return { fillRatio, netContrast, variance, paperLevel };
-
+            return { fillRatio, netContrast, variance, paperLevel, snappedX: bestX, snappedY: bestY };
         },
-
-
-
-        /**
-
-         * 4-State Question Answer Classification
-
-         * Assigns states: SELECTED, EMPTY, MULTIPLE, UNCERTAIN
-
-         */
 
         classifyQuestion(gray, optionCoords, w, h) {
-
             const opts = ['A', 'B', 'C', 'D'];
-
             const scores = [];
-
-
+            const snappedCoords = {};
 
             for (const opt of opts) {
-
                 const coord = optionCoords[opt];
-
-                const res = this.analyzeBubbleCore(gray, Math.round(coord.x), Math.round(coord.y), w, h, 6);
-
+                const res = this.analyzeBubbleCore(gray, Math.round(coord.x), Math.round(coord.y), w, h, 6, 6);
                 const score = (res.fillRatio * 0.6) + (Math.min(1.0, res.netContrast / 100.0) * 0.4);
-
+                snappedCoords[opt] = { x: res.snappedX, y: res.snappedY };
                 scores.push({
-
                     opt: opt,
-
                     fill: res.fillRatio,
-
                     contrast: res.netContrast,
-
                     variance: res.variance,
-
                     score: score
-
                 });
-
             }
-
-
 
             scores.sort((a, b) => b.score - a.score);
-
             const best = scores[0];
-
             const second = scores[1];
-
-
-
-            // 1. EMPTY: No shaded bubble
-
-            if (best.score < 0.22 && best.fill < 0.25) {
-
-                return {
-
-                    state: 'EMPTY',
-
-                    selected: null,
-
-                    confidence: Math.round((1.0 - best.score) * 100) / 100,
-
-                    scores: scores
-
-                };
-
-            }
-
-
-
-            // 2. MULTIPLE: Two or more clearly marked answers
-
-            if (best.score >= 0.38 && second.score >= 0.36 && (best.score - second.score) < 0.12) {
-
-                return {
-
-                    state: 'MULTIPLE',
-
-                    selected: [best.opt, second.opt],
-
-                    confidence: Math.round(second.score * 100) / 100,
-
-                    scores: scores
-
-                };
-
-            }
-
-
-
-            // 3. UNCERTAIN: Erasure residue smudge (high variance), faint fill, or narrow margin
-
-            if ((best.score >= 0.22 && best.score < 0.40) ||
-
-                (best.variance > 700 && best.fill < 0.45) ||
-
-                ((best.score - second.score) < 0.16 && best.score < 0.55)) {
-
-                return {
-
-                    state: 'UNCERTAIN',
-
-                    selected: best.opt,
-
-                    confidence: Math.round(best.score * 100) / 100,
-
-                    scores: scores
-
-                };
-
-            }
-
-
-
-            // 4. SELECTED: One clearly marked answer
-
             const margin = best.score - second.score;
 
+            // 1. EMPTY: No shaded bubble
+            if (best.score < 0.22 && best.fill < 0.25) {
+                return {
+                    state: 'EMPTY',
+                    selected: null,
+                    confidence: Math.round((1.0 - best.score) * 100) / 100,
+                    scores: scores,
+                    snappedCoords: snappedCoords
+                };
+            }
+
+            // 2. MULTIPLE: Two or more clearly marked answers
+            if (best.score >= 0.38 && second.score >= 0.36 && margin < 0.12) {
+                return {
+                    state: 'MULTIPLE',
+                    selected: best.opt,
+                    multipleSelected: [best.opt, second.opt],
+                    confidence: Math.round(second.score * 100) / 100,
+                    scores: scores,
+                    snappedCoords: snappedCoords
+                };
+            }
+
+            // 3. UNCERTAIN: Erasure residue smudge (high variance), faint fill, or borderline margin
+            if ((best.score >= 0.22 && best.score < 0.40) ||
+                (best.variance > 700 && best.fill < 0.45) ||
+                (margin < 0.16 && best.score < 0.55)) {
+                return {
+                    state: 'UNCERTAIN',
+                    selected: best.opt,
+                    confidence: Math.round(best.score * 100) / 100,
+                    scores: scores,
+                    snappedCoords: snappedCoords
+                };
+            }
+
+            // 4. SELECTED: One clearly marked answer
             const confidence = Math.min(0.99, Math.max(0.80, 0.70 + margin * 0.5));
-
             return {
-
                 state: 'SELECTED',
-
                 selected: best.opt,
-
                 confidence: Math.round(confidence * 100) / 100,
-
-                scores: scores
-
+                scores: scores,
+                snappedCoords: snappedCoords
             };
-
         },
-
-
-
-        /**
-
-         * Production OMR Engine Master Scan Pipeline
-
-         * Input: HTMLCanvasElement or Image
-
-         * Output: Complete scan report with quality, rectified canvas, confidence, and 4-state classifications
-
-         */
 
         scanImage(canvas, questionCount = 30) {
 
@@ -2924,40 +2836,44 @@
             const gridTopY = 480;
             const gridBotY = 1550;
 
-            // Step 4: Read Model (A, B, C, D)
-            // Supports standard table Model row (y=265), tall table (y=340), wide & narrow layouts
+            // Step 4: Read Model (A, B, C, D) with Band Search (EvalBee-Style)
             let detectedModel = 'A';
-            let bestModelScore = -1.0;
+            let bestModelMargin = -1.0;
             let detectedModelCoord = null;
 
-            const candidateModelConfigs = [
-                { y: 265, xs: { 'A': 360, 'B': 440, 'C': 520, 'D': 600 } },
-                { y: 340, xs: { 'A': 360, 'B': 440, 'C': 520, 'D': 600 } },
-                { y: 265, xs: { 'A': 250, 'B': 290, 'C': 330, 'D': 370 } },
-                { y: 340, xs: { 'A': 250, 'B': 290, 'C': 330, 'D': 370 } }
+            const candidateModelYs = [240, 255, 265, 280, 300, 320, 340, 360];
+            const candidateXConfigs = [
+                { 'A': 360, 'B': 440, 'C': 520, 'D': 600 }, // Wide table spacing
+                { 'A': 250, 'B': 290, 'C': 330, 'D': 370 }  // Narrow table spacing
             ];
 
-            for (const cfg of candidateModelConfigs) {
-                const my = cfg.y;
-                const xs = cfg.xs;
-                const modelCoords = {
-                    'A': { x: xs['A'], y: my },
-                    'B': { x: xs['B'], y: my },
-                    'C': { x: xs['C'], y: my },
-                    'D': { x: xs['D'], y: my }
-                };
-                const res = this.classifyQuestion(gray, modelCoords, TARGET_W, TARGET_H);
-                if (res.state === 'SELECTED' && res.selected && res.confidence > bestModelScore) {
-                    bestModelScore = res.confidence;
-                    detectedModel = res.selected;
-                    detectedModelCoord = { x: xs[res.selected], y: my };
+            for (const my of candidateModelYs) {
+                for (const xs of candidateXConfigs) {
+                    const modelCoords = {
+                        'A': { x: xs['A'], y: my },
+                        'B': { x: xs['B'], y: my },
+                        'C': { x: xs['C'], y: my },
+                        'D': { x: xs['D'], y: my }
+                    };
+                    const res = this.classifyQuestion(gray, modelCoords, TARGET_W, TARGET_H);
+                    if (res.state === 'SELECTED' && res.selected) {
+                        const sorted = res.scores.slice().sort((a, b) => b.score - a.score);
+                        const margin = sorted.length >= 2 ? (sorted[0].score - sorted[1].score) : sorted[0].score;
+                        if (margin > bestModelMargin) {
+                            bestModelMargin = margin;
+                            detectedModel = res.selected;
+                            const snapped = res.snappedCoords ? res.snappedCoords[res.selected] : null;
+                            detectedModelCoord = snapped ? { x: snapped.x, y: snapped.y } : { x: xs[res.selected], y: my };
+                        }
+                    }
                 }
             }
 
-            // Step 5: Read Student Roll No (5 Digits)
-            // Calibrated against printable template layout (10 rows: 0 to 9)
+            // Step 5: Read Student Roll No (5 Digits) with Snapping
             const rollRowYs = [604, 657, 708, 763, 817, 872, 924, 974, 1028, 1080];
-            const rollColXs = [268, 326, 385, 443, 502]; // 5 digits
+            const rollColXs = (numMcqCols === 1)
+                ? [268, 326, 385, 443, 502]  // 15-question sheet
+                : [196, 242, 289, 335, 382]; // 30+ question multi-column sheet
             const detectedRollCoords = [];
 
             const idDigits = [];
@@ -2966,9 +2882,9 @@
                 const digitScores = [];
                 for (let d = 0; d <= 9; d++) {
                     const cy = rollRowYs[d];
-                    const res = this.analyzeBubbleCore(gray, cx, cy, TARGET_W, TARGET_H, 6);
+                    const res = this.analyzeBubbleCore(gray, cx, cy, TARGET_W, TARGET_H, 6, 6);
                     const s = (res.fillRatio * 0.6) + (Math.min(1.0, res.netContrast / 100.0) * 0.4);
-                    digitScores.push({ digit: d, score: s, x: cx, y: cy });
+                    digitScores.push({ digit: d, score: s, x: res.snappedX, y: res.snappedY });
                 }
                 digitScores.sort((a, b) => b.score - a.score);
                 const best = digitScores[0];
@@ -2982,11 +2898,10 @@
             }
             const detectedStudentCode = idDigits.join('');
 
-            // Step 6: Read MCQ Questions with Calibrated Coordinates & 4-State Classifier
+            // Step 6: Read MCQ Questions with Snapped Coordinates & 4-State Classifier
             const detectedAnswers = {};
             const optOffsets = [0.32, 0.49, 0.66, 0.83];
 
-            // Calibrated coordinates for 15-question single-column exams
             const qYs15 = [
                 656, 708, 764, 817, 869,     // Block 1: Q1..5
                 978, 1030, 1082, 1139, 1191, // Block 2: Q6..10
@@ -2994,14 +2909,12 @@
             ];
             const optXs15 = { 'A': 796, 'B': 852, 'C': 910, 'D': 971 };
 
-            // Calibrated column X boundaries for 1, 2, 3, or 4 columns
             let regX;
             if (numMcqCols === 1) regX = [100, 480, 1100];
             else if (numMcqCols === 2) regX = [100, 420, 800, 1100];
             else if (numMcqCols === 3) regX = [80, 340, 620, 900, 1120];
             else regX = [60, 290, 530, 770, 1010, 1140];
 
-            // Calibrated vertical dimensions matching template CSS
             const isSpacious = qPerCol <= 16;
             const isMedium = qPerCol > 16 && qPerCol <= 24;
             const rowStepY = isSpacious ? 48.0 : (isMedium ? 42.0 : 36.0);
@@ -3099,14 +3012,15 @@
                     const effColLeft = ans.effColLeft;
                     const effColW = ans.effColW;
 
-                    if (ans.state === 'SELECTED' && ans.selected && ans.coords && ans.coords[ans.selected]) {
-                        const bx = ans.coords[ans.selected].x;
-                        const by = ans.coords[ans.selected].y;
-                        octx.strokeStyle = '#10b981';
-                        octx.lineWidth = 3.5;
-                        octx.beginPath();
-                        octx.arc(bx, by, 14, 0, 2 * Math.PI);
-                        octx.stroke();
+                    if (ans.state === 'SELECTED' && ans.selected) {
+                        const snapped = ans.snappedCoords ? ans.snappedCoords[ans.selected] : (ans.coords ? ans.coords[ans.selected] : null);
+                        if (snapped) {
+                            octx.strokeStyle = '#10b981';
+                            octx.lineWidth = 3.5;
+                            octx.beginPath();
+                            octx.arc(snapped.x, snapped.y, 14, 0, 2 * Math.PI);
+                            octx.stroke();
+                        }
                     } else if (ans.state === 'UNCERTAIN') {
                         octx.strokeStyle = '#f59e0b';
                         octx.lineWidth = 2.5;

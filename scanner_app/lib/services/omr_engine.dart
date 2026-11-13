@@ -10,18 +10,22 @@ enum QuestionState {
   uncertain,
 }
 
-/// Analysis metrics of a single bubble
+/// Analysis metrics of a single bubble with local centroid snapping
 class BubbleAnalysis {
   final double fillRatio;
   final double netContrast;
   final double variance;
   final double paperLevel;
+  final int snappedX;
+  final int snappedY;
 
   BubbleAnalysis({
     required this.fillRatio,
     required this.netContrast,
     required this.variance,
     required this.paperLevel,
+    this.snappedX = 0,
+    this.snappedY = 0,
   });
 }
 
@@ -32,6 +36,7 @@ class QuestionResult {
   final List<String>? multipleSelected;
   final double confidence;
   final Map<String, double> scores;
+  final Map<String, math.Point<int>> snappedCoords;
 
   QuestionResult({
     required this.state,
@@ -39,6 +44,7 @@ class QuestionResult {
     this.multipleSelected,
     required this.confidence,
     required this.scores,
+    this.snappedCoords = const {},
   });
 
   Map<String, dynamic> toJson() => {
@@ -315,22 +321,13 @@ class OMREngine {
     }
 
     // If at least 4 fiducials are found, warp with homography
-    if (candidateDots.length >= 4) {
-      math.Point<double> tl = candidateDots[0],
-          tr = candidateDots[0],
-          br = candidateDots[0],
-          bl = candidateDots[0];
-      double minSum = double.infinity, maxSum = -double.infinity;
-      double minDiff = double.infinity, maxDiff = -double.infinity;
-
-      for (final pt in candidateDots) {
-        final s = pt.x + pt.y;
-        final d = pt.x - pt.y;
-        if (s < minSum) { minSum = s; tl = pt; }
-        if (s > maxSum) { maxSum = s; br = pt; }
-        if (d > maxDiff) { maxDiff = d; tr = pt; }
-        if (d < minDiff) { minDiff = d; bl = pt; }
-      }
+    // Robust Quadrilateral Detection (EvalBee-Style) to prevent mixing outer & inner fiducials
+    final bestQuad = _findBestFiducialQuad(candidateDots);
+    if (bestQuad != null) {
+      final tl = bestQuad[0];
+      final tr = bestQuad[1];
+      final br = bestQuad[2];
+      final bl = bestQuad[3];
 
       double hypot(num dx, num dy) => math.sqrt(dx * dx + dy * dy);
       final boxW = math.max(
@@ -420,49 +417,56 @@ class OMREngine {
     return img.copyResize(source, width: targetW, height: targetH);
   }
 
-  /// Inner-Core Bubble Analysis (excludes circular borders, samples background annulus)
-  static BubbleAnalysis analyzeBubbleCore(Uint8List gray, int cx, int cy, int w, int h, [int rInner = 6]) {
-    if (cx < rInner || cx >= w - rInner || cy < rInner || cy >= h - rInner) {
-      return BubbleAnalysis(fillRatio: 0, netContrast: 0, variance: 0, paperLevel: 245);
+  /// Inner-Core Bubble Analysis with Local Centroid Snapping (EvalBee-Style)
+  static BubbleAnalysis analyzeBubbleCoreWithSnapping(
+      Uint8List gray, int cx, int cy, int w, int h,
+      [int searchR = 6, int rInner = 6]) {
+    if (cx < rInner + searchR || cx >= w - (rInner + searchR) ||
+        cy < rInner + searchR || cy >= h - (rInner + searchR)) {
+      return BubbleAnalysis(fillRatio: 0, netContrast: 0, variance: 0, paperLevel: 245, snappedX: cx, snappedY: cy);
     }
 
-    double coreSum = 0;
-    double coreSqSum = 0;
-    int coreCount = 0;
-    final r2 = rInner * rInner;
+    // 1. Search local +/- searchR window for darkest core centroid
+    int bestX = cx;
+    int bestY = cy;
+    double maxDarkness = -1.0;
 
-    for (int dy = -rInner; dy <= rInner; dy++) {
+    for (int dy = -searchR; dy <= searchR; dy += 2) {
       final py = cy + dy;
-      final row = py * w;
-      for (int dx = -rInner; dx <= rInner; dx++) {
-        if (dx * dx + dy * dy <= r2) {
-          final px = cx + dx;
-          final lum = gray[row + px];
-          coreSum += lum;
-          coreSqSum += (lum * lum);
-          coreCount++;
+      for (int dx = -searchR; dx <= searchR; dx += 2) {
+        final px = cx + dx;
+        double patchSum = 0;
+        int patchCount = 0;
+        for (int cdy = -2; cdy <= 2; cdy++) {
+          final crow = (py + cdy) * w;
+          for (int cdx = -2; cdx <= 2; cdx++) {
+            patchSum += gray[crow + px + cdx];
+            patchCount++;
+          }
+        }
+        final darkness = 255.0 - (patchSum / patchCount);
+        if (darkness > maxDarkness) {
+          maxDarkness = darkness;
+          bestX = px;
+          bestY = py;
         }
       }
     }
 
-    final coreMean = coreCount > 0 ? coreSum / coreCount : 255.0;
-    final coreMeanSq = coreCount > 0 ? coreSqSum / coreCount : 0.0;
-    final variance = math.max(0.0, coreMeanSq - (coreMean * coreMean));
-
-    // Local paper background annulus (radius 12 to 17)
+    // 2. Measure local paper background annulus at snapped center (radius 12 to 17)
     double paperSum = 0;
     int paperCount = 0;
     const rAnnulusInner2 = 12 * 12;
     const rAnnulusOuter2 = 17 * 17;
 
     for (int dy = -17; dy <= 17; dy += 2) {
-      final py = cy + dy;
+      final py = bestY + dy;
       if (py < 0 || py >= h) continue;
       final row = py * w;
       for (int dx = -17; dx <= 17; dx += 2) {
         final d2 = dx * dx + dy * dy;
         if (d2 >= rAnnulusInner2 && d2 <= rAnnulusOuter2) {
-          final px = cx + dx;
+          final px = bestX + dx;
           if (px >= 0 && px < w) {
             paperSum += gray[row + px];
             paperCount++;
@@ -473,20 +477,34 @@ class OMREngine {
 
     final paperLevel = paperCount > 0 ? paperSum / paperCount : 245.0;
     final fillThresh = paperLevel * 0.72;
+
+    // 3. Measure core fill ratio & variance at snapped center
+    double coreSum = 0;
+    double coreSqSum = 0;
+    int coreCount = 0;
     int filledCount = 0;
+    final r2 = rInner * rInner;
 
     for (int dy = -rInner; dy <= rInner; dy++) {
-      final py = cy + dy;
+      final py = bestY + dy;
       final row = py * w;
       for (int dx = -rInner; dx <= rInner; dx++) {
         if (dx * dx + dy * dy <= r2) {
-          if (gray[row + cx + dx] < fillThresh) {
+          final px = bestX + dx;
+          final lum = gray[row + px];
+          coreSum += lum;
+          coreSqSum += (lum * lum);
+          coreCount++;
+          if (lum < fillThresh) {
             filledCount++;
           }
         }
       }
     }
 
+    final coreMean = coreCount > 0 ? coreSum / coreCount : 255.0;
+    final coreMeanSq = coreCount > 0 ? coreSqSum / coreCount : 0.0;
+    final variance = math.max(0.0, coreMeanSq - (coreMean * coreMean));
     final fillRatio = coreCount > 0 ? filledCount / coreCount : 0.0;
     final meanDarkness = 255.0 - coreMean;
     final paperDarkness = 255.0 - paperLevel;
@@ -497,19 +515,23 @@ class OMREngine {
       netContrast: netContrast,
       variance: variance,
       paperLevel: paperLevel,
+      snappedX: bestX,
+      snappedY: bestY,
     );
   }
 
-  /// 4-State Question Classification: SELECTED, EMPTY, MULTIPLE, UNCERTAIN
+  /// 4-State Question Classification with Snapping
   static QuestionResult classifyQuestion(
       Uint8List gray, Map<String, math.Point<int>> coords, int w, int h) {
     final opts = ['A', 'B', 'C', 'D'];
     final scores = <String, Map<String, double>>{};
+    final snappedCoords = <String, math.Point<int>>{};
 
     for (final opt in opts) {
       final pt = coords[opt]!;
-      final res = analyzeBubbleCore(gray, pt.x, pt.y, w, h, 6);
+      final res = analyzeBubbleCoreWithSnapping(gray, pt.x, pt.y, w, h, 6, 6);
       final score = (res.fillRatio * 0.6) + (math.min(1.0, res.netContrast / 100.0) * 0.4);
+      snappedCoords[opt] = math.Point(res.snappedX, res.snappedY);
       scores[opt] = {
         'score': score,
         'fill': res.fillRatio,
@@ -533,6 +555,7 @@ class OMREngine {
         selected: null,
         confidence: (1.0 - best['score']!).clamp(0.0, 1.0),
         scores: scoreMap,
+        snappedCoords: snappedCoords,
       );
     }
 
@@ -544,6 +567,7 @@ class OMREngine {
         multipleSelected: [bestOpt, secondOpt],
         confidence: second['score']!,
         scores: scoreMap,
+        snappedCoords: snappedCoords,
       );
     }
 
@@ -556,6 +580,7 @@ class OMREngine {
         selected: bestOpt,
         confidence: best['score']!,
         scores: scoreMap,
+        snappedCoords: snappedCoords,
       );
     }
 
@@ -567,6 +592,7 @@ class OMREngine {
       selected: bestOpt,
       confidence: confidence,
       scores: scoreMap,
+      snappedCoords: snappedCoords,
     );
   }
 
@@ -597,53 +623,57 @@ class OMREngine {
     final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
     final qPerCol = (qCount / numMcqCols).ceil();
 
-    // 1. Read Model (A, B, C, D)
-    // Supports both standard table Model row (y=265) and tall table (y=340)
+    // 1. Robust Model Detection (Band Search)
     String detectedModel = 'A';
-    double bestModelScore = -1.0;
-    int detectedModelY = 265;
+    double bestModelMargin = -1.0;
     int detectedModelX = 360;
+    int detectedModelY = 265;
 
-    final candidateModelConfigs = [
-      {'y': 265, 'xs': {'A': 360, 'B': 440, 'C': 520, 'D': 600}},
-      {'y': 340, 'xs': {'A': 360, 'B': 440, 'C': 520, 'D': 600}},
-      {'y': 265, 'xs': {'A': 250, 'B': 290, 'C': 330, 'D': 370}},
-      {'y': 340, 'xs': {'A': 250, 'B': 290, 'C': 330, 'D': 370}},
+    final candidateModelYs = [240, 255, 265, 280, 300, 320, 340, 360];
+    final candidateXConfigs = [
+      {'A': 360, 'B': 440, 'C': 520, 'D': 600}, // Wide table spacing
+      {'A': 250, 'B': 290, 'C': 330, 'D': 370}, // Narrow table spacing
     ];
 
-    for (final cfg in candidateModelConfigs) {
-      final my = cfg['y'] as int;
-      final xs = cfg['xs'] as Map<String, int>;
-      final modelCoords = {
-        'A': math.Point(xs['A']!, my),
-        'B': math.Point(xs['B']!, my),
-        'C': math.Point(xs['C']!, my),
-        'D': math.Point(xs['D']!, my),
-      };
-      final res = classifyQuestion(gray, modelCoords, targetW, targetH);
-      if (res.state == QuestionState.selected && res.selected != null && res.confidence > bestModelScore) {
-        bestModelScore = res.confidence;
-        detectedModel = res.selected!;
-        detectedModelY = my;
-        detectedModelX = xs[res.selected!]!;
+    for (final my in candidateModelYs) {
+      for (final xs in candidateXConfigs) {
+        final modelCoords = {
+          'A': math.Point(xs['A']!, my),
+          'B': math.Point(xs['B']!, my),
+          'C': math.Point(xs['C']!, my),
+          'D': math.Point(xs['D']!, my),
+        };
+        final res = classifyQuestion(gray, modelCoords, targetW, targetH);
+        if (res.state == QuestionState.selected && res.selected != null) {
+          final sortedScores = res.scores.values.toList()..sort((a, b) => b.compareTo(a));
+          final margin = sortedScores.length >= 2 ? (sortedScores[0] - sortedScores[1]) : sortedScores[0];
+          if (margin > bestModelMargin) {
+            bestModelMargin = margin;
+            detectedModel = res.selected!;
+            final snapped = res.snappedCoords[res.selected!];
+            detectedModelX = snapped != null ? snapped.x : xs[res.selected!]!;
+            detectedModelY = snapped != null ? snapped.y : my;
+          }
+        }
       }
     }
 
     // 2. Read Student Roll No (5 Digits)
-    // Calibrated against printable template layout (10 rows: 0 to 9)
     final rollRowYs = [604, 657, 708, 763, 817, 872, 924, 974, 1028, 1080];
-    final rollColXs = [268, 326, 385, 443, 502]; // 5 digits
+    final rollColXs = numMcqCols == 1
+        ? [268, 326, 385, 443, 502]  // 15-question sheet
+        : [196, 242, 289, 335, 382]; // 30+ question multi-column sheet
     final detectedRollCoords = <math.Point<int>>[];
-
     final idDigits = <String>[];
+
     for (int c = 0; c < rollColXs.length; c++) {
       final cx = rollColXs[c];
       final digitScores = <Map<String, dynamic>>[];
       for (int d = 0; d <= 9; d++) {
         final cy = rollRowYs[d];
-        final res = analyzeBubbleCore(gray, cx, cy, targetW, targetH, 6);
+        final res = analyzeBubbleCoreWithSnapping(gray, cx, cy, targetW, targetH, 6, 6);
         final score = (res.fillRatio * 0.6) + (math.min(1.0, res.netContrast / 100.0) * 0.4);
-        digitScores.add({'digit': d, 'score': score, 'x': cx, 'y': cy});
+        digitScores.add({'digit': d, 'score': score, 'x': res.snappedX, 'y': res.snappedY});
       }
       digitScores.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
       final best = digitScores[0];
@@ -810,4 +840,100 @@ class OMREngine {
       annotatedImage: annotated,
     );
   }
+
+  /// EvalBee-Style Geometric Quadrilateral Validator:
+  /// Prevents mixing outer corner dots with inner grid dots
+  static List<math.Point<double>>? _findBestFiducialQuad(List<math.Point<double>> dots) {
+    if (dots.length < 4) return null;
+
+    double hypot(num dx, num dy) => math.sqrt(dx * dx + dy * dy);
+
+    bool isValidQuad(
+      math.Point<double> tl,
+      math.Point<double> tr,
+      math.Point<double> br,
+      math.Point<double> bl,
+    ) {
+      final wTop = hypot(tr.x - tl.x, tr.y - tl.y);
+      final wBot = hypot(br.x - bl.x, br.y - bl.y);
+      final hLeft = hypot(bl.x - tl.x, bl.y - tl.y);
+      final hRight = hypot(br.x - tr.x, br.y - tr.y);
+
+      if (math.min(math.min(wTop, wBot), math.min(hLeft, hRight)) < 40) {
+        return false;
+      }
+      if (math.min(wTop, wBot) / math.max(wTop, wBot) < 0.65) return false;
+      if (math.min(hLeft, hRight) / math.max(hLeft, hRight) < 0.65) return false;
+
+      final angTop = math.atan2(tr.y - tl.y, tr.x - tl.x);
+      final angBot = math.atan2(br.y - bl.y, br.x - bl.x);
+      var diffH = (angTop - angBot).abs();
+      if (diffH > math.pi) diffH = 2 * math.pi - diffH;
+      if (diffH > 0.28) return false; // ~16 degrees max divergence
+
+      final angLeft = math.atan2(bl.x - tl.x, bl.y - tl.y);
+      final angRight = math.atan2(br.x - tr.x, br.y - tr.y);
+      var diffV = (angLeft - angRight).abs();
+      if (diffV > math.pi) diffV = 2 * math.pi - diffV;
+      if (diffV > 0.28) return false; // ~16 degrees max divergence
+
+      return true;
+    }
+
+    // Try 1: Extreme bounding points
+    math.Point<double> tl = dots[0], tr = dots[0], br = dots[0], bl = dots[0];
+    double minSum = double.infinity, maxSum = -double.infinity;
+    double minDiff = double.infinity, maxDiff = -double.infinity;
+
+    for (final pt in dots) {
+      final s = pt.x + pt.y;
+      final d = pt.x - pt.y;
+      if (s < minSum) { minSum = s; tl = pt; }
+      if (s > maxSum) { maxSum = s; br = pt; }
+      if (d > maxDiff) { maxDiff = d; tr = pt; }
+      if (d < minDiff) { minDiff = d; bl = pt; }
+    }
+
+    if (isValidQuad(tl, tr, br, bl)) {
+      return [tl, tr, br, bl];
+    }
+
+    // Try 2: Avoid mixing outer & inner markers by checking consistent candidate subsets
+    final sortedByY = List<math.Point<double>>.from(dots)..sort((a, b) => a.y.compareTo(b.y));
+    final half = sortedByY.length ~/ 2;
+    final topHalf = sortedByY.sublist(0, half)..sort((a, b) => a.x.compareTo(b.x));
+    final botHalf = sortedByY.sublist(half)..sort((a, b) => a.x.compareTo(b.x));
+
+    final topCandL = topHalf.take(math.min(3, topHalf.length)).toList();
+    final topCandR = topHalf.reversed.take(math.min(3, topHalf.length)).toList();
+    final botCandL = botHalf.take(math.min(3, botHalf.length)).toList();
+    final botCandR = botHalf.reversed.take(math.min(3, botHalf.length)).toList();
+
+    List<math.Point<double>>? bestQuad;
+    double maxArea = 0;
+
+    for (final cTl in topCandL) {
+      for (final cTr in topCandR) {
+        if (cTl == cTr) continue;
+        for (final cBr in botCandR) {
+          for (final cBl in botCandL) {
+            if (cBr == cBl || cTl == cBl || cTr == cBr) continue;
+            if (isValidQuad(cTl, cTr, cBr, cBl)) {
+              final area = 0.5 * ((cTl.x * cTr.y - cTl.y * cTr.x) +
+                                  (cTr.x * cBr.y - cTr.y * cBr.x) +
+                                  (cBr.x * cBl.y - cBr.y * cBl.x) +
+                                  (cBl.x * cTl.y - cBl.y * cTl.x)).abs();
+              if (area > maxArea) {
+                maxArea = area;
+                bestQuad = [cTl, cTr, cBr, cBl];
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return bestQuad;
+  }
+
 }
