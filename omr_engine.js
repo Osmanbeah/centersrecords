@@ -104,6 +104,22 @@
             const numCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
             const qPerCol = Math.ceil(qCount / numCols);
 
+            // Calculate exact number of registration dots needed based on question blocks
+            const maxRowsInCol = Math.max(11, qPerCol + Math.ceil(qPerCol / 5)); // account for headers/spacers
+            const numDots = Math.max(3, Math.min(6, Math.ceil(qPerCol / 5) + 1));
+
+            function buildRegDotsColHtml() {
+                let dots = '';
+                for (let d = 0; d < numDots; d++) {
+                    dots += '<div class="reg-dot"></div>';
+                }
+                return `
+                    <div class="reg-dot-col">
+                        ${dots}
+                    </div>
+                `;
+            }
+
             function buildMcqCol(colIdx) {
                 const startQ = (colIdx * qPerCol) + 1;
                 const endQ = Math.min(qCount, (colIdx + 1) * qPerCol);
@@ -162,13 +178,7 @@
                 // Middle registration dots column between MCQ columns
                 if (c < numCols - 1) {
                     mcqColumnsHtml += `
-                        <div class="reg-dot-col">
-                            <div class="reg-dot"></div>
-                            <div class="reg-dot"></div>
-                            <div class="reg-dot"></div>
-                            <div class="reg-dot"></div>
-                            <div class="reg-dot"></div>
-                        </div>
+                        ${buildRegDotsColHtml()}
                     `;
                 }
             }
@@ -254,15 +264,16 @@
         }
         .bubble-sheet-page {
             width: 194mm;
-            min-height: 275mm;
-            max-height: 280mm;
+            height: auto;
+            min-height: auto;
             background: #ffffff;
-            padding: 8mm 9mm;
+            padding: 7mm 9mm;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: flex-start;
             position: relative;
+            margin-bottom: 12px;
         }
 
         /* Two-Up A5 Mode */
@@ -408,20 +419,18 @@
         /* Registration Dots & OMR Grid Layout */
         .omr-main-grid {
             display: flex;
-            align-items: flex-start;
+            align-items: stretch;
             justify-content: space-between;
             gap: 8px;
-            flex: 1;
-            padding: 6px 0;
+            padding: 4px 0 8px 0;
         }
 
-        /* Solid Black Square Registration Dots */
+        /* Solid Black Square Registration Dots - Locked strictly to questions height */
         .reg-dot-col {
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
-            align-self: stretch;
             width: 14px;
             padding: 2px 0;
         }
@@ -703,13 +712,7 @@
             <!-- 3. OMR Grid: Framed with Black Registration Dots -->
             <div class="omr-main-grid">
                 <!-- Left Registration Dots -->
-                <div class="reg-dot-col">
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                </div>
+                ${buildRegDotsColHtml()}
 
                 <!-- Roll No Matrix -->
                 <div class="roll-section">
@@ -732,25 +735,13 @@
                 </div>
 
                 <!-- Middle Registration Dots -->
-                <div class="reg-dot-col">
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                </div>
+                ${buildRegDotsColHtml()}
 
                 <!-- MCQ Columns -->
                 ${mcqColumnsHtml}
 
                 <!-- Right Registration Dots -->
-                <div class="reg-dot-col">
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                    <div class="reg-dot"></div>
-                </div>
+                ${buildRegDotsColHtml()}
             </div>
 
             <!-- 4. Footer & Scanner Guide -->
