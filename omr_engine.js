@@ -81,6 +81,25 @@
             const writtenMax = exam.written_max_score != null ? exam.written_max_score : 20;
             const totalScore = exam.total_score || ((qCount * mcqPerQ) + parseFloat(writtenMax));
 
+            // Customizable Sheet & Info Table Configuration
+            const cfg = exam.sheet_config || {};
+            const academyName = cfg.academy_name || 'MR. KELANY ACADEMY';
+            const nameLabel = cfg.name_label || 'Full NAME :';
+            const phoneLabel = cfg.phone_label || 'Phone Number :';
+            const parentPhoneLabel = cfg.parent_phone_label || 'Parent Number :';
+            const idLabel = cfg.id_label || 'ID :';
+            const modelLabel = cfg.model_label || 'Model :';
+            const attendLabel = cfg.attend_center_label || 'بتحضر فين :';
+            const examCenterLabel = cfg.exam_center_label || 'بتمتحن فين :';
+            const showParentPhone = cfg.show_parent_phone !== false;
+            const showCenterQuestions = cfg.show_center_questions !== false;
+            const showWrittenBox = cfg.show_written_box !== false;
+            const writtenBoxTitle = cfg.written_box_title || 'خاص بالمصحح';
+            const writtenBoxSub = cfg.written_box_sub || 'درجة السؤال المقالي';
+            const idDigits = Math.max(3, Math.min(8, cfg.id_digits || 5));
+            const rollTitle = cfg.roll_title || 'Roll No (كود الطالب)';
+            const footerNote = cfg.footer_note || 'تعليمات التظليل: ● تظليل كامل (صحيح) | ✕ ✗ غير صحيح - لا تطوِ الورقة أو تكتب في الهوامش';
+
             // Determine MCQ columns (1 col for <=20, 2 cols for 21-40, 3 cols for 41-60)
             const numCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : 3);
             const qPerCol = Math.ceil(qCount / numCols);
@@ -609,7 +628,7 @@
             <div class="sheet-header">
                 <div class="exam-title-group">
                     <h1>${escapeHtml(title)}</h1>
-                    <div class="exam-subtitle">MR. KELANY ACADEMY &bull; ${escapeHtml(subject).toUpperCase()}</div>
+                    <div class="exam-subtitle">${escapeHtml(academyName)} &bull; ${escapeHtml(subject).toUpperCase()}</div>
                 </div>
                 <div class="sheet-meta-badges">
                     <span class="meta-badge">Date: <strong>${date}</strong></span>
@@ -618,27 +637,29 @@
                 </div>
             </div>
 
-            <!-- 2. Student Info Table & Written Score Box (Exact requested widget) -->
+            <!-- 2. Student Info Table & Written Score Box (Customizable widget) -->
             <div class="top-info-section">
                 <table class="student-table">
                     <tr>
-                        <td class="td-label">Full NAME :</td>
+                        <td class="td-label">${escapeHtml(nameLabel)}</td>
                         <td class="td-fill"></td>
                     </tr>
                     <tr>
-                        <td class="td-label">Phone Number :</td>
+                        <td class="td-label">${escapeHtml(phoneLabel)}</td>
+                        <td class="td-fill"></td>
+                    </tr>
+                    ${showParentPhone ? `
+                    <tr>
+                        <td class="td-label">${escapeHtml(parentPhoneLabel)}</td>
+                        <td class="td-fill"></td>
+                    </tr>
+                    ` : ''}
+                    <tr>
+                        <td class="td-label">${escapeHtml(idLabel)}</td>
                         <td class="td-fill"></td>
                     </tr>
                     <tr>
-                        <td class="td-label">Parent Number :</td>
-                        <td class="td-fill"></td>
-                    </tr>
-                    <tr>
-                        <td class="td-label">ID :</td>
-                        <td class="td-fill"></td>
-                    </tr>
-                    <tr>
-                        <td class="td-label">Model :</td>
+                        <td class="td-label">${escapeHtml(modelLabel)}</td>
                         <td class="td-fill">
                             <div class="model-bubbles-row">
                                 <span class="model-bubble-item"><span class="bubble"></span> A</span>
@@ -648,31 +669,35 @@
                             </div>
                         </td>
                     </tr>
+                    ${showCenterQuestions ? `
                     <tr>
                         <td colspan="2" style="padding:0;">
                             <table style="width:100%; border-collapse:collapse; height:24px;">
                                 <tr>
                                     <td style="width:50%; border-right:1.4px solid #000; direction:rtl; text-align:right; font-weight:800; padding:2px 8px; font-size:11px;">
-                                        بتحضر فين :
+                                        ${escapeHtml(attendLabel)}
                                     </td>
                                     <td style="width:50%; direction:rtl; text-align:right; font-weight:800; padding:2px 8px; font-size:11px;">
-                                        بتمتحن فين :
+                                        ${escapeHtml(examCenterLabel)}
                                     </td>
                                 </tr>
                             </table>
                         </td>
                     </tr>
+                    ` : ''}
                 </table>
 
+                ${showWrittenBox ? `
                 <!-- Teacher's Written Score Box -->
                 <div class="teacher-written-box">
                     <div>
-                        <div class="twb-header">خاص بالمصحح</div>
-                        <div class="twb-sub">درجة السؤال المقالي</div>
+                        <div class="twb-header">${escapeHtml(writtenBoxTitle)}</div>
+                        <div class="twb-sub">${escapeHtml(writtenBoxSub)}</div>
                     </div>
                     <div class="twb-score-area"></div>
                     <div class="twb-max">من <strong>${writtenMax}</strong> درجات</div>
                 </div>
+                ` : ''}
             </div>
 
             <!-- 3. OMR Grid: Framed with Black Registration Dots -->
@@ -688,24 +713,18 @@
 
                 <!-- Roll No Matrix -->
                 <div class="roll-section">
-                    <div class="roll-title">Roll No (كود الطالب)</div>
+                    <div class="roll-title">${escapeHtml(rollTitle)}</div>
                     <div class="roll-boxes-row">
-                        <span class="roll-box"></span>
-                        <span class="roll-box"></span>
-                        <span class="roll-box"></span>
-                        <span class="roll-box"></span>
-                        <span class="roll-box"></span>
+                        ${Array.from({ length: idDigits }).map(() => '<span class="roll-box"></span>').join('')}
                     </div>
                     <div class="roll-matrix">
                         ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => `
                             <div class="roll-row">
                                 <span class="roll-digit-label">${d}</span>
                                 <div class="roll-bubbles">
-                                    <span class="bubble" data-col="0" data-val="${d}"></span>
-                                    <span class="bubble" data-col="1" data-val="${d}"></span>
-                                    <span class="bubble" data-col="2" data-val="${d}"></span>
-                                    <span class="bubble" data-col="3" data-val="${d}"></span>
-                                    <span class="bubble" data-col="4" data-val="${d}"></span>
+                                    ${Array.from({ length: idDigits }).map((_, col) => `
+                                        <span class="bubble" data-col="${col}" data-val="${d}"></span>
+                                    `).join('')}
                                 </div>
                             </div>
                         `).join('')}
@@ -742,7 +761,7 @@
                     <span style="color:#ba1a1a;">✕ ✗ غير صحيح</span>
                 </div>
                 <div>OMR Serial: <strong>${exam.id ? exam.id.substring(0, 12).toUpperCase() : 'KELANY-OMR'}</strong></div>
-                <div>لا تطوِ الورقة أو تكتب في الهوامش</div>
+                <div>${escapeHtml(footerNote)}</div>
             </div>
         </div>
     </div>

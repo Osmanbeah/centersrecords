@@ -7116,14 +7116,18 @@ function getAdminCenterCoords(centerName, address) {
 
                         <!-- Action Buttons -->
                         <div class="pt-3 border-t border-surface-variant flex flex-col gap-2">
-                            <div class="grid grid-cols-2 gap-2">
-                                <button type="button" onclick="printExamBubbleSheet('${exam.id}')" class="w-full py-2 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-xs font-bold inline-flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                            <div class="grid grid-cols-3 gap-2">
+                                <button type="button" onclick="printExamBubbleSheet('${exam.id}')" class="w-full py-2 px-1 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-xs font-bold inline-flex items-center justify-center gap-1 active:scale-95 transition-all" title="Print Bubble Sheet">
                                     <span class="material-symbols-outlined text-[16px] text-secondary">print</span>
-                                    <span>Print Sheet (A4)</span>
+                                    <span>Print</span>
                                 </button>
-                                <button type="button" onclick="openAnswerKeyModal('${exam.id}')" class="w-full py-2 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-xs font-bold inline-flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                <button type="button" onclick="openSheetConfigModal('${exam.id}')" class="w-full py-2 px-1 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-xs font-bold inline-flex items-center justify-center gap-1 active:scale-95 transition-all" title="Customize Info Table & Sheet">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary">tune</span>
+                                    <span>Edit Sheet</span>
+                                </button>
+                                <button type="button" onclick="openAnswerKeyModal('${exam.id}')" class="w-full py-2 px-1 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-xs font-bold inline-flex items-center justify-center gap-1 active:scale-95 transition-all" title="Configure Model Answer Keys">
                                     <span class="material-symbols-outlined text-[16px] text-secondary">vpn_key</span>
-                                    <span>Answer Keys</span>
+                                    <span>Keys</span>
                                 </button>
                             </div>
                             <button type="button" onclick="openExamResultsModal('${exam.id}')" class="w-full py-2 px-3 rounded-xl bg-secondary-container hover:bg-secondary-container/80 text-on-secondary-container text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
@@ -7231,8 +7235,8 @@ function getAdminCenterCoords(centerName, address) {
                 date: exam.exam_date || exam.date,
                 question_count: exam.question_count || 30,
                 mcq_score_per_q: exam.mcq_score_per_q || 1,
-                written_max_score: exam.written_max_score || 20
-            };
+                written_max_score: exam.written_max_score != null ? exam.written_max_score : 20,
+                sheet_config: exam.sheet_config || {}};
 
             const printableHtml = OMREngine.generatePrintableSheetHtml(normalized);
             const printWin = window.open('', '_blank');
@@ -7612,6 +7616,119 @@ function getAdminCenterCoords(centerName, address) {
         }
 
 
+    
+        // ==================== BUBBLE SHEET & INFO TABLE CUSTOMIZER ====================
+        let currentConfigExamId = null;
+
+        function openSheetConfigModal(examId) {
+            const exam = adminExamsList.find(e => e.id === examId);
+            if (!exam) return;
+
+            currentConfigExamId = examId;
+            const modal = document.getElementById('edit_sheet_modal');
+            if (!modal) return;
+
+            document.getElementById('edit_sheet_modal_subtitle').textContent = `${exam.title} - Configure header & fields`;
+
+            const cfg = exam.sheet_config || {};
+
+            document.getElementById('cfg_academy_name').value = cfg.academy_name || 'MR. KELANY ACADEMY';
+            document.getElementById('cfg_footer_note').value = cfg.footer_note || 'تعليمات التظليل: ● تظليل كامل (صحيح) | ✕ ✗ غير صحيح - لا تطوِ الورقة أو تكتب في الهوامش';
+
+            document.getElementById('cfg_name_label').value = cfg.name_label || 'Full NAME :';
+            document.getElementById('cfg_phone_label').value = cfg.phone_label || 'Phone Number :';
+            document.getElementById('cfg_parent_phone_label').value = cfg.parent_phone_label || 'Parent Number :';
+            document.getElementById('cfg_show_parent_phone').checked = cfg.show_parent_phone !== false;
+
+            document.getElementById('cfg_id_label').value = cfg.id_label || 'ID :';
+            document.getElementById('cfg_model_label').value = cfg.model_label || 'Model :';
+            document.getElementById('cfg_roll_title').value = cfg.roll_title || 'Roll No (كود الطالب)';
+
+            const showCenterQ = cfg.show_center_questions !== false;
+            document.getElementById('cfg_show_center_questions').checked = showCenterQ;
+            toggleCenterQuestions(showCenterQ);
+
+            document.getElementById('cfg_attend_label').value = cfg.attend_center_label || 'بتحضر فين :';
+            document.getElementById('cfg_exam_center_label').value = cfg.exam_center_label || 'بتمتحن فين :';
+
+            document.getElementById('cfg_id_digits').value = String(cfg.id_digits || 5);
+            document.getElementById('cfg_show_written_box').checked = cfg.show_written_box !== false;
+            document.getElementById('cfg_written_box_title').value = cfg.written_box_title || 'خاص بالمصحح';
+            document.getElementById('cfg_written_box_sub').value = cfg.written_box_sub || 'درجة السؤال المقالي';
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeSheetConfigModal() {
+            const modal = document.getElementById('edit_sheet_modal');
+            if (modal) modal.classList.add('hidden');
+            currentConfigExamId = null;
+        }
+
+        function toggleCenterQuestions(show) {
+            const grp = document.getElementById('cfg_center_questions_group');
+            if (grp) {
+                if (show) grp.classList.remove('hidden');
+                else grp.classList.add('hidden');
+            }
+        }
+
+        async function saveSheetConfig(e) {
+            if (e && e.preventDefault) e.preventDefault();
+            if (!currentConfigExamId) return;
+
+            const exam = adminExamsList.find(e => e.id === currentConfigExamId);
+            if (!exam) return;
+
+            const sheetConfig = {
+                academy_name: document.getElementById('cfg_academy_name').value.trim() || 'MR. KELANY ACADEMY',
+                footer_note: document.getElementById('cfg_footer_note').value.trim() || 'تعليمات التظليل: ● تظليل كامل (صحيح) | ✕ ✗ غير صحيح - لا تطوِ الورقة أو تكتب في الهوامش',
+                name_label: document.getElementById('cfg_name_label').value.trim() || 'Full NAME :',
+                phone_label: document.getElementById('cfg_phone_label').value.trim() || 'Phone Number :',
+                parent_phone_label: document.getElementById('cfg_parent_phone_label').value.trim() || 'Parent Number :',
+                show_parent_phone: document.getElementById('cfg_show_parent_phone').checked,
+                id_label: document.getElementById('cfg_id_label').value.trim() || 'ID :',
+                model_label: document.getElementById('cfg_model_label').value.trim() || 'Model :',
+                roll_title: document.getElementById('cfg_roll_title').value.trim() || 'Roll No (كود الطالب)',
+                show_center_questions: document.getElementById('cfg_show_center_questions').checked,
+                attend_center_label: document.getElementById('cfg_attend_label').value.trim() || 'بتحضر فين :',
+                exam_center_label: document.getElementById('cfg_exam_center_label').value.trim() || 'بتمتحن فين :',
+                id_digits: parseInt(document.getElementById('cfg_id_digits').value, 10) || 5,
+                show_written_box: document.getElementById('cfg_show_written_box').checked,
+                written_box_title: document.getElementById('cfg_written_box_title').value.trim() || 'خاص بالمصحح',
+                written_box_sub: document.getElementById('cfg_written_box_sub').value.trim() || 'درجة السؤال المقالي'
+            };
+
+            exam.sheet_config = sheetConfig;
+
+            if (typeof supabase !== 'undefined' && supabase) {
+                try {
+                    await supabase.from('exams')
+                        .update({ sheet_config: sheetConfig })
+                        .eq('id', currentConfigExamId);
+                } catch(err) {
+                    console.warn('Supabase update sheet_config fallback to local:', err);
+                }
+            }
+
+            try {
+                localStorage.setItem('mr_kelany_exams', JSON.stringify(adminExamsList));
+            } catch(e) {}
+
+            renderAdminExamsGrid();
+            closeSheetConfigModal();
+            showToast('Bubble sheet customization saved! (تم حفظ تخصيص ورقة الإجابة)');
+            return exam.id;
+        }
+
+        async function saveSheetConfigAndPrint() {
+            const examId = currentConfigExamId;
+            await saveSheetConfig();
+            if (examId) {
+                setTimeout(() => printExamBubbleSheet(examId), 200);
+            }
+        }
+
     </script>
 
     <!-- ================= CREATE EXAM MODAL ================= -->
@@ -7824,6 +7941,167 @@ function getAdminCenterCoords(centerName, address) {
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+
+    <!-- ================= EDIT BUBBLE SHEET & INFO TABLE MODAL ================= -->
+    <div id="edit_sheet_modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-scrim/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-surface rounded-2xl max-w-2xl w-full p-5 sm:p-6 border border-outline-variant shadow-2xl flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-surface-variant">
+                <div>
+                    <h3 id="edit_sheet_modal_title" class="font-bold text-base sm:text-lg flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary">tune</span>
+                        <span>Customize Bubble Sheet & Info Table (تخصيص ورقة الإجابة والبيانات)</span>
+                    </h3>
+                    <p id="edit_sheet_modal_subtitle" class="text-xs text-on-surface-variant mt-0.5">Customize headers, student fields, Roll No digits, and score boxes</p>
+                </div>
+                <button type="button" onclick="closeSheetConfigModal()" class="text-on-surface-variant hover:text-on-surface p-1">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <form id="edit_sheet_form" onsubmit="saveSheetConfig(event)" class="space-y-4 text-xs">
+                <!-- 1. Branding & Header Section -->
+                <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 space-y-3">
+                    <h4 class="font-bold text-on-surface flex items-center gap-1.5 text-xs">
+                        <span class="material-symbols-outlined text-[17px] text-secondary">branding_watermark</span>
+                        <span>Header & Academy Branding (الترويسة والعنوان)</span>
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-bold text-on-surface-variant mb-1">Academy / Teacher Header:</label>
+                            <input type="text" id="cfg_academy_name" placeholder="MR. KELANY ACADEMY" class="w-full bg-surface border border-outline-variant rounded-xl p-2 font-bold text-xs"/>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-on-surface-variant mb-1">Footer Instructions Note:</label>
+                            <input type="text" id="cfg_footer_note" placeholder="تعليمات التظليل: ● تظليل كامل (صحيح) | ✕ ✗ غير صحيح" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Student Info Table Labels & Toggles (جدول بيانات الطالب) -->
+                <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-bold text-on-surface flex items-center gap-1.5 text-xs">
+                            <span class="material-symbols-outlined text-[17px] text-secondary">table_chart</span>
+                            <span>Student Info Table (حقول جدول البيانات)</span>
+                        </h4>
+                        <span class="text-[11px] text-on-surface-variant">Edit labels or toggle rows</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-on-surface-variant mb-1">Name Field Label:</label>
+                            <input type="text" id="cfg_name_label" value="Full NAME :" class="w-full bg-surface border border-outline-variant rounded-xl p-2 font-semibold text-xs"/>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-on-surface-variant mb-1">Phone Number Label:</label>
+                            <input type="text" id="cfg_phone_label" value="Phone Number :" class="w-full bg-surface border border-outline-variant rounded-xl p-2 font-semibold text-xs"/>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-on-surface-variant mb-1">Parent Phone Label:</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="cfg_parent_phone_label" value="Parent Number :" class="flex-1 bg-surface border border-outline-variant rounded-xl p-2 font-semibold text-xs"/>
+                                <label class="flex items-center gap-1 shrink-0 font-bold text-[11px] cursor-pointer">
+                                    <input type="checkbox" id="cfg_show_parent_phone" checked class="rounded border-outline-variant text-secondary focus:ring-secondary"/>
+                                    <span>Show</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-on-surface-variant mb-1">Student ID Label:</label>
+                            <input type="text" id="cfg_id_label" value="ID :" class="w-full bg-surface border border-outline-variant rounded-xl p-2 font-semibold text-xs"/>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-on-surface-variant mb-1">Model Selection Label:</label>
+                            <input type="text" id="cfg_model_label" value="Model :" class="w-full bg-surface border border-outline-variant rounded-xl p-2 font-semibold text-xs"/>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-on-surface-variant mb-1">Roll No Matrix Label:</label>
+                            <input type="text" id="cfg_roll_title" value="Roll No (كود الطالب)" class="w-full bg-surface border border-outline-variant rounded-xl p-2 font-semibold text-xs"/>
+                        </div>
+                    </div>
+
+                    <!-- Split Bottom Row (Center questions) -->
+                    <div class="pt-2 border-t border-surface-variant space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="font-bold text-on-surface flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="cfg_show_center_questions" checked onchange="toggleCenterQuestions(this.checked)" class="rounded border-outline-variant text-secondary focus:ring-secondary"/>
+                                <span>Show Bottom Split Center Row (سؤال سنتر الحضور والامتحان)</span>
+                            </label>
+                        </div>
+                        <div id="cfg_center_questions_group" class="grid grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label class="block font-semibold text-on-surface-variant mb-1 text-[11px]">Left Question Label:</label>
+                                <input type="text" id="cfg_attend_label" value="بتحضر فين :" dir="rtl" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-semibold text-right"/>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-on-surface-variant mb-1 text-[11px]">Right Question Label:</label>
+                                <input type="text" id="cfg_exam_center_label" value="بتمتحن فين :" dir="rtl" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-semibold text-right"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Roll No Digits & Teacher Written Box -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Roll No Digits Count -->
+                    <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 space-y-2">
+                        <h4 class="font-bold text-on-surface flex items-center gap-1.5 text-xs">
+                            <span class="material-symbols-outlined text-[17px] text-secondary">pin</span>
+                            <span>Student ID / Roll No Format</span>
+                        </h4>
+                        <div>
+                            <label class="block font-semibold text-on-surface-variant mb-1">Number of ID Digits:</label>
+                            <select id="cfg_id_digits" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-bold">
+                                <option value="4">4 Digits (e.g. 1024)</option>
+                                <option value="5" selected>5 Digits (Standard e.g. 10245)</option>
+                                <option value="6">6 Digits (e.g. 102456)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Teacher's Written Score Box -->
+                    <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-on-surface flex items-center gap-1.5 text-xs">
+                                <span class="material-symbols-outlined text-[17px] text-secondary">edit_note</span>
+                                <span>Written Score Box (مربع المقالي)</span>
+                            </h4>
+                            <label class="flex items-center gap-1 font-bold text-[11px] cursor-pointer">
+                                <input type="checkbox" id="cfg_show_written_box" checked class="rounded border-outline-variant text-secondary focus:ring-secondary"/>
+                                <span>Show</span>
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold text-on-surface-variant mb-1 text-[11px]">Title:</label>
+                                <input type="text" id="cfg_written_box_title" value="خاص بالمصحح" dir="rtl" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-semibold text-right"/>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-on-surface-variant mb-1 text-[11px]">Subtitle:</label>
+                                <input type="text" id="cfg_written_box_sub" value="درجة السؤال المقالي" dir="rtl" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-semibold text-right"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2">
+                    <button type="button" onclick="closeSheetConfigModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="saveSheetConfigAndPrint()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+                        <span class="material-symbols-outlined text-[17px] text-secondary">print</span>
+                        <span>Save & Print Preview</span>
+                    </button>
+                    <button type="submit" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all">
+                        <span class="material-symbols-outlined text-[17px]">save</span>
+                        <span>Save Changes (حفظ التعديلات)</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
