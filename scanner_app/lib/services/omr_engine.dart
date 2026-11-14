@@ -179,11 +179,11 @@ class OMREngine {
     final w = image.width;
     final h = image.height;
 
-    if (math.min(w, h) < 600 || math.max(w, h) < 800) {
+    if (math.min(w, h) < 480 || math.max(w, h) < 640) {
       return {
         'passed': false,
         'reason': 'LOW_RESOLUTION',
-        'message': 'Resolution is too low (minimum 600x800). Hold camera closer.',
+        'message': 'Resolution is too low (minimum 480x640). Hold camera closer.',
       };
     }
 
@@ -438,10 +438,11 @@ class OMREngine {
     }
     final meanLum = sumLum / (dW * dH);
 
-    final minBlob = math.max(5, (dW * 0.006).round());
-    final maxBlob = math.max(45, (dW * 0.050).round());
+    final minBlob = math.max(7, (dW * 0.010).round());
+    final maxBlob = math.max(50, (dW * 0.055).round());
+    final minArea = math.max(35, (minBlob * minBlob * 0.6).round());
     final visited = Uint8List(dW * dH);
-    final candidateDots = <math.Point<double>>[];
+    final candidateBlobs = <_FiducialBlob>[];
     final step = math.max(2, minBlob ~/ 2);
     final darkThresh = math.min(160, math.max(85, (meanLum * 0.65).toInt()));
 
@@ -500,22 +501,32 @@ class OMREngine {
         final bh = maxY - minY + 1;
         final aspect = bw / math.max(1, bh);
         final fillDensity = blobPixels / (bw * bh);
-        final touchesBorder = minX <= 1 || minY <= 1 || maxX >= dW - 2 || maxY >= dH - 2;
 
-        if (!touchesBorder &&
+        // Reject extreme thin edge slivers, but allow solid corner squares
+        final touchesExtremeBorder = (minX == 0 && bw < minBlob) ||
+            (minY == 0 && bh < minBlob) ||
+            (maxX == dW - 1 && bw < minBlob) ||
+            (maxY == dH - 1 && bh < minBlob);
+
+        if (!touchesExtremeBorder &&
+            blobPixels >= minArea &&
             bw >= minBlob &&
             bw <= maxBlob &&
             bh >= minBlob &&
             bh <= maxBlob &&
             aspect >= 0.65 &&
             aspect <= 1.45 &&
-            fillDensity >= 0.70) {
-          candidateDots.add(math.Point((minX + maxX) / 2.0 * sc, (minY + maxY) / 2.0 * sc));
+            fillDensity >= 0.65) {
+          candidateBlobs.add(_FiducialBlob(
+            (minX + maxX) / 2.0 * sc,
+            (minY + maxY) / 2.0 * sc,
+            blobPixels,
+          ));
         }
       }
     }
 
-    final bestQuad = _findBestFiducialQuad(candidateDots);
+    final bestQuad = _findBestFiducialQuad(candidateBlobs, srcW.toDouble(), srcH.toDouble());
     if (bestQuad == null) return null;
 
     final tl = bestQuad[0];
@@ -540,8 +551,8 @@ class OMREngine {
     final gridRightX = numMcqCols == 1 ? 1103.0 : regX.last.toDouble();
 
     final List<math.Point<double>> dstCorners;
-    // Outer page markers span almost full height from near top (tl.y < srcH * 0.18, aspect < 0.76)
-    final isPageCorners = (aspect < 0.76) && (tl.y < srcH * 0.18);
+    // Outer page markers span full page (aspect ~ 0.667, while inner grid aspect ~ 1.10)
+    final isPageCorners = aspect < 0.88;
     if (isPageCorners) {
       final pageLeftX = numMcqCols == 1 ? 103.0 : 60.0;
       final pageRightX = numMcqCols == 1 ? 1109.0 : targetW - 60.0;
@@ -895,11 +906,11 @@ class OMREngine {
     // Apply EXIF rotation, then require a portrait photo
     var image = img.bakeOrientation(rawImage);
 
-    if (math.min(image.width, image.height) < 600 || math.max(image.width, image.height) < 800) {
+    if (math.min(image.width, image.height) < 480 || math.max(image.width, image.height) < 640) {
       return OMRScanResult(
         success: false,
         error: 'LOW_RESOLUTION',
-        message: 'Resolution is too low (minimum 600x800). Hold camera closer.',
+        message: 'Resolution is too low (minimum 480x640). Hold camera closer.',
       );
     }
     if (image.width > image.height) {
@@ -1132,13 +1143,21 @@ class OMREngine {
   // ---------------------------------------------------------------------------
   // FIDUCIAL QUAD SELECTION
   // ---------------------------------------------------------------------------
-  static List<math.Point<double>>? _findBestFiducialQuad(List<math.Point<double>> dots) {
-    if (dots.length < 4) return null;
+  static List<math.Point<double>>? _findBestFiducialQuad(
+    List<_FiducialBlob> blobs,
+    double srcW,
+    double srcH,
+  ) {
+    if (blobs.length < 4) return null;
 
     double hypot(num dx, num dy) => math.sqrt(dx * dx + dy * dy);
 
-    bool isValidQuad(math.Point<double> tl, math.Point<double> tr, math.Point<double> br,
-        math.Point<double> bl) {
+    bool isValidQuad(
+      math.Point<double> tl,
+      math.Point<double> tr,
+      math.Point<double> br,
+      math.Point<double> bl,
+    ) {
       // 1. Strict directional sanity
       if (tr.x <= tl.x + 40) return false;
       if (br.x <= bl.x + 40) return false;
@@ -1166,34 +1185,91 @@ class OMREngine {
       final angBot = math.atan2(br.y - bl.y, br.x - bl.x);
       var diffH = (angTop - angBot).abs();
       if (diffH > math.pi) diffH = 2 * math.pi - diffH;
-      if (diffH > 0.32) return false;
+      if (diffH > 0.35) return false;
 
       final angLeft = math.atan2(bl.y - tl.y, bl.x - tl.x);
       final angRight = math.atan2(br.y - tr.y, br.x - tr.x);
       var diffV = (angLeft - angRight).abs();
       if (diffV > math.pi) diffV = 2 * math.pi - diffV;
-      if (diffV > 0.32) return false;
+      if (diffV > 0.35) return false;
 
       return true;
     }
 
-    // Try 1: extreme points (picks the outer page corners when they are visible)
-    math.Point<double> tl = dots[0], tr = dots[0], br = dots[0], bl = dots[0];
-    double minSum = double.infinity, maxSum = -double.infinity;
-    double minDiff = double.infinity, maxDiff = -double.infinity;
+    // Quadrant-based grouping (primary and most robust approach)
+    final quadTL = <_FiducialBlob>[];
+    final quadTR = <_FiducialBlob>[];
+    final quadBR = <_FiducialBlob>[];
+    final quadBL = <_FiducialBlob>[];
 
-    for (final pt in dots) {
-      final s = pt.x + pt.y;
-      final d = pt.x - pt.y;
-      if (s < minSum) { minSum = s; tl = pt; }
-      if (s > maxSum) { maxSum = s; br = pt; }
-      if (d > maxDiff) { maxDiff = d; tr = pt; }
-      if (d < minDiff) { minDiff = d; bl = pt; }
+    for (final b in blobs) {
+      if (b.x < 0.48 * srcW && b.y < 0.48 * srcH) {
+        quadTL.add(b);
+      } else if (b.x > 0.52 * srcW && b.y < 0.48 * srcH) {
+        quadTR.add(b);
+      } else if (b.x > 0.52 * srcW && b.y > 0.52 * srcH) {
+        quadBR.add(b);
+      } else if (b.x < 0.48 * srcW && b.y > 0.52 * srcH) {
+        quadBL.add(b);
+      }
     }
 
-    if (isValidQuad(tl, tr, br, bl)) return [tl, tr, br, bl];
+    List<math.Point<double>>? bestQuad;
+    double maxScore = -1e9;
 
-    // Try 2: consistent candidate subsets
+    if (quadTL.isNotEmpty && quadTR.isNotEmpty && quadBR.isNotEmpty && quadBL.isNotEmpty) {
+      for (final p0 in quadTL) {
+        for (final p1 in quadTR) {
+          for (final p2 in quadBR) {
+            for (final p3 in quadBL) {
+              final tl = math.Point(p0.x, p0.y);
+              final tr = math.Point(p1.x, p1.y);
+              final br = math.Point(p2.x, p2.y);
+              final bl = math.Point(p3.x, p3.y);
+
+              if (!isValidQuad(tl, tr, br, bl)) continue;
+
+              final wTop = hypot(tr.x - tl.x, tr.y - tl.y);
+              final wBot = hypot(br.x - bl.x, br.y - bl.y);
+              final hLeft = hypot(bl.x - tl.x, bl.y - tl.y);
+              final hRight = hypot(br.x - tr.x, br.y - tr.y);
+
+              final wRatio = math.min(wTop, wBot) / math.max(wTop, wBot);
+              final hRatio = math.min(hLeft, hRight) / math.max(hLeft, hRight);
+
+              final area = 0.5 *
+                  ((tl.x * tr.y - tl.y * tr.x) +
+                          (tr.x * br.y - tr.y * br.x) +
+                          (br.x * bl.y - br.y * bl.x) +
+                          (bl.x * tl.y - bl.y * tl.x))
+                      .abs();
+
+              final avgW = (wTop + wBot) / 2.0;
+              final avgH = (hLeft + hRight) / 2.0;
+              final aspect = avgW / math.max(1.0, avgH);
+              if (aspect < 0.45 || aspect > 0.90) continue;
+
+              final aspectScore = 1.0 - (aspect - 0.667).abs() / 0.667;
+              final score = area *
+                  math.max(0.2, aspectScore) *
+                  wRatio *
+                  hRatio *
+                  (p0.area + p1.area + p2.area + p3.area);
+
+              if (score > maxScore) {
+                maxScore = score;
+                bestQuad = [tl, tr, br, bl];
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (bestQuad != null) return bestQuad;
+
+    // Fallback: candidate subsets (when quadrant separation is skewed)
+    final dots = blobs.map((b) => math.Point(b.x, b.y)).toList();
     final sortedByY = List<math.Point<double>>.from(dots)..sort((a, b) => a.y.compareTo(b.y));
     final half = sortedByY.length ~/ 2;
     final topHalf = sortedByY.sublist(0, half)..sort((a, b) => a.x.compareTo(b.x));
@@ -1203,9 +1279,6 @@ class OMREngine {
     final topCandR = topHalf.reversed.take(math.min(5, topHalf.length)).toList();
     final botCandL = botHalf.take(math.min(5, botHalf.length)).toList();
     final botCandR = botHalf.reversed.take(math.min(5, botHalf.length)).toList();
-
-    List<math.Point<double>>? bestQuad;
-    double maxArea = 0;
 
     for (final cTl in topCandL) {
       for (final cTr in topCandR) {
@@ -1220,8 +1293,8 @@ class OMREngine {
                           (cBr.x * cBl.y - cBr.y * cBl.x) +
                           (cBl.x * cTl.y - cBl.y * cTl.x))
                       .abs();
-              if (area > maxArea) {
-                maxArea = area;
+              if (area > maxScore) {
+                maxScore = area;
                 bestQuad = [cTl, cTr, cBr, cBl];
               }
             }
@@ -1232,4 +1305,11 @@ class OMREngine {
 
     return bestQuad;
   }
+}
+
+class _FiducialBlob {
+  final double x;
+  final double y;
+  final int area;
+  const _FiducialBlob(this.x, this.y, this.area);
 }

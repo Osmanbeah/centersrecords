@@ -30,7 +30,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
   bool _isTorchOn = false;
-  String _statusMessage = 'اضبط ورقة الإجابة داخل الإطار';
+  String _statusMessage = 'وجّه المربعات السوداء الأربعة داخل زوايا التحديد بدقة';
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -455,103 +455,109 @@ class _ViewfinderOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final frameW = size.width * 0.88;
-    final frameH = frameW * 1.414; // A4 Sheet ratio
-    final left = (size.width - frameW) / 2.0;
-    final top = (size.height - frameH) / 2.0 - 20;
-    final rect = Rect.fromLTWH(left, top, frameW, frameH);
+    // Canonical dimensions between registration markers:
+    // Left marker X: 103, Right marker X: 1109 -> Wm = 1006
+    // Top marker Y: 88, Bottom marker Y: 1597 -> Hm = 1509
+    // Aspect ratio between registration markers = 1509 / 1006 = 1.500
+    final targetW = size.width * 0.82;
+    final targetH = targetW * (1509.0 / 1006.0); // Exact 1.500 ratio
+    final targetLeft = (size.width - targetW) / 2.0;
+    final targetTop = (size.height - targetH) / 2.0;
+    final targetRight = targetLeft + targetW;
+    final targetBottom = targetTop + targetH;
 
     // Dark semi-transparent background around viewfinder
     final bgPaint = Paint()..color = Colors.black.withValues(alpha: 0.45);
+    final outerRect = Rect.fromLTRB(targetLeft - 20, targetTop - 20, targetRight + 20, targetBottom + 20);
     final path = Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRRect(RRect.fromRectAndRadius(rect, const Radius.circular(16)))
+      ..addRRect(RRect.fromRectAndRadius(outerRect, const Radius.circular(16)))
       ..fillType = PathFillType.evenOdd;
     canvas.drawPath(path, bgPaint);
 
-    // Frame border
+    // Frame border around active scanning area
     final borderPaint = Paint()
-      ..color = const Color(0xFF0F766E).withValues(alpha: 0.8)
+      ..color = const Color(0xFF0F766E).withValues(alpha: 0.5)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(16)), borderPaint);
+      ..strokeWidth = 1.5;
+    canvas.drawRRect(RRect.fromRectAndRadius(outerRect, const Radius.circular(16)), borderPaint);
 
-    // Corner brackets
-    final cornerPaint = Paint()
-      ..color = const Color(0xFF14B8A6)
+    // 4 Corner Alignment Target Brackets (directly targeting the 4 black squares!)
+    final cornerTargetPaint = Paint()
+      ..color = const Color(0xFF38BDF8)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.0
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round;
 
-    const cornerLen = 28.0;
+    const cornerBracketLen = 22.0;
+    const boxR = 12.0;
 
-    // Top-Left
-    canvas.drawLine(Offset(left, top + cornerLen), Offset(left, top), cornerPaint);
-    canvas.drawLine(Offset(left, top), Offset(left + cornerLen, top), cornerPaint);
+    // Helper to map canonical (1200 x 1697) points directly into the target frame
+    double mapX(int canonX) => targetLeft + ((canonX - 103) / 1006.0) * targetW;
+    double mapY(int canonY) => targetTop + ((canonY - 88) / 1509.0) * targetH;
 
-    // Top-Right
-    canvas.drawLine(Offset(left + frameW - cornerLen, top), Offset(left + frameW, top), cornerPaint);
-    canvas.drawLine(Offset(left + frameW, top), Offset(left + frameW, top + cornerLen), cornerPaint);
+    // Draw the 4 corner targets around (TL, TR, BL, BR) markers
+    final corners = [
+      Offset(targetLeft, targetTop),
+      Offset(targetRight, targetTop),
+      Offset(targetRight, targetBottom),
+      Offset(targetLeft, targetBottom),
+    ];
 
-    // Bottom-Left
-    canvas.drawLine(Offset(left, top + frameH - cornerLen), Offset(left, top + frameH), cornerPaint);
-    canvas.drawLine(Offset(left, top + frameH), Offset(left + cornerLen, top + frameH), cornerPaint);
-
-    // Bottom-Right
-    canvas.drawLine(Offset(left + frameW - cornerLen, top + frameH), Offset(left + frameW, top + frameH), cornerPaint);
-    canvas.drawLine(Offset(left + frameW, top + frameH - cornerLen), Offset(left + frameW, top + frameH), cornerPaint);
-
-    // -------------------------------------------------------------------------
-    // DYNAMIC HOLO BUBBLE CIRCLES & CORNER ALIGNMENT TARGETS
-    // -------------------------------------------------------------------------
-    final scaleX = frameW / OMREngine.targetW;
-    final scaleY = frameH / OMREngine.targetH;
-
-    // 1. Enlarged Corner Alignment Target Boxes (36px canonical)
-    final cornerBoxPaint = Paint()
-      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.85)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    const markerBoxSize = 36.0;
-    for (final cm in layout.cornerMarkers) {
-      final cx = left + cm.x * scaleX;
-      final cy = top + cm.y * scaleY;
-      final boxSize = markerBoxSize * scaleX;
-      canvas.drawRect(
-        Rect.fromCenter(center: Offset(cx, cy), width: boxSize, height: boxSize),
-        cornerBoxPaint,
+    for (int i = 0; i < 4; i++) {
+      final c = corners[i];
+      // Target center box
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: c, width: boxR * 2, height: boxR * 2),
+          const Radius.circular(4),
+        ),
+        Paint()
+          ..color = const Color(0xFF38BDF8).withValues(alpha: 0.20)
+          ..style = PaintingStyle.fill,
       );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: c, width: boxR * 2, height: boxR * 2),
+          const Radius.circular(4),
+        ),
+        Paint()
+          ..color = const Color(0xFF38BDF8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0,
+      );
+
+      // Outer guide bracket
+      final sx = (i == 0 || i == 3) ? -1.0 : 1.0;
+      final sy = (i == 0 || i == 1) ? -1.0 : 1.0;
+      canvas.drawLine(Offset(c.dx, c.dy + sy * (boxR + 4)), Offset(c.dx, c.dy + sy * (boxR + 4 + cornerBracketLen)), cornerTargetPaint);
+      canvas.drawLine(Offset(c.dx + sx * (boxR + 4), c.dy), Offset(c.dx + sx * (boxR + 4 + cornerBracketLen), c.dy), cornerTargetPaint);
     }
 
-    // 2. Small Holo Bubble Circles (glowing cyan rings)
+    // Small Holo Bubble Circles positioned accurately relative to the 4 corner targets
     final holoCirclePaint = Paint()
-      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.55)
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.60)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.3;
 
+    final circleRadius = (13.0 / 1006.0) * targetW;
+
     // Model hollow circles (4 bubbles)
     for (final pt in layout.modelCoords.values) {
-      final cx = left + pt.x * scaleX;
-      final cy = top + pt.y * scaleY;
-      canvas.drawCircle(Offset(cx, cy), 14.0 * scaleX, holoCirclePaint);
+      canvas.drawCircle(Offset(mapX(pt.x), mapY(pt.y)), circleRadius * 1.05, holoCirclePaint);
     }
 
     // Roll number hollow circles (50 bubbles)
     for (final col in layout.rollCoords) {
       for (final pt in col) {
-        final cx = left + pt.x * scaleX;
-        final cy = top + pt.y * scaleY;
-        canvas.drawCircle(Offset(cx, cy), 12.0 * scaleX, holoCirclePaint);
+        canvas.drawCircle(Offset(mapX(pt.x), mapY(pt.y)), circleRadius * 0.95, holoCirclePaint);
       }
     }
 
     // MCQ Question hollow circles (all questions in their format)
     for (final opts in layout.questionCoords.values) {
       for (final pt in opts.values) {
-        final cx = left + pt.x * scaleX;
-        final cy = top + pt.y * scaleY;
-        canvas.drawCircle(Offset(cx, cy), 13.0 * scaleX, holoCirclePaint);
+        canvas.drawCircle(Offset(mapX(pt.x), mapY(pt.y)), circleRadius, holoCirclePaint);
       }
     }
   }
