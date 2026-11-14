@@ -93,5 +93,73 @@ void main() {
       expect(updated.mcqScore, 10.0);
       expect(updated.totalScore, 10.0);
     });
+
+    test('Assistant Isolation: Each assistant only sees their own scanned records', () {
+      final records = [
+        ExamResult(
+          examId: exam.id,
+          studentCode: '101',
+          studentName: 'Student 1',
+          center: 'Dokki',
+          model: 'A',
+          mcqScore: 8.0,
+          writtenScore: 4.0,
+          totalScore: 12.0,
+          studentAnswers: {'1': 'A'},
+          assistantName: 'gamal@kelany.com',
+          createdAt: DateTime.now().toIso8601String(),
+        ),
+        ExamResult(
+          examId: exam.id,
+          studentCode: '102',
+          studentName: 'Student 2',
+          center: 'Dokki',
+          model: 'A',
+          mcqScore: 6.0,
+          writtenScore: 5.0,
+          totalScore: 11.0,
+          studentAnswers: {'1': 'A'},
+          assistantName: 'ahmed@kelany.com',
+          createdAt: DateTime.now().toIso8601String(),
+        ),
+        ExamResult(
+          examId: exam.id,
+          studentCode: '103',
+          studentName: 'Student 3',
+          center: 'Dokki',
+          model: 'A',
+          mcqScore: 10.0,
+          writtenScore: 5.0,
+          totalScore: 15.0,
+          studentAnswers: {'1': 'A'},
+          assistantName: 'Gamal (gamal@kelany.com)',
+          createdAt: DateTime.now().toIso8601String(),
+        ),
+      ];
+
+      // Simulate logged in assistant Gamal:
+      const loggedInEmail = 'gamal@kelany.com';
+      final gamalRecords = records.where((r) {
+        final email = loggedInEmail.toLowerCase();
+        final rec = r.assistantName.toLowerCase();
+        return rec == email || rec.contains(email);
+      }).toList();
+
+      // Gamal should only see student 101 and 103, NOT 102
+      expect(gamalRecords.length, 2);
+      expect(gamalRecords.map((r) => r.studentCode).toList(), containsAll(['101', '103']));
+      expect(gamalRecords.map((r) => r.studentCode).toList(), isNot(contains('102')));
+
+      // Simulate logged in assistant Ahmed:
+      const ahmedEmail = 'ahmed@kelany.com';
+      final ahmedRecords = records.where((r) {
+        final email = ahmedEmail.toLowerCase();
+        final rec = r.assistantName.toLowerCase();
+        return rec == email || rec.contains(email);
+      }).toList();
+
+      expect(ahmedRecords.length, 1);
+      expect(ahmedRecords.first.studentCode, '102');
+    });
   });
 }

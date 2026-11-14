@@ -173,7 +173,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       writtenScore: _writtenScore,
       totalScore: _totalScore,
       studentAnswers: finalAnswers,
-      assistantName: widget.assistantName,
+      assistantName: SupabaseService.currentUserEmail ?? widget.assistantName,
       createdAt: DateTime.now().toIso8601String(),
     );
 

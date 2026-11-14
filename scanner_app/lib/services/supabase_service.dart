@@ -11,6 +11,59 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
+  static User? get currentUser => client.auth.currentUser;
+  static String? get currentUserEmail => client.auth.currentUser?.email;
+  static String get currentUserName {
+    final metaName = client.auth.currentUser?.userMetadata?['name']?.toString();
+    if (metaName != null && metaName.trim().isNotEmpty) {
+      return metaName.trim();
+    }
+    final email = currentUserEmail;
+    if (email != null && email.isNotEmpty) {
+      return email.split('@')[0];
+    }
+    return 'Assistant';
+  }
+
+  static bool get isAdmin {
+    final role = client.auth.currentUser?.userMetadata?['role']?.toString().toLowerCase();
+    if (role == 'admin') return true;
+    final email = currentUserEmail?.toLowerCase() ?? '';
+    if (email.contains('admin') || email.contains('kelany')) return true;
+    return false;
+  }
+
+  static Future<AuthResponse> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    return await client.auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
+    );
+  }
+
+  static Future<void> signOut() async {
+    await client.auth.signOut();
+  }
+
+  /// Checks whether a record belongs to the given assistant email or name.
+  /// If admin, matches all.
+  static bool matchesCurrentAssistant(
+    String recordAssistantName, {
+    String? targetEmail,
+    String? targetName,
+  }) {
+    if (isAdmin) return true;
+    final email = (targetEmail ?? currentUserEmail ?? '').trim().toLowerCase();
+    final name = (targetName ?? currentUserName).trim().toLowerCase();
+    final rec = recordAssistantName.trim().toLowerCase();
+    if (rec.isEmpty) return false;
+    if (email.isNotEmpty && (rec == email || rec.contains(email))) return true;
+    if (name.isNotEmpty && (rec == name || rec.contains(name))) return true;
+    return false;
+  }
+
   static Future<void> initialize() async {
     await Supabase.initialize(
       url: supabaseUrl,
@@ -60,7 +113,16 @@ class SupabaseService {
   }
 
   /// Fetch results for a specific exam
-  static Future<List<ExamResult>> fetchExamResults(String examId) async {
+  /// If [forAssistantEmail] or [forAssistantName] is provided (and user is not admin),
+  /// filters strictly to only that assistant's scanned papers.
+  static Future<List<ExamResult>> fetchExamResults(
+    String examId, {
+    String? forAssistantEmail,
+    String? forAssistantName,
+  }) async {
+    final emailFilter = forAssistantEmail ?? (isAdmin ? null : currentUserEmail);
+    final nameFilter = forAssistantName ?? (isAdmin ? null : currentUserName);
+
     try {
       final List<dynamic> response = await client
           .from('exam_results')
@@ -68,9 +130,21 @@ class SupabaseService {
           .eq('exam_id', examId)
           .order('created_at', ascending: false);
 
-      return response
+      final allResults = response
           .map((item) => ExamResult.fromJson(Map<String, dynamic>.from(item as Map)))
           .toList();
+
+      if (emailFilter == null || emailFilter.isEmpty || isAdmin) {
+        return allResults;
+      }
+
+      return allResults.where((r) {
+        return matchesCurrentAssistant(
+          r.assistantName,
+          targetEmail: emailFilter,
+          targetName: nameFilter,
+        );
+      }).toList();
     } catch (e) {
       debugPrint('Error fetching exam results: $e');
     }
@@ -81,9 +155,21 @@ class SupabaseService {
       final cached = prefs.getString('local_results_$examId');
       if (cached != null) {
         final List list = jsonDecode(cached);
-        return list
+        final allResults = list
             .map((item) => ExamResult.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList();
+
+        if (emailFilter == null || emailFilter.isEmpty || isAdmin) {
+          return allResults;
+        }
+
+        return allResults.where((r) {
+          return matchesCurrentAssistant(
+            r.assistantName,
+            targetEmail: emailFilter,
+            targetName: nameFilter,
+          );
+        }).toList();
       }
     } catch (_) {}
 

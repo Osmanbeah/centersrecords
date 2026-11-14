@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/exam.dart';
 import '../services/supabase_service.dart';
 import 'exam_results_screen.dart';
+import 'login_screen.dart';
 import 'scanner_screen.dart';
 
 class ExamSelectScreen extends StatefulWidget {
@@ -16,8 +17,7 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
   List<Exam> _exams = [];
   bool _isLoading = true;
   String _assistantName = 'Assistant';
-  String _assistantCode = '';
-  String _assistantPhone = '';
+  String _assistantEmail = '';
   String _selectedCenter = 'All Centers';
 
   final List<String> _centers = [
@@ -38,27 +38,27 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final profile = await SupabaseService.getAssistantProfile();
-    final name = profile['name'] ?? '';
-    final code = profile['code'] ?? '';
-    final phone = profile['phone'] ?? '';
-    final center = profile['center'] ?? 'All Centers';
+    final user = SupabaseService.currentUser;
+    if (user == null) {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+      return;
+    }
+
+    final email = SupabaseService.currentUserEmail ?? '';
+    final name = SupabaseService.currentUserName;
+    final center = await SupabaseService.getSelectedCenter();
 
     setState(() {
-      _assistantName = name.isNotEmpty ? name : 'Assistant';
-      _assistantCode = code;
-      _assistantPhone = phone;
+      _assistantName = name;
+      _assistantEmail = email;
       _selectedCenter = center;
     });
 
     await _refreshExams();
-
-    // Auto-prompt to link account on first open if still default
-    if (mounted && (name.isEmpty || name == 'Assistant')) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showAssistantLinkingDialog();
-      });
-    }
   }
 
   Future<void> _refreshExams() async {
@@ -72,179 +72,88 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
     }
   }
 
-  void _showAssistantLinkingDialog() {
-    final nameCtrl = TextEditingController(text: _assistantName != 'Assistant' ? _assistantName : '');
-    final codeCtrl = TextEditingController(text: _assistantCode);
-    final phoneCtrl = TextEditingController(text: _assistantPhone);
-    String dialogCenter = _selectedCenter;
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.logout, color: Color(0xFFDC2626)),
+            const SizedBox(width: 8),
+            Text('تسجيل الخروج', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'هل تريد بالتأكيد تسجيل الخروج من حساب $_assistantEmail؟\n\nلن تفقد درجاتك السابقة، ويمكنك الدخول في أي وقت.',
+          style: GoogleFonts.cairo(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('خروج', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
 
+    if (confirmed == true) {
+      await SupabaseService.signOut();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
+  void _showCenterSelectDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F766E).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.person_pin_outlined, color: Color(0xFF0F766E), size: 24),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'ربط التطبيق بحساب المساعد',
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'لتسجيل كل ورقة باسم المساعد الذي قام بتصحيحها ورصدها:',
-                  style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 14),
-
-                // Assistant Name
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'اسم المساعد الكامل *',
-                    labelStyle: GoogleFonts.cairo(fontSize: 13),
-                    hintText: 'مثال: أحمد رجب',
-                    hintStyle: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
-                    prefixIcon: const Icon(Icons.person, size: 20, color: Color(0xFF0F766E)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    isDense: true,
-                  ),
-                  style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-
-                // Assistant Code / ID
-                TextField(
-                  controller: codeCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'كود المساعد (Assistant ID)',
-                    labelStyle: GoogleFonts.cairo(fontSize: 13),
-                    hintText: 'مثال: AST-01',
-                    hintStyle: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
-                    prefixIcon: const Icon(Icons.tag, size: 20),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    isDense: true,
-                  ),
-                  style: GoogleFonts.cairo(fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-
-                // Assistant Phone
-                TextField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'رقم الهاتف (اختياري)',
-                    labelStyle: GoogleFonts.cairo(fontSize: 13),
-                    hintText: '010XXXXXXXX',
-                    hintStyle: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
-                    prefixIcon: const Icon(Icons.phone_outlined, size: 20),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    isDense: true,
-                  ),
-                  style: GoogleFonts.cairo(fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-
-                // Center dropdown
-                Text('السنتر المخصص له:', style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF475569))),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                    color: const Color(0xFFF8FAFC),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: dialogCenter,
-                      isExpanded: true,
-                      items: _centers.map((c) {
-                        return DropdownMenuItem<String>(
-                          value: c,
-                          child: Text(c, style: GoogleFonts.cairo(fontSize: 13)),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setDialogState(() => dialogCenter = val);
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            if (_assistantName.isNotEmpty && _assistantName != 'Assistant')
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey)),
-              ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F766E),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () async {
-                final name = nameCtrl.text.trim();
-                if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('يرجى كتابة اسم المساعد', style: GoogleFonts.cairo()), backgroundColor: Colors.red),
-                  );
-                  return;
-                }
-
-                final code = codeCtrl.text.trim();
-                final phone = phoneCtrl.text.trim();
-
-                await SupabaseService.saveAssistantProfile(
-                  name: name,
-                  code: code,
-                  phone: phone,
-                  center: dialogCenter,
-                );
-
-                setState(() {
-                  _assistantName = name;
-                  _assistantCode = code;
-                  _assistantPhone = phone;
-                  _selectedCenter = dialogCenter;
-                });
-
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                }
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('تم ربط حساب المساعد بهذا الجهاز بنجاح! 🟢', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                      backgroundColor: const Color(0xFF0F766E),
-                    ),
-                  );
-                }
-              },
-              child: Text('ربط وتأكيد الحساب', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-            ),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.location_on_outlined, color: Color(0xFF0F766E)),
+            const SizedBox(width: 8),
+            Text('تحديد السنتر النشط', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: _centers.map((c) {
+              final isSelected = _selectedCenter == c;
+              return ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                tileColor: isSelected ? const Color(0xFFCCFBF1) : null,
+                title: Text(
+                  c == 'All Centers' ? 'كل السناتر (All Centers)' : c,
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF1E293B),
+                  ),
+                ),
+                trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF0F766E)) : null,
+                onTap: () async {
+                  await SupabaseService.setSelectedCenter(c);
+                  setState(() => _selectedCenter = c);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -257,7 +166,7 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLinked = _assistantName.isNotEmpty && _assistantName != 'Assistant';
+    final isAdmin = SupabaseService.isAdmin;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -290,11 +199,16 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
             tooltip: 'تحديث الامتحانات',
             onPressed: _refreshExams,
           ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'تسجيل الخروج',
+            onPressed: _confirmSignOut,
+          ),
         ],
       ),
       body: Column(
         children: [
-          // Assistant Account Linked Card
+          // Assistant Account Card
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -313,7 +227,7 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
                   children: [
                     CircleAvatar(
                       radius: 20,
-                      backgroundColor: isLinked ? const Color(0xFF0F766E) : Colors.amber.shade700,
+                      backgroundColor: isAdmin ? const Color(0xFF7C3AED) : const Color(0xFF0F766E),
                       child: Text(
                         _assistantName.isNotEmpty ? _assistantName.characters.first : 'A',
                         style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
@@ -326,51 +240,71 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                isLinked ? _assistantName : 'لم يتم ربط حساب مساعد',
-                                style: GoogleFonts.cairo(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF0F172A),
+                              Flexible(
+                                child: Text(
+                                  _assistantName,
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: isLinked ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                  color: isAdmin ? const Color(0xFFF3E8FF) : const Color(0xFFDCFCE7),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  isLinked ? 'حساب معتمد' : 'غير مرتبط',
+                                  isAdmin ? 'مسؤول (Admin)' : 'مساعد معتمد',
                                   style: GoogleFonts.cairo(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: isLinked ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                                    color: isAdmin ? const Color(0xFF6B21A8) : const Color(0xFF15803D),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                           Text(
-                            _assistantCode.isNotEmpty
-                                ? 'كود: $_assistantCode • السنتر: $_selectedCenter'
-                                : 'السنتر المعتمد: $_selectedCenter',
-                            style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF64748B)),
+                            _assistantEmail.isNotEmpty ? _assistantEmail : 'مسجل الدخول',
+                            style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF64748B)),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF0F766E),
-                        side: const BorderSide(color: Color(0xFF0F766E)),
+                    // Change active center button
+                    InkWell(
+                      onTap: _showCenterSelectDialog,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on, size: 14, color: Color(0xFF0F766E)),
+                            const SizedBox(width: 4),
+                            Text(
+                              _selectedCenter == 'All Centers' ? 'كل السناتر' : _selectedCenter,
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF334155),
+                              ),
+                            ),
+                            const Icon(Icons.arrow_drop_down, size: 16, color: Color(0xFF64748B)),
+                          ],
+                        ),
                       ),
-                      onPressed: _showAssistantLinkingDialog,
-                      icon: const Icon(Icons.badge_outlined, size: 16),
-                      label: Text('تعديل', style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -602,12 +536,13 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
   }
 
   void _openScanner(Exam exam) {
+    final effectiveAssistant = _assistantEmail.isNotEmpty ? _assistantEmail : _assistantName;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ScannerScreen(
           exam: exam,
-          assistantName: _assistantCode.isNotEmpty ? '$_assistantName ($_assistantCode)' : _assistantName,
+          assistantName: effectiveAssistant,
           centerName: _selectedCenter,
         ),
       ),
@@ -615,12 +550,13 @@ class _ExamSelectScreenState extends State<ExamSelectScreen> {
   }
 
   void _openResults(Exam exam) {
+    final effectiveAssistant = _assistantEmail.isNotEmpty ? _assistantEmail : _assistantName;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ExamResultsScreen(
           exam: exam,
-          assistantName: _assistantCode.isNotEmpty ? '$_assistantName ($_assistantCode)' : _assistantName,
+          assistantName: effectiveAssistant,
           centerName: _selectedCenter,
         ),
       ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/exam_select_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/supabase_service.dart';
 
 void main() async {
@@ -46,7 +48,30 @@ class KelanyOmrApp extends StatelessWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: const ExamSelectScreen(),
+      home: const AuthGate(),
     );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final client = Supabase.instance.client;
+      return StreamBuilder<AuthState>(
+        stream: client.auth.onAuthStateChange,
+        builder: (context, snapshot) {
+          final session = client.auth.currentSession;
+          if (session != null) {
+            return const ExamSelectScreen();
+          }
+          return const LoginScreen();
+        },
+      );
+    } catch (_) {
+      return const LoginScreen();
+    }
   }
 }

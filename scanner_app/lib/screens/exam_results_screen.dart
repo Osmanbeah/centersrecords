@@ -37,7 +37,10 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
 
   Future<void> _fetchResults() async {
     setState(() => _isLoading = true);
-    final results = await SupabaseService.fetchExamResults(widget.exam.id);
+    final results = await SupabaseService.fetchExamResults(
+      widget.exam.id,
+      forAssistantEmail: widget.assistantName,
+    );
     if (mounted) {
       setState(() {
         _results = results;
@@ -267,8 +270,11 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
                             const Icon(Icons.people_outline, size: 54, color: Color(0xFF94A3B8)),
                             const SizedBox(height: 12),
                             Text(
-                              _searchQuery.isEmpty ? 'لم يتم رصد أي طالب لهذا الامتحان حتى الآن' : 'لا يوجد طالب يطابق البحث',
-                              style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                              _searchQuery.isEmpty
+                                  ? 'لم تقم برصد أي أوراق لهذا الامتحان بحسابك بعد\n(تظهر أوراقك المرصودة بهذا الحساب فقط)'
+                                  : 'لا يوجد طالب يطابق البحث',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), height: 1.5),
                             ),
                             const SizedBox(height: 12),
                             ElevatedButton.icon(
