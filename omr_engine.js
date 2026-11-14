@@ -296,23 +296,19 @@
 
                 rollTitleFont: isSpacious ? '14.5px' : (isMedium ? '12.5px' : '11px'),
 
-                rollSectionW: (idDigits >= 9) ? '225px' : (isSpacious ? '170px' : (isMedium ? '150px' : '140px')),
+                rollSectionW: (idDigits >= 9) ? '290px' : (isSpacious ? '190px' : (isMedium ? '170px' : '150px')),
 
-                rollBoxW: (idDigits >= 12) ? '12px' : ((idDigits >= 9) ? '15px' : (isSpacious ? '28px' : (isMedium ? '24px' : '20px'))),
+                rollItemW: (idDigits >= 12) ? '14px' : ((idDigits >= 9) ? '19px' : (isSpacious ? '26px' : (isMedium ? '22px' : '19px'))),
 
-                rollBoxH: (idDigits >= 12) ? '15px' : ((idDigits >= 9) ? '18px' : (isSpacious ? '32px' : (isMedium ? '26px' : '20px'))),
+                rollBoxH: (idDigits >= 12) ? '20px' : ((idDigits >= 9) ? '26px' : (isSpacious ? '32px' : (isMedium ? '28px' : '24px'))),
 
-                rollBoxesGap: (idDigits >= 12) ? '2px' : ((idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px'))),
+                rollItemGap: (idDigits >= 12) ? '2.5px' : ((idDigits >= 9) ? '4px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px'))),
 
                 rollBoxesMarB: isSpacious ? '12px' : (isMedium ? '8px' : '6px'),
 
                 rollRowGap: isSpacious ? '7px' : (isMedium ? '4.5px' : '3.5px'),
 
                 rollDigitFont: isSpacious ? '13.5px' : (isMedium ? '11.5px' : '10px'),
-
-                rollBubbleSize: (idDigits >= 12) ? '12px' : ((idDigits >= 9) ? '15px' : (isSpacious ? '22px' : (isMedium ? '19px' : '17px'))),
-
-                rollBubblesGap: (idDigits >= 12) ? '2px' : ((idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px'))),
 
 
 
@@ -1129,42 +1125,7 @@
 
         }
 
-        .roll-boxes-row {
-
-            display: flex;
-
-            gap: ${dyn.rollBoxesGap};
-
-            margin-bottom: ${dyn.rollBoxesMarB};
-
-            padding-left: 22px; /* Aligns boxes directly with roll bubbles taking 14px+8px digit label into account */
-
-        }
-
-        .roll-box {
-
-            width: ${dyn.rollBoxW};
-
-            height: ${dyn.rollBoxH};
-
-            border: 1.8px solid #000000;
-
-            background: #ffffff;
-
-            border-radius: 2px;
-
-        }
-
-        .roll-matrix {
-
-            display: flex;
-
-            flex-direction: column;
-
-            gap: ${dyn.rollRowGap};
-
-        }
-
+        .roll-boxes-row,
         .roll-row {
 
             display: flex;
@@ -1172,6 +1133,12 @@
             align-items: center;
 
             gap: 8px;
+
+        }
+
+        .roll-boxes-row {
+
+            margin-bottom: ${dyn.rollBoxesMarB};
 
         }
 
@@ -1187,13 +1154,70 @@
 
             color: #334155;
 
+            flex-shrink: 0;
+
         }
 
+        .roll-digit-label.spacer {
+
+            visibility: hidden;
+
+        }
+
+        .roll-boxes,
         .roll-bubbles {
 
             display: flex;
 
-            gap: ${dyn.rollBubblesGap};
+            gap: ${dyn.rollItemGap};
+
+        }
+
+        .roll-box {
+
+            width: ${dyn.rollItemW};
+
+            height: ${dyn.rollBoxH};
+
+            border: 1.8px solid #000000;
+
+            background: #ffffff;
+
+            border-radius: 3px;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            box-sizing: border-box;
+
+        }
+
+        .roll-matrix {
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: ${dyn.rollRowGap};
+
+        }
+
+        .roll-bubbles .bubble {
+
+            width: ${dyn.rollItemW};
+
+            height: ${dyn.rollItemW};
+
+            border: ${dyn.bubbleBorder} solid #000000;
+
+            border-radius: 50%;
+
+            display: inline-block;
+
+            box-sizing: border-box;
 
         }
 
@@ -1693,7 +1717,13 @@
 
                     <div class="roll-boxes-row">
 
-                        ${Array.from({ length: idDigits }).map(() => '<span class="roll-box"></span>').join('')}
+                        <span class="roll-digit-label spacer"></span>
+
+                        <div class="roll-boxes">
+
+                            ${Array.from({ length: idDigits }).map(() => '<span class="roll-box"></span>').join('')}
+
+                        </div>
 
                     </div>
 
