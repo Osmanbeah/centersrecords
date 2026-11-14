@@ -372,7 +372,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
           // Viewfinder Overlay Frame (Guides user to frame the sheet)
           CustomPaint(
-            painter: _ViewfinderOverlayPainter(),
+            painter: _ViewfinderOverlayPainter(questionCount: widget.exam.questionCount),
           ),
 
           // Guidance Prompt Bar at Top
@@ -447,6 +447,12 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
 /// Custom Viewfinder Painter with Corner Brackets
 class _ViewfinderOverlayPainter extends CustomPainter {
+  final int questionCount;
+  final SheetBubbleLayout layout;
+
+  _ViewfinderOverlayPainter({required this.questionCount})
+      : layout = OMREngine.computeBubbleLayout(questionCount);
+
   @override
   void paint(Canvas canvas, Size size) {
     final frameW = size.width * 0.88;
@@ -494,10 +500,65 @@ class _ViewfinderOverlayPainter extends CustomPainter {
     // Bottom-Right
     canvas.drawLine(Offset(left + frameW - cornerLen, top + frameH), Offset(left + frameW, top + frameH), cornerPaint);
     canvas.drawLine(Offset(left + frameW, top + frameH - cornerLen), Offset(left + frameW, top + frameH), cornerPaint);
+
+    // -------------------------------------------------------------------------
+    // DYNAMIC HOLO BUBBLE CIRCLES & CORNER ALIGNMENT TARGETS
+    // -------------------------------------------------------------------------
+    final scaleX = frameW / OMREngine.targetW;
+    final scaleY = frameH / OMREngine.targetH;
+
+    // 1. Enlarged Corner Alignment Target Boxes (36px canonical)
+    final cornerBoxPaint = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    const markerBoxSize = 36.0;
+    for (final cm in layout.cornerMarkers) {
+      final cx = left + cm.x * scaleX;
+      final cy = top + cm.y * scaleY;
+      final boxSize = markerBoxSize * scaleX;
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset(cx, cy), width: boxSize, height: boxSize),
+        cornerBoxPaint,
+      );
+    }
+
+    // 2. Small Holo Bubble Circles (glowing cyan rings)
+    final holoCirclePaint = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+
+    // Model hollow circles (4 bubbles)
+    for (final pt in layout.modelCoords.values) {
+      final cx = left + pt.x * scaleX;
+      final cy = top + pt.y * scaleY;
+      canvas.drawCircle(Offset(cx, cy), 14.0 * scaleX, holoCirclePaint);
+    }
+
+    // Roll number hollow circles (50 bubbles)
+    for (final col in layout.rollCoords) {
+      for (final pt in col) {
+        final cx = left + pt.x * scaleX;
+        final cy = top + pt.y * scaleY;
+        canvas.drawCircle(Offset(cx, cy), 12.0 * scaleX, holoCirclePaint);
+      }
+    }
+
+    // MCQ Question hollow circles (all questions in their format)
+    for (final opts in layout.questionCoords.values) {
+      for (final pt in opts.values) {
+        final cx = left + pt.x * scaleX;
+        final cy = top + pt.y * scaleY;
+        canvas.drawCircle(Offset(cx, cy), 13.0 * scaleX, holoCirclePaint);
+      }
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _ViewfinderOverlayPainter oldDelegate) =>
+      oldDelegate.questionCount != questionCount;
 }
 
 /// Helper class for Isolate

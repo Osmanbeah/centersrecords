@@ -96,6 +96,21 @@ class OMRScanResult {
   });
 }
 
+/// Exact canonical bubble coordinates for a given exam format
+class SheetBubbleLayout {
+  final Map<String, math.Point<int>> modelCoords;
+  final List<List<math.Point<int>>> rollCoords; // 5 columns x 10 rows
+  final Map<int, Map<String, math.Point<int>>> questionCoords; // q -> 'A'..'D'
+  final List<math.Point<int>> cornerMarkers; // 4 corners
+
+  const SheetBubbleLayout({
+    required this.modelCoords,
+    required this.rollCoords,
+    required this.questionCoords,
+    required this.cornerMarkers,
+  });
+}
+
 /// Summed-area table for O(1) box-mean queries
 class _Integral {
   final int w, h;
@@ -262,6 +277,101 @@ class OMREngine {
     if (numMcqCols == 2) return [100, 420, 800, 1100];
     if (numMcqCols == 3) return [80, 340, 620, 900, 1120];
     return [60, 290, 530, 770, 1010, 1140];
+  }
+
+  /// Calculates exact canonical bubble coordinates for any exam question count
+  static SheetBubbleLayout computeBubbleLayout(int questionCount) {
+    final qCount = questionCount.clamp(1, 100);
+    final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
+    final qPerCol = (qCount / numMcqCols).ceil();
+
+    // 1. Model coordinates
+    const modelYs = 476;
+    const modelXs = [357, 452, 545, 640];
+    const opts = ['A', 'B', 'C', 'D'];
+    final modelCoords = {
+      for (int i = 0; i < 4; i++) opts[i]: math.Point(modelXs[i], modelYs),
+    };
+
+    // 2. Roll number coordinates (5 cols x 10 rows)
+    final rollRowYs = numMcqCols == 1
+        ? const [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083]
+        : const [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
+    final rollColXs = numMcqCols == 1
+        ? const [197, 240, 282, 325, 367]
+        : const [196, 242, 289, 335, 382];
+
+    final rollCoords = <List<math.Point<int>>>[];
+    for (final cx in rollColXs) {
+      final col = <math.Point<int>>[];
+      for (final cy in rollRowYs) {
+        col.add(math.Point(cx, cy));
+      }
+      rollCoords.add(col);
+    }
+
+    // 3. MCQ coordinates
+    final qYs15 = const [
+      634, 680, 728, 774, 820,
+      925, 971, 1017, 1065, 1111,
+      1214, 1261, 1307, 1353, 1401,
+    ];
+    final optXs15 = const [683, 752, 825, 895];
+
+    final regX = _regX(numMcqCols);
+    final gridTopY = numMcqCols == 1 ? 566.0 : 480.0;
+    final isSpacious = qPerCol <= 16;
+    final isMedium = qPerCol > 16 && qPerCol <= 24;
+    final rowStepY = isSpacious ? 48.0 : (isMedium ? 42.0 : 36.0);
+    final blockHeaderH = isSpacious ? 42.0 : (isMedium ? 36.0 : 30.0);
+    final blockSpacerH = isSpacious ? 38.0 : (isMedium ? 28.0 : 20.0);
+    final colStartY = gridTopY + (isSpacious ? 25.0 : 18.0);
+    const optOffsets = [0.32, 0.49, 0.66, 0.83];
+
+    final questionCoords = <int, Map<String, math.Point<int>>>{};
+    for (int q = 1; q <= qCount; q++) {
+      if (numMcqCols == 1 && qCount <= 15 && (q - 1) < qYs15.length) {
+        final qy = qYs15[q - 1];
+        questionCoords[q] = {for (int i = 0; i < 4; i++) opts[i]: math.Point(optXs15[i], qy)};
+      } else {
+        final colIdx = (q - 1) ~/ qPerCol;
+        final inCol = (q - 1) % qPerCol;
+        final blockIdx = inCol ~/ 5;
+        final posInBlock = inCol % 5;
+
+        final xLeft = regX[colIdx + 1];
+        final xRight = regX[colIdx + 2];
+        final rawColW = xRight - xLeft;
+        final effColW = math.min(rawColW, (numMcqCols == 1 ? 320 : 340));
+        final colCenterX = (xLeft + xRight) / 2.0;
+        final effColLeft = (numMcqCols == 1) ? (colCenterX - effColW / 2.0) : xLeft.toDouble();
+
+        final qy = (colStartY +
+                (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) +
+                blockHeaderH +
+                (posInBlock * rowStepY))
+            .round();
+
+        questionCoords[q] = {
+          for (int i = 0; i < 4; i++)
+            opts[i]: math.Point((effColLeft + effColW * optOffsets[i]).round(), qy),
+        };
+      }
+    }
+
+    final cornerMarkers = const [
+      math.Point(103, 88),
+      math.Point(1109, 88),
+      math.Point(1109, 1597),
+      math.Point(103, 1597),
+    ];
+
+    return SheetBubbleLayout(
+      modelCoords: modelCoords,
+      rollCoords: rollCoords,
+      questionCoords: questionCoords,
+      cornerMarkers: cornerMarkers,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -736,8 +846,6 @@ class OMREngine {
     final ii = _Integral(gray, targetW, targetH);
 
     final qCount = questionCount.clamp(1, 100);
-    final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
-    final qPerCol = (qCount / numMcqCols).ceil();
 
     // 1. Model detection (band search) - needs ONE clear mark and three clean bubbles
     String detectedModel = 'A';
@@ -780,19 +888,14 @@ class OMREngine {
       }
     }
 
+    final layout = computeBubbleLayout(qCount);
+
     // 2. Student roll number (5 digits)
-    final rollRowYs = numMcqCols == 1
-        ? const [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083]
-        : const [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
-    final rollColXs = numMcqCols == 1
-        ? const [197, 240, 282, 325, 367]
-        : const [196, 242, 289, 335, 382];
     final detectedRollCoords = <math.Point<int>>[];
     final idDigits = <String>[];
 
-    for (final cx in rollColXs) {
-      final an = _analyzePoints(
-          gray, ii, [for (final cy in rollRowYs) math.Point(cx, cy)], targetW, targetH);
+    for (final colPts in layout.rollCoords) {
+      final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
       final adj = _adjustedScores(an);
       final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
       final best = adj[order[0]];
@@ -808,63 +911,16 @@ class OMREngine {
 
     // 3. MCQ questions
     final answers = <int, QuestionResult>{};
-    const optOffsets = [0.32, 0.49, 0.66, 0.83];
-
-    final qYs15 = [
-      634, 680, 728, 774, 820,
-      925, 971, 1017, 1065, 1111,
-      1214, 1261, 1307, 1353, 1401,
-    ];
-    final optXs15 = [683, 752, 825, 895];
-
-    final regX = _regX(numMcqCols);
-    final gridTopY = numMcqCols == 1 ? 566.0 : 480.0;
-    final isSpacious = qPerCol <= 16;
-    final isMedium = qPerCol > 16 && qPerCol <= 24;
-    final rowStepY = isSpacious ? 48.0 : (isMedium ? 42.0 : 36.0);
-    final blockHeaderH = isSpacious ? 42.0 : (isMedium ? 36.0 : 30.0);
-    final blockSpacerH = isSpacious ? 38.0 : (isMedium ? 28.0 : 20.0);
-    final colStartY = gridTopY + (isSpacious ? 25.0 : 18.0);
-
     int uncertainCount = 0;
     int multipleCount = 0;
     int emptyCount = 0;
     int correctCount = 0;
     double totalConfidence = 0.0;
 
-    final questionCoords = <int, Map<String, math.Point<int>>>{};
+    final questionCoords = layout.questionCoords;
 
     for (int q = 1; q <= qCount; q++) {
-      final Map<String, math.Point<int>> coords;
-      if (numMcqCols == 1 && qCount <= 15 && (q - 1) < qYs15.length) {
-        final qy = qYs15[q - 1];
-        coords = {for (int i = 0; i < 4; i++) opts[i]: math.Point(optXs15[i], qy)};
-      } else {
-        final colIdx = (q - 1) ~/ qPerCol;
-        final inCol = (q - 1) % qPerCol;
-        final blockIdx = inCol ~/ 5;
-        final posInBlock = inCol % 5;
-
-        final xLeft = regX[colIdx + 1];
-        final xRight = regX[colIdx + 2];
-        final rawColW = xRight - xLeft;
-        final effColW = math.min(rawColW, (numMcqCols == 1 ? 320 : 340));
-        final colCenterX = (xLeft + xRight) / 2.0;
-        final effColLeft = (numMcqCols == 1) ? (colCenterX - effColW / 2.0) : xLeft.toDouble();
-
-        final qy = (colStartY +
-                (blockIdx * (5 * rowStepY + blockHeaderH + blockSpacerH)) +
-                blockHeaderH +
-                (posInBlock * rowStepY))
-            .round();
-
-        coords = {
-          for (int i = 0; i < 4; i++)
-            opts[i]: math.Point((effColLeft + effColW * optOffsets[i]).round(), qy),
-        };
-      }
-
-      questionCoords[q] = coords;
+      final coords = questionCoords[q]!;
       final res = _classify(gray, ii, coords, targetW, targetH);
       answers[q] = res;
 
@@ -882,40 +938,72 @@ class OMREngine {
 
     final overallConf = (totalConfidence / qCount).clamp(0.0, 1.0);
 
-    // Annotated overlay
+    // Annotated overlay with small holo bubble circles on every single bubble
     final annotated = rectified.clone();
     final green = img.ColorRgb8(16, 185, 129);
+    final holoCyan = img.ColorRgb8(14, 165, 233);
 
-    if (modelDetected) {
-      img.drawCircle(annotated, x: detectedModelX, y: detectedModelY, radius: 16, color: green);
-    }
-    for (final pt in detectedRollCoords) {
-      img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: green);
+    // 0. Corner alignment markers (enlarged for accuracy: 36x36 px)
+    for (final cm in layout.cornerMarkers) {
+      img.drawRect(annotated,
+          x1: cm.x - 18, y1: cm.y - 18, x2: cm.x + 18, y2: cm.y + 18,
+          color: img.ColorRgb8(0, 0, 0));
+      // Outer guide frame
+      img.drawRect(annotated,
+          x1: cm.x - 22, y1: cm.y - 22, x2: cm.x + 22, y2: cm.y + 22,
+          color: holoCyan);
     }
 
+    // 1. Model bubbles: hollow circle on every model bubble, bold green on detected
+    for (final entry in layout.modelCoords.entries) {
+      final opt = entry.key;
+      final pt = entry.value;
+      if (modelDetected && opt == detectedModel) {
+        img.drawCircle(annotated, x: detectedModelX, y: detectedModelY, radius: 16, color: green);
+        img.drawCircle(annotated, x: detectedModelX, y: detectedModelY, radius: 15, color: green);
+      } else {
+        img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: holoCyan);
+      }
+    }
+
+    // 2. Student ID bubbles: hollow circle on every single bubble (50 total)
+    final detectedRollSet = detectedRollCoords.toSet();
+    for (final col in layout.rollCoords) {
+      for (final pt in col) {
+        final isDetected = detectedRollSet.contains(pt);
+        if (isDetected) {
+          img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: green);
+          img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 13, color: green);
+        } else {
+          img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 12, color: holoCyan);
+        }
+      }
+    }
+
+    // 3. MCQ bubbles: hollow circle on every single bubble (all options of all questions)
     for (int q = 1; q <= qCount; q++) {
       final ans = answers[q]!;
-      final coords = questionCoords[q];
+      final coords = layout.questionCoords[q] ?? questionCoords[q];
       if (coords == null) continue;
 
-      if ((ans.state == QuestionState.selected) && ans.selected != null) {
-        final pt = ans.snappedCoords[ans.selected!] ?? coords[ans.selected!]!;
-        img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: green);
-      } else if (ans.state == QuestionState.uncertain) {
-        final a = coords['A']!, d = coords['D']!;
-        img.drawRect(annotated,
-            x1: a.x - 20, y1: a.y - 14, x2: d.x + 20, y2: d.y + 14,
-            color: img.ColorRgb8(245, 158, 11));
-      } else if (ans.state == QuestionState.multiple) {
+      for (final opt in opts) {
+        final pt = coords[opt]!;
+        final isSelected = ans.selected == opt && (ans.state == QuestionState.selected || ans.state == QuestionState.uncertain);
+        if (isSelected) {
+          final snapPt = ans.snappedCoords[opt] ?? pt;
+          final color = ans.state == QuestionState.uncertain ? img.ColorRgb8(245, 158, 11) : green;
+          img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 15, color: color);
+          img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 14, color: color);
+        } else {
+          img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 13, color: holoCyan);
+        }
+      }
+
+      if (ans.state == QuestionState.multiple) {
         final a = coords['A']!, d = coords['D']!;
         img.drawRect(annotated,
             x1: a.x - 20, y1: a.y - 14, x2: d.x + 20, y2: d.y + 14,
             color: img.ColorRgb8(239, 68, 68));
-      } else if (ans.state == QuestionState.empty) {
-        final a = coords['A']!, d = coords['D']!;
-        img.drawRect(annotated,
-            x1: a.x - 20, y1: a.y - 14, x2: d.x + 20, y2: d.y + 14,
-            color: img.ColorRgb8(148, 163, 184));
       }
     }
 

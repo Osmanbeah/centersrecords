@@ -667,9 +667,9 @@
 
             position: absolute;
 
-            width: 18px;
+            width: 24px;
 
-            height: 18px;
+            height: 24px;
 
             background: #000000;
 
