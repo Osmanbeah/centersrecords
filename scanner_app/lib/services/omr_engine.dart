@@ -322,7 +322,7 @@ class OMREngine {
   }
 
   /// Calculates exact canonical bubble coordinates for any exam question count
-  static SheetBubbleLayout computeBubbleLayout(int questionCount, {int idDigits = 5}) {
+  static SheetBubbleLayout computeBubbleLayout(int questionCount, {int idDigits = 11}) {
     final qCount = questionCount.clamp(1, 100);
     final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
     final qPerCol = (qCount / numMcqCols).ceil();

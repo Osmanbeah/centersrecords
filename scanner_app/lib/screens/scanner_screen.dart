@@ -32,6 +32,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   bool _isTorchOn = false;
   bool _isAutoCaptureEnabled = true;
   bool _isAligned = false;
+  int _idDigits = 11;
   int _consecutiveAlignedFrames = 0;
   int _lastFrameTime = 0;
   String _statusMessage = 'وجّه المربعات السوداء الأربعة داخل الإطار للمسح التلقائي';
@@ -40,6 +41,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   @override
   void initState() {
     super.initState();
+    _idDigits = (widget.exam.idDigits == 5) ? 11 : widget.exam.idDigits;
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
   }
@@ -278,7 +280,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       final scanResult = await compute(_runOmrScanIsolate, _OmrParam(
         imageBytes: rawBytes,
         questionCount: widget.exam.questionCount,
-        idDigits: widget.exam.idDigits,
+        idDigits: _idDigits,
         answerKey: widget.exam.getAnswerKey('A'),
       ));
 
@@ -542,7 +544,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
           CustomPaint(
             painter: _ViewfinderOverlayPainter(
               questionCount: widget.exam.questionCount,
-              idDigits: widget.exam.idDigits,
+              idDigits: _idDigits,
               isAligned: _isAligned,
             ),
           ),
