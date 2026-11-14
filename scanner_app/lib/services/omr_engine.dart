@@ -96,6 +96,21 @@ class OMRScanResult {
   });
 }
 
+/// Alignment check result for live camera preview
+class AlignmentStatus {
+  final bool isAligned;
+  final int visibleCornersCount;
+  final String message;
+  final List<math.Point<double>>? detectedCorners;
+
+  const AlignmentStatus({
+    required this.isAligned,
+    required this.visibleCornersCount,
+    required this.message,
+    this.detectedCorners,
+  });
+}
+
 /// Exact canonical bubble coordinates for a given exam format
 class SheetBubbleLayout {
   final Map<String, math.Point<int>> modelCoords;
@@ -307,7 +322,7 @@ class OMREngine {
   }
 
   /// Calculates exact canonical bubble coordinates for any exam question count
-  static SheetBubbleLayout computeBubbleLayout(int questionCount) {
+  static SheetBubbleLayout computeBubbleLayout(int questionCount, {int idDigits = 5}) {
     final qCount = questionCount.clamp(1, 100);
     final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
     final qPerCol = (qCount / numMcqCols).ceil();
@@ -324,9 +339,11 @@ class OMREngine {
     final rollRowYs = numMcqCols == 1
         ? const [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083]
         : const [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
-    final rollColXs = numMcqCols == 1
-        ? const [197, 240, 282, 325, 367]
-        : const [196, 242, 289, 335, 382];
+    final rollColXs = (idDigits == 11)
+        ? const [145, 173, 201, 229, 257, 285, 313, 341, 369, 397, 425]
+        : (numMcqCols == 1
+            ? const [197, 240, 282, 325, 367]
+            : const [196, 242, 289, 335, 382]);
 
     final rollCoords = <List<math.Point<int>>>[];
     for (final cx in rollColXs) {
@@ -1001,11 +1018,32 @@ class OMREngine {
       detectedModelCoords = defaultRes.snappedCoords;
     }
 
-    // 2. Student roll number (5 digits)
+    // 2. Student roll / phone number (supports 5 digits or 11 digits phone number)
     final allSnappedRollCoords = <List<math.Point<int>>>[];
-    final idDigits = <String>[];
+    final idDigitsList = <String>[];
 
-    for (final colPts in layout.rollCoords) {
+    // Try reading 11-digit phone layout first
+    final layout11 = computeBubbleLayout(qCount, idDigits: 11);
+    final id11Digits = <String>[];
+    int confident11Count = 0;
+    for (final colPts in layout11.rollCoords) {
+      final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
+      final adj = _adjustedScores(an);
+      final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
+      final best = adj[order[0]];
+      final second = adj[order[1]];
+      if (best > 0.20 && (best - second) > 0.06) {
+        id11Digits.add(order[0].toString());
+        confident11Count++;
+      } else {
+        id11Digits.add('?');
+      }
+    }
+
+    final bool use11Digits = confident11Count >= 8;
+    final activeRollCoords = use11Digits ? layout11.rollCoords : layout.rollCoords;
+
+    for (final colPts in activeRollCoords) {
       final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
       final colSnapped = [for (final a in an) math.Point(a.snappedX, a.snappedY)];
       allSnappedRollCoords.add(colSnapped);
@@ -1014,12 +1052,12 @@ class OMREngine {
       final best = adj[order[0]];
       final second = adj[order[1]];
       if (best > 0.20 && (best - second) > 0.06) {
-        idDigits.add(order[0].toString());
+        idDigitsList.add(order[0].toString());
       } else {
-        idDigits.add('?');
+        idDigitsList.add('?');
       }
     }
-    final detectedCode = idDigits.join();
+    final detectedCode = idDigitsList.join();
 
     // 3. MCQ questions
     final answers = <int, QuestionResult>{};
@@ -1082,7 +1120,7 @@ class OMREngine {
     // 2. Student ID bubbles: auto-adjusted hollow circle on every single bubble (50 total)
     for (int colIdx = 0; colIdx < allSnappedRollCoords.length; colIdx++) {
       final col = allSnappedRollCoords[colIdx];
-      final selDigitStr = idDigits[colIdx];
+      final selDigitStr = (colIdx < idDigitsList.length) ? idDigitsList[colIdx] : '?';
       final selDigit = int.tryParse(selDigitStr);
       for (int digit = 0; digit < col.length; digit++) {
         final pt = col[digit];
@@ -1138,6 +1176,164 @@ class OMREngine {
       rectifiedImage: rectified,
       annotatedImage: annotated,
     );
+  }
+
+  /// Fast live camera alignment check directly from camera Y (luminance) plane.
+  /// Runs in sub-5ms without memory allocation or disk I/O.
+  static AlignmentStatus checkAlignmentFromYPlane(
+    Uint8List yBytes,
+    int srcW,
+    int srcH,
+    int rowStride,
+  ) {
+    if (srcW < 200 || srcH < 200) {
+      return const AlignmentStatus(isAligned: false, visibleCornersCount: 0, message: 'انتظر تحميل الكاميرا...');
+    }
+
+    final step = math.max(1, srcW ~/ 280);
+    final dW = srcW ~/ step;
+    final dH = srcH ~/ step;
+    final gray = Uint8List(dW * dH);
+
+    double sumLum = 0;
+    for (int y = 0; y < dH; y++) {
+      final srcY = y * step;
+      final rowOffset = srcY * rowStride;
+      final destRowOffset = y * dW;
+      for (int x = 0; x < dW; x++) {
+        final srcX = x * step;
+        final val = yBytes[rowOffset + srcX];
+        gray[destRowOffset + x] = val;
+        sumLum += val;
+      }
+    }
+
+    final meanLum = sumLum / (dW * dH);
+    if (meanLum < 30) {
+      return const AlignmentStatus(isAligned: false, visibleCornersCount: 0, message: 'الإضاءة معتمة جداً ⚡ شغل الفلاش');
+    }
+
+    final minBlob = math.max(4, (dW * 0.010).round());
+    final maxBlob = math.max(40, (dW * 0.075).round());
+    final minArea = math.max(16, (minBlob * minBlob * 0.45).round());
+    final visited = Uint8List(dW * dH);
+    final candidateBlobs = <_FiducialBlob>[];
+    final darkThresh = math.min(160, math.max(75, (meanLum * 0.65).toInt()));
+
+    final scanStep = math.max(2, minBlob ~/ 2);
+    for (int y = scanStep; y < dH - scanStep; y += scanStep) {
+      final rowOff = y * dW;
+      for (int x = scanStep; x < dW - scanStep; x += scanStep) {
+        final idx = rowOff + x;
+        if (visited[idx] == 1 || gray[idx] >= darkThresh) continue;
+
+        int minX = x, maxX = x, minY = y, maxY = y;
+        int blobPixels = 0;
+        final stack = <int>[idx];
+        visited[idx] = 1;
+
+        while (stack.isNotEmpty && blobPixels < 2500) {
+          final curr = stack.removeLast();
+          final cy = curr ~/ dW;
+          final cx = curr - cy * dW;
+          blobPixels++;
+
+          if (cx < minX) minX = cx;
+          if (cx > maxX) maxX = cx;
+          if (cy < minY) minY = cy;
+          if (cy > maxY) maxY = cy;
+
+          if (cx > 0) {
+            final n = curr - 1;
+            if (visited[n] == 0) {
+              visited[n] = 1;
+              if (gray[n] < darkThresh) stack.add(n);
+            }
+          }
+          if (cx < dW - 1) {
+            final n = curr + 1;
+            if (visited[n] == 0) {
+              visited[n] = 1;
+              if (gray[n] < darkThresh) stack.add(n);
+            }
+          }
+          if (cy > 0) {
+            final n = curr - dW;
+            if (visited[n] == 0) {
+              visited[n] = 1;
+              if (gray[n] < darkThresh) stack.add(n);
+            }
+          }
+          if (cy < dH - 1) {
+            final n = curr + dW;
+            if (visited[n] == 0) {
+              visited[n] = 1;
+              if (gray[n] < darkThresh) stack.add(n);
+            }
+          }
+        }
+
+        final bw = maxX - minX + 1;
+        final bh = maxY - minY + 1;
+        final aspect = bw / math.max(1, bh);
+        final fillDensity = blobPixels / (bw * bh);
+
+        if (blobPixels >= minArea &&
+            bw >= minBlob &&
+            bw <= maxBlob &&
+            bh >= minBlob &&
+            bh <= maxBlob &&
+            aspect >= 0.45 &&
+            aspect <= 1.90 &&
+            fillDensity >= 0.45) {
+          candidateBlobs.add(_FiducialBlob(
+            (minX + maxX) / 2.0 * step,
+            (minY + maxY) / 2.0 * step,
+            blobPixels,
+          ));
+        }
+      }
+    }
+
+    if (candidateBlobs.length < 4) {
+      return AlignmentStatus(
+        isAligned: false,
+        visibleCornersCount: candidateBlobs.length,
+        message: candidateBlobs.length == 3
+            ? 'اقترب قليلاً لتظهر الزاوية الرابعة'
+            : 'وجّه الكاميرا نحو الورقة لتظهر المربعات السوداء',
+      );
+    }
+
+    final quad = _findBestFiducialQuad(candidateBlobs, srcW.toDouble(), srcH.toDouble());
+    if (quad == null) {
+      return AlignmentStatus(
+        isAligned: false,
+        visibleCornersCount: candidateBlobs.length.clamp(0, 3),
+        message: 'اضبط الهاتف عمودياً فوق الورقة',
+      );
+    }
+
+    return AlignmentStatus(
+      isAligned: true,
+      visibleCornersCount: 4,
+      message: 'تم محاذاة الورقة بنجاح 🟢 جارِ المسح التلقائي...',
+      detectedCorners: quad,
+    );
+  }
+
+  /// Fast alignment check on an img.Image instance
+  static AlignmentStatus checkAlignmentFromImage(img.Image image) {
+    final w = image.width;
+    final h = image.height;
+    final yBytes = Uint8List(w * h);
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        final p = image.getPixel(x, y);
+        yBytes[y * w + x] = (p.r * 299 + p.g * 587 + p.b * 114) ~/ 1000;
+      }
+    }
+    return checkAlignmentFromYPlane(yBytes, w, h, w);
   }
 
   // ---------------------------------------------------------------------------

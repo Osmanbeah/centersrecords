@@ -7614,7 +7614,7 @@ function getAdminCenterCoords(centerName, address) {
             if (count === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="py-8 text-center text-on-surface-variant font-medium">
+                        <td colspan="10" class="py-8 text-center text-on-surface-variant font-medium">
                             No results recorded yet for this exam. Assistants can grade papers in the Assistant Scanner Portal.
                         </td>
                     </tr>
@@ -7638,9 +7638,15 @@ function getAdminCenterCoords(centerName, address) {
                         <td class="py-2.5 px-3 text-center">${rankBadge}</td>
                         <td class="py-2.5 px-3">
                             <strong class="text-on-surface block font-bold">${escapeHtml(r.student_name || 'Student')}</strong>
-                            <span class="text-[10px] text-on-surface-variant">Code: ${escapeHtml(r.student_code || '---')}</span>
+                            <span class="text-[10px] text-on-surface-variant font-mono">📱 ${escapeHtml(r.student_code || '---')}</span>
                         </td>
                         <td class="py-2.5 px-3 text-on-surface-variant text-[11px]">${escapeHtml(r.center || '---')}</td>
+                        <td class="py-2.5 px-3 text-center">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-semibold text-[11px] max-w-[125px] truncate" title="${escapeHtml(r.assistant_name || 'غير محدد')}">
+                                <span class="material-symbols-outlined text-[13px]">person</span>
+                                <span class="truncate">${escapeHtml(r.assistant_name || 'غير محدد')}</span>
+                            </span>
+                        </td>
                         <td class="py-2.5 px-3 text-center font-bold text-on-surface">${escapeHtml(r.model || 'A')}</td>
                         <td class="py-2.5 px-3 text-center text-on-surface">${r.mcq_score != null ? r.mcq_score : '-'}</td>
                         <td class="py-2.5 px-3 text-center text-on-surface">${r.written_score != null ? r.written_score : '-'}</td>
@@ -7673,7 +7679,7 @@ function getAdminCenterCoords(centerName, address) {
                 return;
             }
 
-            const headers = ['Rank', 'Student Name', 'Student Code', 'Center', 'Model', 'MCQ Score', 'Written Score', 'Total Score', 'Percentage'];
+            const headers = ['Rank', 'Student Name', 'Phone / Code', 'Center', 'Assistant (المصحح)', 'Model', 'MCQ Score', 'Written Score', 'Total Score', 'Percentage'];
             const maxScore = currentResultsExam.total_score || 50;
 
             const rows = [...currentResultsList]
@@ -7685,6 +7691,7 @@ function getAdminCenterCoords(centerName, address) {
                         `"${(r.student_name || '').replace(/"/g, '""')}"`,
                         `"${r.student_code || ''}"`,
                         `"${(r.center || '').replace(/"/g, '""')}"`,
+                        `"${(r.assistant_name || '').replace(/"/g, '""')}"`,
                         r.model || 'A',
                         r.mcq_score != null ? r.mcq_score : 0,
                         r.written_score != null ? r.written_score : 0,
@@ -8013,6 +8020,7 @@ function getAdminCenterCoords(centerName, address) {
                             <th class="py-2.5 px-3 text-center">Rank</th>
                             <th class="py-2.5 px-3">Student Name</th>
                             <th class="py-2.5 px-3">Center</th>
+                            <th class="py-2.5 px-3 text-center">المساعد (Assistant)</th>
                             <th class="py-2.5 px-3 text-center">Model</th>
                             <th class="py-2.5 px-3 text-center">MCQ</th>
                             <th class="py-2.5 px-3 text-center">Written</th>
@@ -8139,7 +8147,8 @@ function getAdminCenterCoords(centerName, address) {
                         </h4>
                         <div>
                             <label class="block font-semibold text-on-surface-variant mb-1">Number of ID Digits:</label>
-                            <select id="cfg_id_digits" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-bold">
+                            <select id="cfg_id_digits" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-bold" onchange="if(this.value==='11'){document.getElementById('cfg_roll_title').value='رقم الهاتف (Phone No)';}else if(this.value==='5'){document.getElementById('cfg_roll_title').value='Roll No (كود الطالب)';}">
+                                <option value="11" selected>11 Digits - Phone Number (رقم الهاتف e.g. 01012345678)</option>
                                 <option value="4">4 Digits (e.g. 1024)</option>
                                 <option value="5" selected>5 Digits (Standard e.g. 10245)</option>
                                 <option value="6">6 Digits (e.g. 102456)</option>

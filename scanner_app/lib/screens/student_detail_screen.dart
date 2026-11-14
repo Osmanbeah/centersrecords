@@ -23,6 +23,7 @@ class StudentDetailScreen extends StatefulWidget {
 class _StudentDetailScreenState extends State<StudentDetailScreen> {
   late TextEditingController _codeController;
   late TextEditingController _nameController;
+  late TextEditingController _writtenScoreController;
   late String _selectedModel;
   late double _writtenScore;
   late Map<int, String?> _answers;
@@ -36,6 +37,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     _nameController = TextEditingController(text: widget.initialResult.studentName);
     _selectedModel = widget.initialResult.model;
     _writtenScore = widget.initialResult.writtenScore;
+    _writtenScoreController = TextEditingController(
+      text: _writtenScore == 0.0 ? '0' : (_writtenScore.truncateToDouble() == _writtenScore ? _writtenScore.toInt().toString() : _writtenScore.toStringAsFixed(1)),
+    );
 
     _answers = {};
     for (int q = 1; q <= widget.exam.questionCount; q++) {
@@ -47,6 +51,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   void dispose() {
     _codeController.dispose();
     _nameController.dispose();
+    _writtenScoreController.dispose();
     super.dispose();
   }
 
@@ -177,7 +182,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     final msg = '''🌟 *نتيجة اختبار مستر كيلاني (معدلة)* 🌟
 👤 *اسم الطالب:* $name
-🆔 *كود الطالب:* $code
+📱 *رقم الهاتف:* $code
 🏫 *السنتر:* ${widget.initialResult.center}
 📝 *الامتحان:* ${widget.exam.title}
 📋 *النموذج:* $_selectedModel
@@ -288,20 +293,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   Row(
                     children: [
                       Expanded(
-                        flex: 4,
+                        flex: 5,
                         child: TextField(
                           controller: _codeController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 11,
                           onChanged: (_) => setState(() => _hasChanges = true),
                           decoration: InputDecoration(
-                            labelText: 'كود الطالب',
+                            labelText: 'رقم هاتف الطالب (Phone No)',
+                            hintText: '010XXXXXXXX',
+                            counterText: '',
                             labelStyle: GoogleFonts.cairo(fontSize: 12),
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            prefixIcon: const Icon(Icons.tag, size: 18, color: Color(0xFF0F766E)),
+                            prefixIcon: const Icon(Icons.phone_android, size: 18, color: Color(0xFF0F766E)),
                           ),
-                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -376,32 +384,45 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   if (widget.exam.writtenMaxScore > 0)
                     Column(
                       children: [
-                        Text('المقالي', style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF64748B))),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                if (_writtenScore > 0) setState(() { _writtenScore -= 0.5; _hasChanges = true; });
-                              },
-                              child: const Icon(Icons.remove_circle_outline, size: 18, color: Color(0xFF64748B)),
+                        Text(
+                          'المقالي (من ${widget.exam.writtenMaxScore.toStringAsFixed(0)})',
+                          style: GoogleFonts.cairo(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 2),
+                        SizedBox(
+                          width: 72,
+                          height: 38,
+                          child: TextField(
+                            controller: _writtenScoreController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            textAlign: TextAlign.center,
+                            textInputAction: TextInputAction.done,
+                            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15, color: const Color(0xFFD97706)),
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                              filled: true,
+                              fillColor: const Color(0xFFFFFBEB),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFF59E0B))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFD97706), width: 2)),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                              child: Text(
-                                _writtenScore.toStringAsFixed(1),
-                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFFD97706)),
-                              ),
-                            ),
-                            InkWell(
-                              onTap: () {
-                                if (_writtenScore < widget.exam.writtenMaxScore) {
-                                  setState(() { _writtenScore += 0.5; _hasChanges = true; });
+                            onChanged: (val) {
+                              final parsed = double.tryParse(val.trim());
+                              setState(() {
+                                _hasChanges = true;
+                                if (parsed == null) {
+                                  _writtenScore = 0.0;
+                                } else if (parsed > widget.exam.writtenMaxScore) {
+                                  _writtenScore = widget.exam.writtenMaxScore;
+                                  _writtenScoreController.text = widget.exam.writtenMaxScore.toStringAsFixed(0);
+                                  _writtenScoreController.selection = TextSelection.fromPosition(TextPosition(offset: _writtenScoreController.text.length));
+                                } else {
+                                  _writtenScore = parsed;
                                 }
-                              },
-                              child: const Icon(Icons.add_circle_outline, size: 18, color: Color(0xFF64748B)),
-                            ),
-                          ],
+                              });
+                            },
+                          ),
                         ),
                       ],
                     )

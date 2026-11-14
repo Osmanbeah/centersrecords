@@ -200,7 +200,7 @@
 
             const writtenBoxSub = cfg.written_box_sub || 'درجة السؤال المقالي';
 
-            const idDigits = Math.max(3, Math.min(8, cfg.id_digits || 5));
+            const idDigits = Math.max(3, Math.min(11, cfg.id_digits || 5));
 
             const rollTitle = cfg.roll_title || 'Roll No (كود الطالب)';
 
@@ -296,11 +296,11 @@
 
                 rollTitleFont: isSpacious ? '14.5px' : (isMedium ? '12.5px' : '11px'),
 
-                rollBoxW: isSpacious ? '28px' : (isMedium ? '24px' : '20px'),
+                rollBoxW: (idDigits >= 9) ? '15px' : (isSpacious ? '28px' : (isMedium ? '24px' : '20px')),
 
-                rollBoxH: isSpacious ? '32px' : (isMedium ? '26px' : '20px'),
+                rollBoxH: (idDigits >= 9) ? '18px' : (isSpacious ? '32px' : (isMedium ? '26px' : '20px')),
 
-                rollBoxesGap: isSpacious ? '6px' : (isMedium ? '5px' : '4px'),
+                rollBoxesGap: (idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px')),
 
                 rollBoxesMarB: isSpacious ? '12px' : (isMedium ? '8px' : '6px'),
 
@@ -308,9 +308,9 @@
 
                 rollDigitFont: isSpacious ? '13.5px' : (isMedium ? '11.5px' : '10px'),
 
-                rollBubbleSize: isSpacious ? '22px' : (isMedium ? '19px' : '17px'),
+                rollBubbleSize: (idDigits >= 9) ? '15px' : (isSpacious ? '22px' : (isMedium ? '19px' : '17px')),
 
-                rollBubblesGap: isSpacious ? '6px' : (isMedium ? '5px' : '4px'),
+                rollBubblesGap: (idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px')),
 
 
 

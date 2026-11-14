@@ -47,4 +47,23 @@ void main() {
     expect(res.answers[13]?.state, QuestionState.multiple);
     expect(res.answers[13]?.multipleSelected, containsAll(['B', 'C']));
   });
+  test('EvalBee alignment checker detects 4 fiducial corners and isAligned=true', () {
+    final file = File(r'C:\Users\Admin\.gemini\antigravity\brain\e32c0684-da8a-471a-bd36-7a5b793303a5\.user_uploaded\media_1794669074855_e5c3d4d7.png');
+    final bytes = file.readAsBytesSync();
+    final decoded = img.decodeImage(bytes)!;
+    final alignment = OMREngine.checkAlignmentFromImage(decoded);
+
+    expect(alignment.isAligned, isTrue);
+    expect(alignment.visibleCornersCount, 4);
+    expect(alignment.detectedCorners, isNotNull);
+    expect(alignment.detectedCorners!.length, 4);
+  });
+
+  test('11-digit phone number layout generates 11 columns with 10 digits each', () {
+    final layout11 = OMREngine.computeBubbleLayout(15, idDigits: 11);
+    expect(layout11.rollCoords.length, 11);
+    for (final col in layout11.rollCoords) {
+      expect(col.length, 10);
+    }
+  });
 }

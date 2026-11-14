@@ -30,7 +30,11 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
   bool _isTorchOn = false;
-  String _statusMessage = 'وجّه المربعات السوداء الأربعة داخل زوايا التحديد بدقة';
+  bool _isAutoCaptureEnabled = true;
+  bool _isAligned = false;
+  int _consecutiveAlignedFrames = 0;
+  int _lastFrameTime = 0;
+  String _statusMessage = 'وجّه المربعات السوداء الأربعة داخل الإطار للمسح التلقائي';
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -71,7 +75,6 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         return;
       }
 
-      // Pick back camera
       final backCamera = _cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => _cameras.first,
@@ -81,13 +84,12 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         backCamera,
         ResolutionPreset.veryHigh,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+        imageFormatGroup: ImageFormatGroup.yuv420,
       );
 
       _cameraController = controller;
       await controller.initialize();
 
-      // Configure autofocus & auto exposure
       try {
         await controller.setFocusMode(FocusMode.auto);
         await controller.setFlashMode(FlashMode.off);
@@ -96,8 +98,12 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       if (mounted) {
         setState(() {
           _isCameraInitialized = true;
-          _statusMessage = 'اضبط ورقة الإجابة داخل الإطار واقترب كفاية';
+          _statusMessage = 'اضبط ورقة الإجابة داخل الإطار للالتقاط الفوري';
         });
+
+        if (_isAutoCaptureEnabled) {
+          _startLiveStream();
+        }
       }
     } catch (e) {
       debugPrint('Camera init error: $e');
@@ -105,6 +111,85 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         setState(() {
           _statusMessage = 'فشل تشغيل الكاميرا - يمكنك اختيار صورة من المعرض';
         });
+      }
+    }
+  }
+
+  void _startLiveStream() {
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.isStreamingImages) return;
+
+    _lastFrameTime = 0;
+    _consecutiveAlignedFrames = 0;
+
+    try {
+      controller.startImageStream((CameraImage image) {
+        if (_isProcessing || !mounted) return;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _lastFrameTime < 180) return; // run at ~5-6 fps
+        _lastFrameTime = now;
+
+        try {
+          if (image.planes.isEmpty) return;
+          final yPlane = image.planes[0];
+          final status = OMREngine.checkAlignmentFromYPlane(
+            yPlane.bytes,
+            image.width,
+            image.height,
+            yPlane.bytesPerRow,
+          );
+
+          if (!mounted) return;
+
+          if (status.isAligned) {
+            _consecutiveAlignedFrames++;
+            if (!_isAligned) {
+              setState(() {
+                _isAligned = true;
+                _statusMessage = 'تم تطابق النقاط والزوايا بنجاح 🟢';
+              });
+            }
+
+            // Auto-capture like EvalBee when aligned stably for ~300ms
+            if (_isAutoCaptureEnabled && _consecutiveAlignedFrames >= 2 && !_isProcessing) {
+              _triggerAutoCapture();
+            }
+          } else {
+            _consecutiveAlignedFrames = 0;
+            if (_isAligned || _statusMessage != status.message) {
+              setState(() {
+                _isAligned = false;
+                _statusMessage = status.message;
+              });
+            }
+          }
+        } catch (_) {}
+      });
+    } catch (e) {
+      debugPrint('startImageStream warning: $e');
+    }
+  }
+
+  Future<void> _triggerAutoCapture() async {
+    if (_isProcessing) return;
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = 'تم التطابق! جارِ التقاط الورقة وتصحيحها...';
+    });
+
+    try {
+      if (_cameraController != null && _cameraController!.value.isStreamingImages) {
+        await _cameraController!.stopImageStream();
+      }
+      final XFile photo = await _cameraController!.takePicture();
+      final bytes = await photo.readAsBytes();
+      await _processImageBytes(bytes);
+    } catch (e) {
+      debugPrint('Auto-capture error: $e');
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _startLiveStream();
       }
     }
   }
@@ -121,6 +206,25 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       }
     } catch (e) {
       debugPrint('Torch error: $e');
+    }
+  }
+
+  void _toggleAutoCapture() {
+    setState(() {
+      _isAutoCaptureEnabled = !_isAutoCaptureEnabled;
+      _isAligned = false;
+      _consecutiveAlignedFrames = 0;
+    });
+
+    if (_isAutoCaptureEnabled) {
+      _startLiveStream();
+    } else {
+      if (_cameraController != null && _cameraController!.value.isStreamingImages) {
+        _cameraController!.stopImageStream();
+      }
+      setState(() {
+        _statusMessage = 'الوضع اليدوي: اضبط الورقة واضغط زر الكاميرا';
+      });
     }
   }
 
@@ -149,6 +253,10 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         _statusMessage = 'جارِ التقاط صورة عالية الدقة...';
       });
 
+      if (_cameraController!.value.isStreamingImages) {
+        await _cameraController!.stopImageStream();
+      }
+
       final XFile photo = await _cameraController!.takePicture();
       final bytes = await photo.readAsBytes();
 
@@ -156,6 +264,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     } catch (e) {
       setState(() => _isProcessing = false);
       _showError('فشل التقاط الصورة: $e');
+      _startLiveStream();
     }
   }
 
@@ -166,7 +275,6 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     });
 
     try {
-      // Execute OMR Scan in background isolate
       final scanResult = await compute(_runOmrScanIsolate, _OmrParam(
         imageBytes: rawBytes,
         questionCount: widget.exam.questionCount,
@@ -182,7 +290,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
       // Successfully detected! Navigate to ReviewScreen
       if (mounted) {
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => ReviewScreen(
@@ -194,10 +302,24 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
             ),
           ),
         );
+
+        // Returned from ReviewScreen: re-arm live stream for next scan
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+            _isAligned = false;
+            _consecutiveAlignedFrames = 0;
+            _statusMessage = 'اضبط ورقة الإجابة داخل الإطار للالتقاط الفوري';
+          });
+          if (_isAutoCaptureEnabled) {
+            _startLiveStream();
+          }
+        }
       }
     } catch (e) {
       setState(() => _isProcessing = false);
       _showError('حدث خطأ أثناء معالجة الورقة: $e');
+      _startLiveStream();
     }
   }
 
@@ -296,10 +418,13 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _startLiveStream();
+            },
             icon: const Icon(Icons.camera_alt_outlined, size: 18),
             label: Text(
-              'إعادة التصوير / Retake Photo',
+              'إعادة المحاولة / Retake',
               style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
@@ -322,13 +447,55 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(
-          'مسح ورقة: ${widget.exam.title}',
-          style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'مسح ورقة: ${widget.exam.title}',
+              style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            Text(
+              _isAutoCaptureEnabled ? '⚡ وضع الالتقاط التلقائي (EvalBee Mode)' : '🖐️ وضع الالتقاط اليدوي',
+              style: GoogleFonts.cairo(fontSize: 11, color: _isAutoCaptureEnabled ? const Color(0xFF34D399) : const Color(0xFF94A3B8)),
+            ),
+          ],
         ),
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
+          // Auto / Manual Toggle
+          InkWell(
+            onTap: _toggleAutoCapture,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isAutoCaptureEnabled ? const Color(0xFF10B981).withValues(alpha: 0.25) : Colors.white12,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _isAutoCaptureEnabled ? const Color(0xFF10B981) : Colors.white30),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isAutoCaptureEnabled ? Icons.bolt : Icons.touch_app,
+                    size: 14,
+                    color: _isAutoCaptureEnabled ? const Color(0xFF34D399) : Colors.white70,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _isAutoCaptureEnabled ? 'تلقائي' : 'يدوي',
+                    style: GoogleFonts.cairo(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: _isAutoCaptureEnabled ? const Color(0xFF34D399) : Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           IconButton(
             icon: Icon(_isTorchOn ? Icons.flash_on : Icons.flash_off, color: _isTorchOn ? Colors.amber : Colors.white),
             tooltip: 'تشغيل الفلاش',
@@ -372,29 +539,55 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
           // Viewfinder Overlay Frame (Guides user to frame the sheet)
           CustomPaint(
-            painter: _ViewfinderOverlayPainter(questionCount: widget.exam.questionCount),
+            painter: _ViewfinderOverlayPainter(
+              questionCount: widget.exam.questionCount,
+              isAligned: _isAligned,
+            ),
           ),
 
           // Guidance Prompt Bar at Top
           Positioned(
-            top: 20,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            top: 16,
+            left: 16,
+            right: 16,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.75),
+                color: _isAligned
+                    ? const Color(0xFF064E3B).withValues(alpha: 0.90)
+                    : Colors.black.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF0F766E), width: 1.2),
+                border: Border.all(
+                  color: _isAligned ? const Color(0xFF10B981) : const Color(0xFF0F766E),
+                  width: _isAligned ? 2.0 : 1.2,
+                ),
+                boxShadow: _isAligned
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.45),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    : null,
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF38BDF8), size: 20),
-                  const SizedBox(width: 10),
+                  Icon(
+                    _isAligned ? Icons.check_circle : Icons.info_outline,
+                    color: _isAligned ? const Color(0xFF34D399) : const Color(0xFF38BDF8),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _statusMessage,
-                      style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.cairo(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -404,37 +597,56 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
           // Bottom Controls (Shutter Button)
           Positioned(
-            bottom: 30,
+            bottom: 24,
             left: 0,
             right: 0,
             child: Column(
               children: [
                 GestureDetector(
                   onTap: _isProcessing ? null : _takePictureAndScan,
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
                     width: 76,
                     height: 76,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
-                      color: _isProcessing ? Colors.grey : const Color(0xFF0F766E),
+                      border: Border.all(
+                        color: _isAligned ? const Color(0xFF34D399) : Colors.white,
+                        width: _isAligned ? 5 : 4,
+                      ),
+                      color: _isProcessing
+                          ? Colors.grey
+                          : (_isAligned ? const Color(0xFF10B981) : const Color(0xFF0F766E)),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0F766E).withValues(alpha: 0.5),
-                          blurRadius: 16,
-                          spreadRadius: 2,
+                          color: (_isAligned ? const Color(0xFF10B981) : const Color(0xFF0F766E))
+                              .withValues(alpha: 0.6),
+                          blurRadius: _isAligned ? 22 : 16,
+                          spreadRadius: _isAligned ? 4 : 2,
                         ),
                       ],
                     ),
                     child: _isProcessing
                         ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
-                        : const Icon(Icons.camera_alt, color: Colors.white, size: 36),
+                        : Icon(
+                            _isAligned ? Icons.auto_awesome : Icons.camera_alt,
+                            color: Colors.white,
+                            size: 36,
+                          ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
-                  _isProcessing ? 'جارِ التحليل...' : 'اضغط لالتقاط وتصحيح الورقة',
-                  style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  _isProcessing
+                      ? 'جارِ التحليل...'
+                      : (_isAutoCaptureEnabled
+                          ? (_isAligned ? '⚡ تم التطابق! جارِ الالتقاط...' : 'وجّه الورقة للالتقاط التلقائي')
+                          : 'اضغط لالتقاط الورقة'),
+                  style: GoogleFonts.cairo(
+                    color: _isAligned ? const Color(0xFF34D399) : Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -445,20 +657,19 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   }
 }
 
-/// Custom Viewfinder Painter with Corner Brackets
+/// Custom Viewfinder Painter with Dynamic Alignment Highlighting
 class _ViewfinderOverlayPainter extends CustomPainter {
   final int questionCount;
+  final bool isAligned;
   final SheetBubbleLayout layout;
 
-  _ViewfinderOverlayPainter({required this.questionCount})
-      : layout = OMREngine.computeBubbleLayout(questionCount);
+  _ViewfinderOverlayPainter({
+    required this.questionCount,
+    this.isAligned = false,
+  }) : layout = OMREngine.computeBubbleLayout(questionCount);
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Canonical dimensions between registration markers:
-    // Left marker X: 103, Right marker X: 1109 -> Wm = 1006
-    // Top marker Y: 88, Bottom marker Y: 1597 -> Hm = 1509
-    // Aspect ratio between registration markers = 1509 / 1006 = 1.500
     final targetW = size.width * 0.82;
     final targetH = targetW * (1509.0 / 1006.0); // Exact 1.500 ratio
     final targetLeft = (size.width - targetW) / 2.0;
@@ -475,28 +686,28 @@ class _ViewfinderOverlayPainter extends CustomPainter {
       ..fillType = PathFillType.evenOdd;
     canvas.drawPath(path, bgPaint);
 
-    // Frame border around active scanning area
+    // Frame border around active scanning area (turns green when aligned!)
+    final borderColor = isAligned ? const Color(0xFF10B981) : const Color(0xFF0F766E).withValues(alpha: 0.5);
     final borderPaint = Paint()
-      ..color = const Color(0xFF0F766E).withValues(alpha: 0.5)
+      ..color = borderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+      ..strokeWidth = isAligned ? 2.5 : 1.5;
     canvas.drawRRect(RRect.fromRectAndRadius(outerRect, const Radius.circular(16)), borderPaint);
 
-    // 4 Corner Alignment Target Brackets (directly targeting the 4 black squares!)
+    // 4 Corner Alignment Target Brackets (turns green when aligned!)
+    final targetColor = isAligned ? const Color(0xFF10B981) : const Color(0xFF38BDF8);
     final cornerTargetPaint = Paint()
-      ..color = const Color(0xFF38BDF8)
+      ..color = targetColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
+      ..strokeWidth = isAligned ? 4.5 : 3.5
       ..strokeCap = StrokeCap.round;
 
     const cornerBracketLen = 22.0;
     const boxR = 12.0;
 
-    // Helper to map canonical (1200 x 1697) points directly into the target frame
     double mapX(int canonX) => targetLeft + ((canonX - 103) / 1006.0) * targetW;
     double mapY(int canonY) => targetTop + ((canonY - 88) / 1509.0) * targetH;
 
-    // Draw the 4 corner targets around (TL, TR, BL, BR) markers
     final corners = [
       Offset(targetLeft, targetTop),
       Offset(targetRight, targetTop),
@@ -513,7 +724,7 @@ class _ViewfinderOverlayPainter extends CustomPainter {
           const Radius.circular(4),
         ),
         Paint()
-          ..color = const Color(0xFF38BDF8).withValues(alpha: 0.20)
+          ..color = targetColor.withValues(alpha: isAligned ? 0.40 : 0.20)
           ..style = PaintingStyle.fill,
       );
       canvas.drawRRect(
@@ -522,7 +733,7 @@ class _ViewfinderOverlayPainter extends CustomPainter {
           const Radius.circular(4),
         ),
         Paint()
-          ..color = const Color(0xFF38BDF8)
+          ..color = targetColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0,
       );
@@ -534,11 +745,11 @@ class _ViewfinderOverlayPainter extends CustomPainter {
       canvas.drawLine(Offset(c.dx + sx * (boxR + 4), c.dy), Offset(c.dx + sx * (boxR + 4 + cornerBracketLen), c.dy), cornerTargetPaint);
     }
 
-    // Small Holo Bubble Circles positioned accurately relative to the 4 corner targets
+    // Small Holo Bubble Circles (turns bright green when aligned!)
     final holoCirclePaint = Paint()
-      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.60)
+      ..color = targetColor.withValues(alpha: isAligned ? 0.85 : 0.60)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3;
+      ..strokeWidth = isAligned ? 1.5 : 1.3;
 
     final circleRadius = (13.0 / 1006.0) * targetW;
 
@@ -547,14 +758,14 @@ class _ViewfinderOverlayPainter extends CustomPainter {
       canvas.drawCircle(Offset(mapX(pt.x), mapY(pt.y)), circleRadius * 1.05, holoCirclePaint);
     }
 
-    // Roll number hollow circles (50 bubbles)
+    // Roll number hollow circles (all columns)
     for (final col in layout.rollCoords) {
       for (final pt in col) {
         canvas.drawCircle(Offset(mapX(pt.x), mapY(pt.y)), circleRadius * 0.95, holoCirclePaint);
       }
     }
 
-    // MCQ Question hollow circles (all questions in their format)
+    // MCQ Question hollow circles
     for (final opts in layout.questionCoords.values) {
       for (final pt in opts.values) {
         canvas.drawCircle(Offset(mapX(pt.x), mapY(pt.y)), circleRadius, holoCirclePaint);
@@ -564,7 +775,7 @@ class _ViewfinderOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ViewfinderOverlayPainter oldDelegate) =>
-      oldDelegate.questionCount != questionCount;
+      oldDelegate.questionCount != questionCount || oldDelegate.isAligned != isAligned;
 }
 
 /// Helper class for Isolate
