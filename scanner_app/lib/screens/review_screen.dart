@@ -662,8 +662,25 @@ class _ReviewScreenState extends State<ReviewScreen> {
             // Main Content: either Image Viewer or Questions List
             if (_showOriginal)
               _buildImageViewer()
-            else
+            else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF0F766E)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'اضغط على أي اختيار (A, B, C, D) لتعديل أو تغيير إجابة الطالب مباشرة',
+                        style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
               _buildQuestionsList(answerKey),
+            ],
 
             const SizedBox(height: 24),
           ],

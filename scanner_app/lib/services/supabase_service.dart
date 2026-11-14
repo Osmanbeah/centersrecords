@@ -118,6 +118,111 @@ class SupabaseService {
     return cloudSaved;
   }
 
+  /// Update an existing exam result in Supabase and local cache
+  static Future<bool> updateExamResult(ExamResult result) async {
+    bool cloudSaved = false;
+    try {
+      if (result.id != null && result.id!.isNotEmpty) {
+        await client
+            .from('exam_results')
+            .update(result.toJson())
+            .eq('id', result.id!);
+      } else {
+        await client
+            .from('exam_results')
+            .update(result.toJson())
+            .eq('exam_id', result.examId)
+            .eq('student_code', result.studentCode);
+      }
+      cloudSaved = true;
+    } catch (e) {
+      debugPrint('Error updating exam result in Supabase: $e');
+    }
+
+    // Update local cache
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'local_results_${result.examId}';
+      final cached = prefs.getString(key);
+      if (cached != null) {
+        final List list = jsonDecode(cached);
+        final updatedList = list.map((item) {
+          final res = ExamResult.fromJson(Map<String, dynamic>.from(item as Map));
+          if ((result.id != null && res.id == result.id) ||
+              (res.examId == result.examId && res.studentCode == result.studentCode)) {
+            return result.toJson(includeId: true);
+          }
+          return item;
+        }).toList();
+        await prefs.setString(key, jsonEncode(updatedList));
+      }
+    } catch (_) {}
+
+    return cloudSaved;
+  }
+
+  /// Delete an exam result from Supabase and local cache
+  static Future<bool> deleteExamResult(String? id, String examId, String studentCode) async {
+    bool cloudDeleted = false;
+    try {
+      if (id != null && id.isNotEmpty) {
+        await client.from('exam_results').delete().eq('id', id);
+      } else {
+        await client
+            .from('exam_results')
+            .delete()
+            .eq('exam_id', examId)
+            .eq('student_code', studentCode);
+      }
+      cloudDeleted = true;
+    } catch (e) {
+      debugPrint('Error deleting exam result from Supabase: $e');
+    }
+
+    // Update local cache
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'local_results_$examId';
+      final cached = prefs.getString(key);
+      if (cached != null) {
+        final List list = jsonDecode(cached);
+        final filteredList = list.where((item) {
+          final res = ExamResult.fromJson(Map<String, dynamic>.from(item as Map));
+          if (id != null && res.id == id) return false;
+          if (res.examId == examId && res.studentCode == studentCode) return false;
+          return true;
+        }).toList();
+        await prefs.setString(key, jsonEncode(filteredList));
+      }
+    } catch (_) {}
+
+    return cloudDeleted;
+  }
+
+  /// Persistent Assistant Profile
+  static Future<Map<String, String>> getAssistantProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    return {
+      'name': prefs.getString('assistant_name') ?? '',
+      'code': prefs.getString('assistant_code') ?? '',
+      'phone': prefs.getString('assistant_phone') ?? '',
+      'center': prefs.getString('selected_center') ?? 'All Centers',
+    };
+  }
+
+  static Future<void> saveAssistantProfile({
+    required String name,
+    String code = '',
+    String phone = '',
+    String center = 'All Centers',
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('assistant_name', name);
+    await prefs.setString('assistant_code', code);
+    await prefs.setString('assistant_phone', phone);
+    await prefs.setString('selected_center', center);
+  }
+
   /// Persistent Assistant Name
   static Future<String> getAssistantName() async {
     final prefs = await SharedPreferences.getInstance();

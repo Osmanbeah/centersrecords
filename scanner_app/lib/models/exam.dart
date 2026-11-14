@@ -93,7 +93,8 @@ class ExamResult {
     required this.createdAt,
   });
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool includeId = false}) => {
+    if (includeId && id != null) 'id': id,
     'exam_id': examId,
     'student_code': studentCode,
     'student_name': studentName,
@@ -106,6 +107,36 @@ class ExamResult {
     'assistant_name': assistantName,
     'created_at': createdAt,
   };
+
+  ExamResult copyWith({
+    String? id,
+    String? examId,
+    String? studentCode,
+    String? studentName,
+    String? center,
+    String? model,
+    double? mcqScore,
+    double? writtenScore,
+    double? totalScore,
+    Map<String, String>? studentAnswers,
+    String? assistantName,
+    String? createdAt,
+  }) {
+    return ExamResult(
+      id: id ?? this.id,
+      examId: examId ?? this.examId,
+      studentCode: studentCode ?? this.studentCode,
+      studentName: studentName ?? this.studentName,
+      center: center ?? this.center,
+      model: model ?? this.model,
+      mcqScore: mcqScore ?? this.mcqScore,
+      writtenScore: writtenScore ?? this.writtenScore,
+      totalScore: totalScore ?? this.totalScore,
+      studentAnswers: studentAnswers ?? this.studentAnswers,
+      assistantName: assistantName ?? this.assistantName,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 
   factory ExamResult.fromJson(Map<String, dynamic> json) {
     final rawAns = json['student_answers'];
