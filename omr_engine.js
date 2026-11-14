@@ -360,7 +360,8 @@
 
             // Calculate exact number of registration dots needed based on question blocks
 
-            const numDots = Math.max(3, Math.min(6, Math.ceil(qPerCol / 5) + 1));
+            // Clean grid framing anchors: top and bottom only (eliminates intermediate quad clutter)
+            const numDots = 2;
 
 
 
@@ -678,13 +679,13 @@
 
         }
 
-        .corner-marker-tl { top: 4mm; left: 5mm; }
+        .corner-marker-tl { top: 5mm; left: 5mm; }
 
-        .corner-marker-tr { top: 4mm; right: 5mm; }
+        .corner-marker-tr { top: 5mm; right: 5mm; }
 
-        .corner-marker-bl { bottom: 4mm; left: 5mm; }
+        .corner-marker-bl { bottom: 5mm; left: 5mm; }
 
-        .corner-marker-br { bottom: 4mm; right: 5mm; }
+        .corner-marker-br { bottom: 5mm; right: 5mm; }
 
 
 
@@ -795,6 +796,10 @@
             border-bottom: 2.5px solid #000000;
 
             margin-bottom: ${dyn.headerMarB};
+
+            margin-left: 10mm;
+
+            margin-right: 10mm;
 
         }
 
@@ -1375,6 +1380,10 @@
             padding-top: ${dyn.footerPadT};
 
             margin-top: ${dyn.footerMarT};
+
+            margin-left: 10mm;
+
+            margin-right: 10mm;
 
             display: flex;
 

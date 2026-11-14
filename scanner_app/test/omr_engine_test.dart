@@ -22,8 +22,8 @@ void main() {
     });
 
     test('classifyQuestion correctly detects a filled bubble B', () {
-      const w = 200;
-      const h = 50;
+      const w = 300;
+      const h = 100;
       final gray = Uint8List(w * h);
       // Fill with clean paper white (lum = 230)
       for (int i = 0; i < gray.length; i++) {
@@ -31,10 +31,10 @@ void main() {
       }
 
       final coords = {
-        'A': const math.Point<int>(30, 25),
-        'B': const math.Point<int>(70, 25),
-        'C': const math.Point<int>(110, 25),
-        'D': const math.Point<int>(150, 25),
+        'A': const math.Point<int>(50, 50),
+        'B': const math.Point<int>(100, 50),
+        'C': const math.Point<int>(150, 50),
+        'D': const math.Point<int>(200, 50),
       };
 
       // Draw bubble outlines (rings)
@@ -72,18 +72,18 @@ void main() {
     });
 
     test('classifyQuestion classifies all blank bubbles as EMPTY', () {
-      const w = 200;
-      const h = 50;
+      const w = 300;
+      const h = 100;
       final gray = Uint8List(w * h);
       for (int i = 0; i < gray.length; i++) {
         gray[i] = 230;
       }
 
       final coords = {
-        'A': const math.Point<int>(30, 25),
-        'B': const math.Point<int>(70, 25),
-        'C': const math.Point<int>(110, 25),
-        'D': const math.Point<int>(150, 25),
+        'A': const math.Point<int>(50, 50),
+        'B': const math.Point<int>(100, 50),
+        'C': const math.Point<int>(150, 50),
+        'D': const math.Point<int>(200, 50),
       };
 
       final result = OMREngine.classifyQuestion(gray, coords, w, h);
@@ -92,18 +92,18 @@ void main() {
     });
 
     test('classifyQuestion classifies multiple dark marks as MULTIPLE', () {
-      const w = 200;
-      const h = 50;
+      const w = 300;
+      const h = 100;
       final gray = Uint8List(w * h);
       for (int i = 0; i < gray.length; i++) {
         gray[i] = 230;
       }
 
       final coords = {
-        'A': const math.Point<int>(30, 25),
-        'B': const math.Point<int>(70, 25),
-        'C': const math.Point<int>(110, 25),
-        'D': const math.Point<int>(150, 25),
+        'A': const math.Point<int>(50, 50),
+        'B': const math.Point<int>(100, 50),
+        'C': const math.Point<int>(150, 50),
+        'D': const math.Point<int>(200, 50),
       };
 
       // Fill both A and C

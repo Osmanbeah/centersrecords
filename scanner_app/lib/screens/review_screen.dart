@@ -30,7 +30,7 @@ class ReviewScreen extends StatefulWidget {
 class _ReviewScreenState extends State<ReviewScreen> {
   late TextEditingController _studentCodeController;
   late TextEditingController _studentNameController;
-  late String _selectedModel;
+  String? _selectedModel;
   late double _writtenScore;
   late Map<int, String?> _answers;
   late Map<int, QuestionState> _states;
@@ -44,14 +44,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
     _studentCodeController = TextEditingController(text: widget.scanResult.studentCode);
     _studentNameController = TextEditingController();
 
-    // Default to detected model if valid in exam, else first model or 'A'
-    final availModels = widget.exam.models.keys.toList();
-    if (availModels.contains(widget.scanResult.model)) {
-      _selectedModel = widget.scanResult.model;
-    } else if (availModels.isNotEmpty) {
-      _selectedModel = availModels.first;
+    // If model was detected by engine, pre-select it; otherwise leave null so user MUST choose
+    if (widget.scanResult.modelDetected) {
+      final availModels = widget.exam.models.keys.toList();
+      if (availModels.contains(widget.scanResult.model)) {
+        _selectedModel = widget.scanResult.model;
+      } else if (availModels.isNotEmpty) {
+        _selectedModel = availModels.first;
+      } else {
+        _selectedModel = widget.scanResult.model;
+      }
     } else {
-      _selectedModel = 'A';
+      _selectedModel = null;
     }
 
     _writtenScore = 0.0;
@@ -61,8 +65,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
     for (int q = 1; q <= widget.exam.questionCount; q++) {
       final qRes = widget.scanResult.answers[q];
       if (qRes != null) {
-        _answers[q] = qRes.selected;
         _states[q] = qRes.state;
+        // The student's answer is selected for states SELECTED and UNCERTAIN
+        // For MULTIPLE and EMPTY there is no answer (counts as wrong)
+        if (qRes.state == QuestionState.selected || qRes.state == QuestionState.uncertain) {
+          _answers[q] = qRes.selected;
+        } else {
+          _answers[q] = null;
+        }
       } else {
         _answers[q] = null;
         _states[q] = QuestionState.empty;
@@ -83,7 +93,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   int get _correctMcqCount {
-    final key = widget.exam.getAnswerKey(_selectedModel);
+    if (_selectedModel == null) return 0;
+    final key = widget.exam.getAnswerKey(_selectedModel!);
     if (key == null) return 0;
     int count = 0;
     _answers.forEach((q, ans) {
@@ -95,6 +106,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   double get _mcqScore {
+    if (_selectedModel == null) return 0.0;
     return _correctMcqCount * widget.exam.mcqScorePerQ;
   }
 
@@ -120,6 +132,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   Future<void> _saveResult() async {
+    if (_selectedModel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('يرجى اختيار نموذج الامتحان أولاً في الخطوة الأولى', style: GoogleFonts.cairo()),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
     final code = _studentCodeController.text.trim();
     if (code.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -147,7 +168,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       studentCode: code,
       studentName: name,
       center: widget.centerName != 'All Centers' ? widget.centerName : widget.exam.center,
-      model: _selectedModel,
+      model: _selectedModel!,
       mcqScore: _mcqScore,
       writtenScore: _writtenScore,
       totalScore: _totalScore,
@@ -185,7 +206,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 🆔 *كود الطالب:* $code
 🏫 *السنتر:* $center
 📝 *الامتحان:* ${widget.exam.title}
-📋 *النموذج:* $_selectedModel
+📋 *النموذج:* ${_selectedModel ?? "غير محدد"}
 📊 *الدرجة الكلية:* ${_totalScore.toStringAsFixed(1)} / ${widget.exam.totalScore.toStringAsFixed(0)}
 ✅ *الاختيار من متعدد:* ${_mcqScore.toStringAsFixed(1)} ($_correctMcqCount/${widget.exam.questionCount})
 ✍️ *المقالي:* ${_writtenScore.toStringAsFixed(1)} / ${widget.exam.writtenMaxScore.toStringAsFixed(0)}
@@ -214,7 +235,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final answerKey = widget.exam.getAnswerKey(_selectedModel);
+    final answerKey = _selectedModel != null ? widget.exam.getAnswerKey(_selectedModel!) : null;
     final availModels = widget.exam.models.keys.isNotEmpty ? widget.exam.models.keys.toList() : ['A', 'B'];
 
     return Scaffold(
@@ -244,7 +265,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF0F766E).withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: _selectedModel == null
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFF0F766E).withValues(alpha: 0.3),
+                  width: _selectedModel == null ? 1.5 : 1.0,
+                ),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2)),
                 ],
@@ -279,25 +305,48 @@ class _ReviewScreenState extends State<ReviewScreen> {
                           ),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF10B981)),
+                      if (_selectedModel != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF10B981)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle, color: Color(0xFF047857), size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                widget.scanResult.modelDetected && _selectedModel == widget.scanResult.model
+                                    ? 'تم الكشف: $_selectedModel'
+                                    : 'النموذج: $_selectedModel',
+                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12, color: const Color(0xFF047857)),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFF59E0B)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                'لم يتم الكشف عن الموديل - اختر الموديل',
+                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 11, color: const Color(0xFFB45309)),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.check_circle, color: Color(0xFF047857), size: 14),
-                            const SizedBox(width: 4),
-                            Text(
-                              'تم الكشف: $_selectedModel',
-                              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12, color: const Color(0xFF047857)),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -522,58 +571,30 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '3️⃣ الخطوة الثالثة',
-                          style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED)),
-                        ),
+
+                  const SizedBox(height: 10),
+                  if (_selectedModel == null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFF59E0B)),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'تصحيح الاختيارات والدرجات',
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF1E293B)),
-                      ),
-                      const Spacer(),
-                      // Uncertainty indicator
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: _uncertainCount > 0 ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _uncertainCount > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Color(0xFFB45309), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'اختر نموذج الامتحان في الخطوة الأولى لبدء التصحيح وحساب الدرجات',
+                              style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _uncertainCount > 0 ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                              size: 14,
-                              color: _uncertainCount > 0 ? const Color(0xFFB45309) : const Color(0xFF047857),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _uncertainCount > 0 ? '$_uncertainCount للمراجعة' : 'جميع الإجابات مؤكدة',
-                              style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: _uncertainCount > 0 ? const Color(0xFFB45309) : const Color(0xFF047857),
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                    ),
                   // Score summary row
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -585,12 +606,29 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildScoreItem('الاختيار من متعدد', '${_mcqScore.toStringAsFixed(1)} / ${(widget.exam.questionCount * widget.exam.mcqScorePerQ).toStringAsFixed(0)}', const Color(0xFF0284C7)),
+                        _buildScoreItem(
+                          'الاختيار من متعدد',
+                          _selectedModel != null
+                              ? '${_mcqScore.toStringAsFixed(1)} / ${(widget.exam.questionCount * widget.exam.mcqScorePerQ).toStringAsFixed(0)}'
+                              : '-- / ${(widget.exam.questionCount * widget.exam.mcqScorePerQ).toStringAsFixed(0)}',
+                          const Color(0xFF0284C7),
+                        ),
                         if (widget.exam.writtenMaxScore > 0)
                           _buildWrittenScoreStepper()
                         else
-                          _buildScoreItem('الإجابات الصحيحة', '$_correctMcqCount / ${widget.exam.questionCount}', const Color(0xFF16A34A)),
-                        _buildScoreItem('المجموع الكلي', '${_totalScore.toStringAsFixed(1)} / ${widget.exam.totalScore.toStringAsFixed(0)}', const Color(0xFF0F766E), isBold: true),
+                          _buildScoreItem(
+                            'الإجابات الصحيحة',
+                            _selectedModel != null ? '$_correctMcqCount / ${widget.exam.questionCount}' : '-- / ${widget.exam.questionCount}',
+                            const Color(0xFF16A34A),
+                          ),
+                        _buildScoreItem(
+                          'المجموع الكلي',
+                          _selectedModel != null
+                              ? '${_totalScore.toStringAsFixed(1)} / ${widget.exam.totalScore.toStringAsFixed(0)}'
+                              : '-- / ${widget.exam.totalScore.toStringAsFixed(0)}',
+                          const Color(0xFF0F766E),
+                          isBold: true,
+                        ),
                       ],
                     ),
                   ),
@@ -769,8 +807,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
         final selected = _answers[q];
         final state = _states[q] ?? QuestionState.empty;
         final correctAns = answerKey?[q];
-        final isCorrect = selected != null && correctAns != null && selected == correctAns;
-        final isWrong = selected != null && correctAns != null && selected != correctAns;
+        final isGraded = answerKey != null;
+        final isCorrect = isGraded && selected != null && correctAns != null && selected == correctAns;
+        final isWrong = isGraded && selected != null && correctAns != null && selected != correctAns;
 
         Color tileBorderColor = Colors.grey.shade200;
         if (state == QuestionState.uncertain) {
@@ -815,16 +854,39 @@ class _ReviewScreenState extends State<ReviewScreen> {
               ),
               const SizedBox(width: 10),
 
-              // Status badge if uncertain or multiple
+              // Badges: UNCERTAIN = Orange, MULTIPLE = Red, EMPTY = Gray
               if (state == QuestionState.uncertain)
                 Container(
-                  margin: const EdgeInsets.only(right: 6),
+                  margin: const EdgeInsets.only(right: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
                   ),
                   child: Text('شك', style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFFB45309), fontWeight: FontWeight.bold)),
+                )
+              else if (state == QuestionState.multiple)
+                Container(
+                  margin: const EdgeInsets.only(right: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFEF4444)),
+                  ),
+                  child: Text('متعدد', style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFFB91C1C), fontWeight: FontWeight.bold)),
+                )
+              else if (state == QuestionState.empty)
+                Container(
+                  margin: const EdgeInsets.only(right: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFF94A3B8)),
+                  ),
+                  child: Text('فارغ', style: GoogleFonts.cairo(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.bold)),
                 ),
 
               // Options A, B, C, D
@@ -840,7 +902,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     Color borderColor = Colors.grey.shade300;
 
                     if (isOptSel) {
-                      if (isCorrect) {
+                      if (!isGraded) {
+                        btnColor = const Color(0xFF0F766E);
+                        textColor = Colors.white;
+                        borderColor = const Color(0xFF0F766E);
+                      } else if (isCorrect) {
                         btnColor = const Color(0xFF10B981);
                         textColor = Colors.white;
                         borderColor = const Color(0xFF047857);

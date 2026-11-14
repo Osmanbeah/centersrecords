@@ -166,23 +166,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     });
 
     try {
-      // Decode image
-      final decoded = await compute(_decodeImageIsolate, rawBytes);
-      if (decoded == null) {
-        setState(() => _isProcessing = false);
-        _showError('فشل فك تشفير الصورة، يرجى المحاولة مرة أخرى.');
-        return;
-      }
-
-      // Quality check
-      final quality = OMREngine.checkQuality(decoded);
-      if (quality['passed'] != true) {
-        setState(() => _isProcessing = false);
-        _showQualityWarning(quality['message'] ?? 'جودة الصورة غير كافية', rawBytes, decoded);
-        return;
-      }
-
-      // Execute OMR Scan
+      // Execute OMR Scan in background isolate
       final scanResult = await compute(_runOmrScanIsolate, _OmrParam(
         imageBytes: rawBytes,
         questionCount: widget.exam.questionCount,
@@ -192,7 +176,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       setState(() => _isProcessing = false);
 
       if (!scanResult.success) {
-        _showScanErrorDialog(scanResult.error ?? 'لم نتمكن من تحديد الورقة', rawBytes);
+        _showScanErrorDialog(scanResult);
         return;
       }
 
@@ -217,96 +201,107 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     }
   }
 
-  void _showQualityWarning(String reason, Uint8List rawBytes, img.Image decoded) {
+  void _showScanErrorDialog(OMRScanResult result) {
+    String arTitle = 'تعذر قراءة الورقة';
+    String arMessage = '';
+    String enMessage = result.message ?? '';
+
+    switch (result.error) {
+      case 'SHEET_NOT_FOUND':
+        arMessage = 'لم نتمكن من تحديد زوايا الورقة.\nتأكد أن المربعات السوداء الأربعة في أطراف الورقة ظاهرة بالكامل، والورقة مفرودة، والهاتف عمودي.';
+        break;
+      case 'NOT_PORTRAIT':
+        arMessage = 'يرجى حمل الهاتف في الوضع الرأسي (عمودي) بحيث تملأ الورقة الشاشة.';
+        break;
+      case 'LOW_RESOLUTION':
+        arMessage = 'دقة الصورة منخفضة جداً (الحد الأدنى 600x800). اقترب أكثر من الورقة.';
+        break;
+      case 'TOO_DARK':
+        arMessage = 'الإضاءة معتمة جداً. يرجى تشغيل فلاش الهاتف أو زيادة إضاءة الغرفة.';
+        break;
+      case 'TOO_BLURRY':
+        arMessage = 'الصورة مهتزة أو غير واضحة. يرجى تثبيت الهاتف جيداً وإعادة الالتقاط.';
+        break;
+      default:
+        arMessage = result.message ?? 'فشل التعرف على الورقة';
+    }
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
+            const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 26),
             const SizedBox(width: 8),
-            Text('تنبيه جودة الصورة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+            Expanded(
+              child: Text(
+                '$arTitle / Scan Failed',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
           ],
         ),
-        content: Text(
-          '$reason\n\nيُفضل الاقتراب أكثر من الورقة وتوفير إضاءة واضحة ومستقيمة للحصول على أدق نتيجة.',
-          style: GoogleFonts.cairo(fontSize: 13),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      arMessage,
+                      style: GoogleFonts.cairo(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF991B1B),
+                      ),
+                    ),
+                    if (enMessage.isNotEmpty && enMessage != arMessage) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        enMessage,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7F1D1D),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'نصائح لقراءة دقيقة 100% / Tips for best result:\n• وجّه الكاميرا رأسياً وتأكد من ثبات اليد.\n• تأكد من ظهور العلامات السوداء الأربع في زوايا الورقة.\n• اضغط زر الفلاش ⚡ إذا كانت الإضاءة ضعيفة.',
+                style: GoogleFonts.cairo(fontSize: 12, color: const Color(0xFF475569), height: 1.5),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F766E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
             onPressed: () => Navigator.pop(ctx),
-            child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E)),
-            onPressed: () {
-              Navigator.pop(ctx);
-              // Force scan anyway
-              _forceScan(rawBytes);
-            },
-            child: Text('المتابعة على أي حال', style: GoogleFonts.cairo(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _forceScan(Uint8List rawBytes) async {
-    setState(() {
-      _isProcessing = true;
-      _statusMessage = 'جارِ المعالجة الإجبارية...';
-    });
-
-    final scanResult = await compute(_runOmrScanIsolate, _OmrParam(
-      imageBytes: rawBytes,
-      questionCount: widget.exam.questionCount,
-      answerKey: widget.exam.getAnswerKey('A'),
-    ));
-
-    setState(() => _isProcessing = false);
-
-    if (!scanResult.success) {
-      _showScanErrorDialog(scanResult.error ?? 'فشل التعرف على الورقة', rawBytes);
-      return;
-    }
-
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ReviewScreen(
-            exam: widget.exam,
-            scanResult: scanResult,
-            originalBytes: rawBytes,
-            assistantName: widget.assistantName,
-            centerName: widget.centerName,
-          ),
-        ),
-      );
-    }
-  }
-
-  void _showScanErrorDialog(String error, Uint8List rawBytes) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Color(0xFFEF4444)),
-            const SizedBox(width: 8),
-            Text('تعذر قراءة الورقة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: Text(
-          '$error\n\nنصائح للحصول على قراءة مثالية 100%:\n• اقترب من الورقة بحيث تملأ الشاشة.\n• تأكد أن المربعات السوداء الأربعة في أطراف الورقة ظاهرة بالكامل.\n• تجنب الظلال الكثيفة أو الإمالة الحادة.',
-          style: GoogleFonts.cairo(fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('إعادة التصوير', style: GoogleFonts.cairo(color: const Color(0xFF0F766E), fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.camera_alt_outlined, size: 18),
+            label: Text(
+              'إعادة التصوير / Retake Photo',
+              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -518,14 +513,14 @@ class _OmrParam {
   });
 }
 
-img.Image? _decodeImageIsolate(Uint8List bytes) {
-  return img.decodeImage(bytes);
-}
-
 OMRScanResult _runOmrScanIsolate(_OmrParam param) {
   final decoded = img.decodeImage(param.imageBytes);
   if (decoded == null) {
-    return OMRScanResult(success: false, error: 'فشل فك تشفير الصورة');
+    return OMRScanResult(
+      success: false,
+      error: 'LOW_RESOLUTION',
+      message: 'فشل فك تشفير الصورة، يرجى إعادة المحاولة / Failed to decode image, please retake',
+    );
   }
 
   return OMREngine.scanImage(
