@@ -137,6 +137,33 @@ class _Integral {
   }
 }
 
+/// Offset precomputation for fast circular ring and paper sampling in the auto-adjuster
+class _RingOffsets {
+  final List<int> dxRing;
+  final List<int> dyRing;
+  final List<int> dxOuter;
+  final List<int> dyOuter;
+  final int rRing;
+  final int rOuter;
+
+  _RingOffsets(this.rRing)
+      : rOuter = rRing + (rRing >= 12 ? 4 : 3),
+        dxRing = List.filled(16, 0),
+        dyRing = List.filled(16, 0),
+        dxOuter = List.filled(16, 0),
+        dyOuter = List.filled(16, 0) {
+    for (int i = 0; i < 16; i++) {
+      final angle = 2 * math.pi * i / 16;
+      final c = math.cos(angle);
+      final s = math.sin(angle);
+      dxRing[i] = (rRing * c).round();
+      dyRing[i] = (rRing * s).round();
+      dxOuter[i] = (rOuter * c).round();
+      dyOuter[i] = (rOuter * s).round();
+    }
+  }
+}
+
 /// High-Precision Pure Dart OMR Computer Vision Engine
 class OMREngine {
   static const int targetW = 1200;
@@ -606,16 +633,56 @@ class OMREngine {
     return sum / (vals.length - start);
   }
 
-  /// Analyzes a group of bubbles that share one alignment error (one question row,
-  /// or one roll-number column). One shared offset is found for the whole group,
-  /// which is far more stable than snapping every bubble on its own.
+  /// Fast circular ring offset table for auto-adjuster
+  static final _offsetsCache = <int, _RingOffsets>{};
+
+  static _RingOffsets _getOffsets(int rRing) =>
+      _offsetsCache.putIfAbsent(rRing, () => _RingOffsets(rRing));
+
+  static double _evalBubbleCandidate(
+    Uint8List gray,
+    _Integral ii,
+    int x,
+    int y,
+    int w,
+    int h,
+    _RingOffsets offsets,
+  ) {
+    if (x < offsets.rOuter + 2 ||
+        x >= w - offsets.rOuter - 2 ||
+        y < offsets.rOuter + 2 ||
+        y >= h - offsets.rOuter - 2) {
+      return -1e9;
+    }
+    int ringSum = 0;
+    int outerSum = 0;
+    for (int i = 0; i < 16; i++) {
+      ringSum += gray[(y + offsets.dyRing[i]) * w + (x + offsets.dxRing[i])];
+      outerSum += gray[(y + offsets.dyOuter[i]) * w + (x + offsets.dxOuter[i])];
+    }
+    final outerMean = outerSum / 16.0;
+    final ringMean = ringSum / 16.0;
+    final ringContrast = math.max(0.0, outerMean - ringMean);
+
+    final rCore = math.max(2, (offsets.rRing * 0.4).round());
+    final coreMean = ii.mean(x, y, rCore);
+    final coreDarkness = math.max(0.0, outerMean - coreMean);
+
+    return (ringContrast * 1.3) + (coreDarkness * 0.9);
+  }
+
+  /// Two-Tier Auto-Adjuster:
+  /// 1. Group Coarse Alignment: detects the shared offset across the group
+  ///    by combining printed circular ring contrast and marked core darkness.
+  /// 2. Per-Bubble Fine Snapping: automatically snaps each bubble onto its
+  ///    physical printed ring on the paper with sub-grid accuracy.
   static List<BubbleAnalysis> _analyzePoints(
     Uint8List gray,
     _Integral ii,
     List<math.Point<int>> pts,
     int w,
     int h, {
-    int searchR = 10,
+    int searchR = 12,
     int rCore = 6,
   }) {
     for (final p in pts) {
@@ -634,46 +701,77 @@ class OMREngine {
       }
     }
 
-    // 1. shared offset: the one that exposes the darkest core in the group,
-    //    with a small penalty so empty rows do not drift.
+    final rRing = w < 600 ? 9 : 14;
+    final offsets = _getOffsets(rRing);
+
+    // Tier 1: Group Alignment
     int bdx = 0, bdy = 0;
-    double bestObj = -1e9;
-    for (int dy = -searchR; dy <= searchR; dy++) {
-      for (int dx = -searchR; dx <= searchR; dx++) {
-        double minMean = 255;
+    double bestGroupScore = -1e9;
+    for (int dy = -searchR; dy <= searchR; dy += 2) {
+      for (int dx = -searchR; dx <= searchR; dx += 2) {
+        double groupScore = 0;
         for (final p in pts) {
-          final m = ii.mean(p.x + dx, p.y + dy, 4);
-          if (m < minMean) minMean = m;
+          final sc = _evalBubbleCandidate(gray, ii, p.x + dx, p.y + dy, w, h, offsets);
+          groupScore += sc;
         }
-        final obj = (255 - minMean) - 0.5 * math.sqrt((dx * dx + dy * dy).toDouble());
-        if (obj > bestObj) {
-          bestObj = obj;
+        final dist = math.sqrt((dx * dx + dy * dy).toDouble());
+        final totalScore = groupScore - dist * 1.5 * pts.length;
+        if (totalScore > bestGroupScore) {
+          bestGroupScore = totalScore;
           bdx = dx;
           bdy = dy;
         }
       }
     }
 
-    // 2. paper level per bubble, then the median for the group
+    // Tier 2: Per-Bubble Auto-Adjuster (fine-snap to each local printed ring)
+    const fineR = 4;
+    final snappedPts = <math.Point<int>>[];
+    for (final p in pts) {
+      final cx = p.x + bdx;
+      final cy = p.y + bdy;
+      int bestSx = cx;
+      int bestSy = cy;
+      double bestSingleScore = -1e9;
+      for (int fdy = -fineR; fdy <= fineR; fdy++) {
+        for (int fdx = -fineR; fdx <= fineR; fdx++) {
+          final tx = cx + fdx;
+          final ty = cy + fdy;
+          final sc = _evalBubbleCandidate(gray, ii, tx, ty, w, h, offsets);
+          final dist = math.sqrt((fdx * fdx + fdy * fdy).toDouble());
+          final totalScore = sc - dist * 1.2;
+          if (totalScore > bestSingleScore) {
+            bestSingleScore = totalScore;
+            bestSx = tx;
+            bestSy = ty;
+          }
+        }
+      }
+      snappedPts.add(math.Point(bestSx, bestSy));
+    }
+
+    // 2. Paper level per bubble, then the median for the group
     final papers = <double>[
-      for (final p in pts) _paperLevel(gray, p.x + bdx, p.y + bdy, w),
+      for (final sp in snappedPts) _paperLevel(gray, sp.x, sp.y, w),
     ];
     final sortedP = List<double>.from(papers)..sort();
     final mid = sortedP.length ~/ 2;
     final groupPaper = sortedP.length.isOdd ? sortedP[mid] : (sortedP[mid - 1] + sortedP[mid]) / 2;
     final fillThresh = groupPaper * 0.82;
 
-    // 3. core statistics
-    final r2 = rCore * rCore;
+    // 3. Core statistics at exact snapped coordinates
+    final effectiveRCore = w < 600 ? 4 : rCore;
+    final r2 = effectiveRCore * effectiveRCore;
     final out = <BubbleAnalysis>[];
-    for (final p in pts) {
-      final cx = p.x + bdx;
-      final cy = p.y + bdy;
+    for (int i = 0; i < pts.length; i++) {
+      final snap = snappedPts[i];
+      final cx = snap.x;
+      final cy = snap.y;
       double sum = 0, sqSum = 0;
       int count = 0, filled = 0;
-      for (int dy = -rCore; dy <= rCore; dy++) {
+      for (int dy = -effectiveRCore; dy <= effectiveRCore; dy++) {
         final row = (cy + dy) * w;
-        for (int dx = -rCore; dx <= rCore; dx++) {
+        for (int dx = -effectiveRCore; dx <= effectiveRCore; dx++) {
           if (dx * dx + dy * dy <= r2) {
             final lum = gray[row + cx + dx];
             sum += lum;
@@ -851,8 +949,7 @@ class OMREngine {
     String detectedModel = 'A';
     bool modelDetected = false;
     double bestModelMargin = -1.0;
-    int detectedModelX = 360;
-    int detectedModelY = 476;
+    Map<String, math.Point<int>> detectedModelCoords = {};
 
     const candidateModelYs = [
       476, 460, 490, 505, // Primary: True template position (~476)
@@ -881,28 +978,32 @@ class OMREngine {
           bestModelMargin = margin;
           detectedModel = res.selected!;
           modelDetected = true;
-          final snapped = res.snappedCoords[res.selected!];
-          detectedModelX = snapped?.x ?? xs[opts.indexOf(res.selected!)];
-          detectedModelY = snapped?.y ?? my;
+          detectedModelCoords = res.snappedCoords;
+
         }
       }
     }
 
     final layout = computeBubbleLayout(qCount);
+    if (detectedModelCoords.isEmpty) {
+      final defaultRes = _classify(gray, ii, layout.modelCoords, targetW, targetH);
+      detectedModelCoords = defaultRes.snappedCoords;
+    }
 
     // 2. Student roll number (5 digits)
-    final detectedRollCoords = <math.Point<int>>[];
+    final allSnappedRollCoords = <List<math.Point<int>>>[];
     final idDigits = <String>[];
 
     for (final colPts in layout.rollCoords) {
       final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
+      final colSnapped = [for (final a in an) math.Point(a.snappedX, a.snappedY)];
+      allSnappedRollCoords.add(colSnapped);
       final adj = _adjustedScores(an);
       final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
       final best = adj[order[0]];
       final second = adj[order[1]];
       if (best > 0.20 && (best - second) > 0.06) {
         idDigits.add(order[0].toString());
-        detectedRollCoords.add(math.Point(an[order[0]].snappedX, an[order[0]].snappedY));
       } else {
         idDigits.add('?');
       }
@@ -939,6 +1040,7 @@ class OMREngine {
     final overallConf = (totalConfidence / qCount).clamp(0.0, 1.0);
 
     // Annotated overlay with small holo bubble circles on every single bubble
+    // Each circle is auto-adjusted directly onto the physical bubble ring on the paper.
     final annotated = rectified.clone();
     final green = img.ColorRgb8(16, 185, 129);
     final holoCyan = img.ColorRgb8(14, 165, 233);
@@ -954,24 +1056,26 @@ class OMREngine {
           color: holoCyan);
     }
 
-    // 1. Model bubbles: hollow circle on every model bubble, bold green on detected
+    // 1. Model bubbles: auto-adjusted hollow circle on every model bubble, bold green on detected
     for (final entry in layout.modelCoords.entries) {
       final opt = entry.key;
-      final pt = entry.value;
+      final snapPt = detectedModelCoords[opt] ?? entry.value;
       if (modelDetected && opt == detectedModel) {
-        img.drawCircle(annotated, x: detectedModelX, y: detectedModelY, radius: 16, color: green);
-        img.drawCircle(annotated, x: detectedModelX, y: detectedModelY, radius: 15, color: green);
+        img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 16, color: green);
+        img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 15, color: green);
       } else {
-        img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: holoCyan);
+        img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 14, color: holoCyan);
       }
     }
 
-    // 2. Student ID bubbles: hollow circle on every single bubble (50 total)
-    final detectedRollSet = detectedRollCoords.toSet();
-    for (final col in layout.rollCoords) {
-      for (final pt in col) {
-        final isDetected = detectedRollSet.contains(pt);
-        if (isDetected) {
+    // 2. Student ID bubbles: auto-adjusted hollow circle on every single bubble (50 total)
+    for (int colIdx = 0; colIdx < allSnappedRollCoords.length; colIdx++) {
+      final col = allSnappedRollCoords[colIdx];
+      final selDigitStr = idDigits[colIdx];
+      final selDigit = int.tryParse(selDigitStr);
+      for (int digit = 0; digit < col.length; digit++) {
+        final pt = col[digit];
+        if (digit == selDigit) {
           img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 14, color: green);
           img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 13, color: green);
         } else {
@@ -980,27 +1084,27 @@ class OMREngine {
       }
     }
 
-    // 3. MCQ bubbles: hollow circle on every single bubble (all options of all questions)
+    // 3. MCQ bubbles: auto-adjusted hollow circle on every single bubble (all options of all questions)
     for (int q = 1; q <= qCount; q++) {
       final ans = answers[q]!;
       final coords = layout.questionCoords[q] ?? questionCoords[q];
       if (coords == null) continue;
 
       for (final opt in opts) {
-        final pt = coords[opt]!;
+        final snapPt = ans.snappedCoords[opt] ?? coords[opt]!;
         final isSelected = ans.selected == opt && (ans.state == QuestionState.selected || ans.state == QuestionState.uncertain);
         if (isSelected) {
-          final snapPt = ans.snappedCoords[opt] ?? pt;
           final color = ans.state == QuestionState.uncertain ? img.ColorRgb8(245, 158, 11) : green;
           img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 15, color: color);
           img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 14, color: color);
         } else {
-          img.drawCircle(annotated, x: pt.x, y: pt.y, radius: 13, color: holoCyan);
+          img.drawCircle(annotated, x: snapPt.x, y: snapPt.y, radius: 13, color: holoCyan);
         }
       }
 
       if (ans.state == QuestionState.multiple) {
-        final a = coords['A']!, d = coords['D']!;
+        final a = ans.snappedCoords['A'] ?? coords['A']!;
+        final d = ans.snappedCoords['D'] ?? coords['D']!;
         img.drawRect(annotated,
             x1: a.x - 20, y1: a.y - 14, x2: d.x + 20, y2: d.y + 14,
             color: img.ColorRgb8(239, 68, 68));
