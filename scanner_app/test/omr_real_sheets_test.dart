@@ -60,10 +60,19 @@ void main() {
   });
 
   test('11-digit phone number layout generates 11 columns with 10 digits each', () {
-    final layout11 = OMREngine.computeBubbleLayout(15, idDigits: 11);
+    final layout11 = OMREngine.computeBubbleLayout(15, idDigits: 11, hasCenterQuestions: true);
     expect(layout11.rollCoords.length, 11);
     for (final col in layout11.rollCoords) {
       expect(col.length, 10);
     }
+    // Verify calibrated coordinates
+    expect(layout11.rollCoords.first.first.x, 198);
+    expect(layout11.rollCoords.last.first.x, 554);
+    expect(layout11.rollCoords.first.first.y, 705);
+    expect(layout11.rollCoords.first.last.y, 1101);
+    expect(layout11.modelCoords['A']?.x, 374);
+    expect(layout11.modelCoords['A']?.y, 481);
+    expect(layout11.questionCoords[1]?['A']?.x, 678);
+    expect(layout11.questionCoords[1]?['A']?.y, 705);
   });
 }

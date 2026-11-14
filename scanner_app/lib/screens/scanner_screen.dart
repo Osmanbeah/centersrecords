@@ -281,6 +281,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         imageBytes: rawBytes,
         questionCount: widget.exam.questionCount,
         idDigits: _idDigits,
+        hasCenterQuestions: widget.exam.hasCenterQuestions,
         answerKey: widget.exam.getAnswerKey('A'),
       ));
 
@@ -545,6 +546,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
             painter: _ViewfinderOverlayPainter(
               questionCount: widget.exam.questionCount,
               idDigits: _idDigits,
+              hasCenterQuestions: widget.exam.hasCenterQuestions,
               isAligned: _isAligned,
             ),
           ),
@@ -665,14 +667,20 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 class _ViewfinderOverlayPainter extends CustomPainter {
   final int questionCount;
   final int idDigits;
+  final bool hasCenterQuestions;
   final bool isAligned;
   final SheetBubbleLayout layout;
 
   _ViewfinderOverlayPainter({
     required this.questionCount,
     this.idDigits = 11,
+    this.hasCenterQuestions = true,
     this.isAligned = false,
-  }) : layout = OMREngine.computeBubbleLayout(questionCount, idDigits: idDigits);
+  }) : layout = OMREngine.computeBubbleLayout(
+          questionCount,
+          idDigits: idDigits,
+          hasCenterQuestions: hasCenterQuestions,
+        );
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -783,6 +791,7 @@ class _ViewfinderOverlayPainter extends CustomPainter {
   bool shouldRepaint(covariant _ViewfinderOverlayPainter oldDelegate) =>
       oldDelegate.questionCount != questionCount ||
       oldDelegate.idDigits != idDigits ||
+      oldDelegate.hasCenterQuestions != hasCenterQuestions ||
       oldDelegate.isAligned != isAligned;
 }
 
@@ -791,12 +800,14 @@ class _OmrParam {
   final Uint8List imageBytes;
   final int questionCount;
   final int idDigits;
+  final bool hasCenterQuestions;
   final Map<int, String>? answerKey;
 
   _OmrParam({
     required this.imageBytes,
     required this.questionCount,
     this.idDigits = 11,
+    this.hasCenterQuestions = true,
     this.answerKey,
   });
 }
@@ -816,5 +827,6 @@ OMRScanResult _runOmrScanIsolate(_OmrParam param) {
     param.questionCount,
     param.answerKey,
     param.idDigits,
+    param.hasCenterQuestions,
   );
 }

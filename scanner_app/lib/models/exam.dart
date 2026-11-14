@@ -11,6 +11,7 @@ class Exam {
   final Map<String, Map<int, String>> models;
   final String status;
   final int idDigits;
+  final bool hasCenterQuestions;
 
   Exam({
     required this.id,
@@ -25,6 +26,7 @@ class Exam {
     this.models = const {},
     this.status = 'active',
     this.idDigits = 11,
+    this.hasCenterQuestions = true,
   });
 
   factory Exam.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,9 @@ class Exam {
     final int parsedIdDigits = (rawConfig is Map && rawConfig['id_digits'] != null)
         ? (rawConfig['id_digits'] as num).toInt()
         : ((json['id_digits'] as num?)?.toInt() ?? 11);
+    final bool parsedHasCenterQuestions = (rawConfig is Map && rawConfig['show_center_questions'] != null)
+        ? (rawConfig['show_center_questions'] == true)
+        : true;
 
     return Exam(
       id: json['id']?.toString() ?? '',
@@ -64,6 +69,7 @@ class Exam {
       models: parsedModels,
       status: json['status']?.toString() ?? 'active',
       idDigits: parsedIdDigits,
+      hasCenterQuestions: parsedHasCenterQuestions,
     );
   }
 

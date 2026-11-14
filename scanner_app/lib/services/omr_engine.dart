@@ -322,25 +322,33 @@ class OMREngine {
   }
 
   /// Calculates exact canonical bubble coordinates for any exam question count
-  static SheetBubbleLayout computeBubbleLayout(int questionCount, {int idDigits = 11}) {
+  static SheetBubbleLayout computeBubbleLayout(
+    int questionCount, {
+    int idDigits = 11,
+    bool hasCenterQuestions = true,
+  }) {
     final qCount = questionCount.clamp(1, 100);
     final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
     final qPerCol = (qCount / numMcqCols).ceil();
 
     // 1. Model coordinates
-    const modelYs = 476;
-    const modelXs = [357, 452, 545, 640];
+    final modelYs = hasCenterQuestions ? 481 : 476;
+    final modelXs = hasCenterQuestions
+        ? const [374, 467, 556, 645]
+        : const [357, 452, 545, 640];
     const opts = ['A', 'B', 'C', 'D'];
     final modelCoords = {
       for (int i = 0; i < 4; i++) opts[i]: math.Point(modelXs[i], modelYs),
     };
 
-    // 2. Roll number coordinates (5 cols x 10 rows)
+    // 2. Roll number coordinates (5 cols or 11 cols x 10 rows)
     final rollRowYs = numMcqCols == 1
-        ? const [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083]
+        ? (hasCenterQuestions
+            ? const [705, 749, 793, 837, 881, 925, 969, 1013, 1057, 1101]
+            : const [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083])
         : const [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
     final rollColXs = (idDigits == 11)
-        ? const [145, 173, 201, 229, 257, 285, 313, 341, 369, 397, 425]
+        ? const [198, 234, 269, 305, 341, 376, 412, 447, 483, 519, 554]
         : (numMcqCols == 1
             ? const [197, 240, 282, 325, 367]
             : const [196, 242, 289, 335, 382]);
@@ -355,15 +363,23 @@ class OMREngine {
     }
 
     // 3. MCQ coordinates
-    final qYs15 = const [
-      634, 680, 728, 774, 820,
-      925, 971, 1017, 1065, 1111,
-      1214, 1261, 1307, 1353, 1401,
-    ];
-    final optXs15 = const [683, 752, 825, 895];
+    final qYs15 = hasCenterQuestions
+        ? const [
+            705, 750, 795, 840, 885,
+            988, 1034, 1080, 1125, 1170,
+            1271, 1317, 1364, 1409, 1454,
+          ]
+        : const [
+            634, 680, 728, 774, 820,
+            925, 971, 1017, 1065, 1111,
+            1214, 1261, 1307, 1353, 1401,
+          ];
+    final optXs15 = hasCenterQuestions
+        ? const [678, 745, 815, 883]
+        : const [683, 752, 825, 895];
 
     final regX = _regX(numMcqCols);
-    final gridTopY = numMcqCols == 1 ? 566.0 : 480.0;
+    final gridTopY = numMcqCols == 1 ? (hasCenterQuestions ? 636.0 : 566.0) : 480.0;
     final isSpacious = qPerCol <= 16;
     final isMedium = qPerCol > 16 && qPerCol <= 24;
     final rowStepY = isSpacious ? 48.0 : (isMedium ? 42.0 : 36.0);
@@ -919,7 +935,7 @@ class OMREngine {
   // MASTER PIPELINE
   // ---------------------------------------------------------------------------
   static OMRScanResult scanImage(img.Image rawImage, int questionCount,
-      [Map<int, String>? answerKey, int expectedIdDigits = 11]) {
+      [Map<int, String>? answerKey, int expectedIdDigits = 11, bool? expectedHasCenterQuestions]) {
     // Apply EXIF rotation, then require a portrait photo
     var image = img.bakeOrientation(rawImage);
 
@@ -980,11 +996,12 @@ class OMREngine {
     Map<String, math.Point<int>> detectedModelCoords = {};
 
     const candidateModelYs = [
-      476, 460, 490, 505, // Primary: True template position (~476)
+      481, 476, 460, 490, 505, // Primary: True template position (~481 with center questions, ~476 without)
       240, 255, 265, 280, 300, 320, 340, 360, // Secondary: older/custom headers
     ];
     const candidateXConfigs = [
-      [357, 452, 545, 640], // Primary: True single-column template spacing
+      [374, 467, 556, 645], // Primary: True exact 11-digit template spacing
+      [357, 452, 545, 640], // Single-column 5-digit template spacing
       [360, 440, 520, 600], // wide table spacing
       [250, 290, 330, 370], // narrow table spacing
     ];
@@ -1012,7 +1029,29 @@ class OMREngine {
       }
     }
 
-    final layout = computeBubbleLayout(qCount);
+    // Detect whether the sheet has the center questions row or not
+    final bool useCenterQuestions;
+    if (expectedHasCenterQuestions != null) {
+      useCenterQuestions = expectedHasCenterQuestions;
+    } else {
+      final qCheckNew = computeBubbleLayout(qCount, idDigits: expectedIdDigits, hasCenterQuestions: true);
+      final qCheckOld = computeBubbleLayout(qCount, idDigits: expectedIdDigits, hasCenterQuestions: false);
+
+      double scoreNew = 0.0;
+      double scoreOld = 0.0;
+      final testQuestions = math.min(qCount, 5);
+      for (int q = 1; q <= testQuestions; q++) {
+        final resNew = _classify(gray, ii, qCheckNew.questionCoords[q]!, targetW, targetH);
+        final resOld = _classify(gray, ii, qCheckOld.questionCoords[q]!, targetW, targetH);
+        if (resNew.state == QuestionState.selected) scoreNew += 1.0;
+        if (resOld.state == QuestionState.selected) scoreOld += 1.0;
+        scoreNew += resNew.confidence;
+        scoreOld += resOld.confidence;
+      }
+      useCenterQuestions = scoreNew >= scoreOld;
+    }
+
+    final layout = computeBubbleLayout(qCount, idDigits: expectedIdDigits, hasCenterQuestions: useCenterQuestions);
     if (detectedModelCoords.isEmpty) {
       final defaultRes = _classify(gray, ii, layout.modelCoords, targetW, targetH);
       detectedModelCoords = defaultRes.snappedCoords;
@@ -1023,8 +1062,8 @@ class OMREngine {
     final idDigitsList = <String>[];
 
     // Detect 5-digit vs 11-digit layout
-    final layout5 = computeBubbleLayout(qCount, idDigits: 5);
-    final layout11 = computeBubbleLayout(qCount, idDigits: 11);
+    final layout5 = computeBubbleLayout(qCount, idDigits: 5, hasCenterQuestions: useCenterQuestions);
+    final layout11 = computeBubbleLayout(qCount, idDigits: 11, hasCenterQuestions: useCenterQuestions);
 
     int conf5 = 0;
     for (final colPts in layout5.rollCoords) {
