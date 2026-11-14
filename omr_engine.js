@@ -200,9 +200,9 @@
 
             const writtenBoxSub = cfg.written_box_sub || 'درجة السؤال المقالي';
 
-            const idDigits = Math.max(3, Math.min(11, cfg.id_digits || 5));
+            const idDigits = Math.max(3, Math.min(14, parseInt(cfg.id_digits, 10) || 11));
 
-            const rollTitle = cfg.roll_title || 'Roll No (كود الطالب)';
+            const rollTitle = cfg.roll_title || (idDigits === 11 ? 'رقم الهاتف (Phone No)' : 'Roll No (كود الطالب)');
 
             const footerNote = cfg.footer_note || 'تعليمات التظليل: ● تظليل كامل (صحيح) | ✕ ✗ غير صحيح - لا تطوِ الورقة أو تكتب في الهوامش';
 
@@ -296,11 +296,13 @@
 
                 rollTitleFont: isSpacious ? '14.5px' : (isMedium ? '12.5px' : '11px'),
 
-                rollBoxW: (idDigits >= 9) ? '15px' : (isSpacious ? '28px' : (isMedium ? '24px' : '20px')),
+                rollSectionW: (idDigits >= 9) ? '225px' : (isSpacious ? '170px' : (isMedium ? '150px' : '140px')),
 
-                rollBoxH: (idDigits >= 9) ? '18px' : (isSpacious ? '32px' : (isMedium ? '26px' : '20px')),
+                rollBoxW: (idDigits >= 12) ? '12px' : ((idDigits >= 9) ? '15px' : (isSpacious ? '28px' : (isMedium ? '24px' : '20px'))),
 
-                rollBoxesGap: (idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px')),
+                rollBoxH: (idDigits >= 12) ? '15px' : ((idDigits >= 9) ? '18px' : (isSpacious ? '32px' : (isMedium ? '26px' : '20px'))),
+
+                rollBoxesGap: (idDigits >= 12) ? '2px' : ((idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px'))),
 
                 rollBoxesMarB: isSpacious ? '12px' : (isMedium ? '8px' : '6px'),
 
@@ -308,9 +310,9 @@
 
                 rollDigitFont: isSpacious ? '13.5px' : (isMedium ? '11.5px' : '10px'),
 
-                rollBubbleSize: (idDigits >= 9) ? '15px' : (isSpacious ? '22px' : (isMedium ? '19px' : '17px')),
+                rollBubbleSize: (idDigits >= 12) ? '12px' : ((idDigits >= 9) ? '15px' : (isSpacious ? '22px' : (isMedium ? '19px' : '17px'))),
 
-                rollBubblesGap: (idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px')),
+                rollBubblesGap: (idDigits >= 12) ? '2px' : ((idDigits >= 9) ? '2.5px' : (isSpacious ? '6px' : (isMedium ? '5px' : '4px'))),
 
 
 
@@ -1103,7 +1105,7 @@
 
         .roll-section {
 
-            width: ${isSpacious ? '170px' : (isMedium ? '150px' : '140px')};
+            width: ${dyn.rollSectionW};
 
             display: flex;
 
@@ -1134,6 +1136,8 @@
             gap: ${dyn.rollBoxesGap};
 
             margin-bottom: ${dyn.rollBoxesMarB};
+
+            padding-left: 22px; /* Aligns boxes directly with roll bubbles taking 14px+8px digit label into account */
 
         }
 

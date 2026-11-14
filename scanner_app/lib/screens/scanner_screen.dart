@@ -278,6 +278,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       final scanResult = await compute(_runOmrScanIsolate, _OmrParam(
         imageBytes: rawBytes,
         questionCount: widget.exam.questionCount,
+        idDigits: widget.exam.idDigits,
         answerKey: widget.exam.getAnswerKey('A'),
       ));
 
@@ -541,6 +542,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
           CustomPaint(
             painter: _ViewfinderOverlayPainter(
               questionCount: widget.exam.questionCount,
+              idDigits: widget.exam.idDigits,
               isAligned: _isAligned,
             ),
           ),
@@ -660,13 +662,15 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 /// Custom Viewfinder Painter with Dynamic Alignment Highlighting
 class _ViewfinderOverlayPainter extends CustomPainter {
   final int questionCount;
+  final int idDigits;
   final bool isAligned;
   final SheetBubbleLayout layout;
 
   _ViewfinderOverlayPainter({
     required this.questionCount,
+    this.idDigits = 11,
     this.isAligned = false,
-  }) : layout = OMREngine.computeBubbleLayout(questionCount);
+  }) : layout = OMREngine.computeBubbleLayout(questionCount, idDigits: idDigits);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -775,18 +779,22 @@ class _ViewfinderOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ViewfinderOverlayPainter oldDelegate) =>
-      oldDelegate.questionCount != questionCount || oldDelegate.isAligned != isAligned;
+      oldDelegate.questionCount != questionCount ||
+      oldDelegate.idDigits != idDigits ||
+      oldDelegate.isAligned != isAligned;
 }
 
 /// Helper class for Isolate
 class _OmrParam {
   final Uint8List imageBytes;
   final int questionCount;
+  final int idDigits;
   final Map<int, String>? answerKey;
 
   _OmrParam({
     required this.imageBytes,
     required this.questionCount,
+    this.idDigits = 11,
     this.answerKey,
   });
 }
@@ -805,5 +813,6 @@ OMRScanResult _runOmrScanIsolate(_OmrParam param) {
     decoded,
     param.questionCount,
     param.answerKey,
+    param.idDigits,
   );
 }

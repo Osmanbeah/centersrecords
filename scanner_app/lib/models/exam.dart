@@ -10,6 +10,7 @@ class Exam {
   final double totalScore;
   final Map<String, Map<int, String>> models;
   final String status;
+  final int idDigits;
 
   Exam({
     required this.id,
@@ -23,6 +24,7 @@ class Exam {
     this.totalScore = 30.0,
     this.models = const {},
     this.status = 'active',
+    this.idDigits = 11,
   });
 
   factory Exam.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,11 @@ class Exam {
       });
     }
 
+    final rawConfig = json['sheet_config'];
+    final int parsedIdDigits = (rawConfig is Map && rawConfig['id_digits'] != null)
+        ? (rawConfig['id_digits'] as num).toInt()
+        : ((json['id_digits'] as num?)?.toInt() ?? 11);
+
     return Exam(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Untitled Exam',
@@ -56,6 +63,7 @@ class Exam {
       totalScore: (json['total_score'] as num?)?.toDouble() ?? 30.0,
       models: parsedModels,
       status: json['status']?.toString() ?? 'active',
+      idDigits: parsedIdDigits,
     );
   }
 

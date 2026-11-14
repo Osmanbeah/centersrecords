@@ -205,7 +205,7 @@
         }
     </script>
     <script src="html5-qrcode.min.js"></script>
-    <script src="omr_engine.js"></script>
+    <script src="omr_engine.js?v=2.5"></script>
     <script>
         if (typeof Html5Qrcode === 'undefined') {
             document.write('<script src="https://unpkg.com/html5-qrcode"><\/script>');
@@ -7739,7 +7739,8 @@ function getAdminCenterCoords(centerName, address) {
 
             document.getElementById('cfg_id_label').value = cfg.id_label || 'ID :';
             document.getElementById('cfg_model_label').value = cfg.model_label || 'Model :';
-            document.getElementById('cfg_roll_title').value = cfg.roll_title || 'Roll No (كود الطالب)';
+            const currentDigits = parseInt(cfg.id_digits, 10) || 11;
+            document.getElementById('cfg_roll_title').value = cfg.roll_title || (currentDigits === 11 ? 'رقم الهاتف (Phone No)' : (currentDigits === 14 ? 'الرقم القومي (National ID)' : 'Roll No (كود الطالب)'));
 
             const showCenterQ = cfg.show_center_questions === true; // Default false (hidden)
             document.getElementById('cfg_show_center_questions').checked = showCenterQ;
@@ -7748,7 +7749,7 @@ function getAdminCenterCoords(centerName, address) {
             document.getElementById('cfg_attend_label').value = cfg.attend_center_label || 'بتحضر فين :';
             document.getElementById('cfg_exam_center_label').value = cfg.exam_center_label || 'بتمتحن فين :';
 
-            document.getElementById('cfg_id_digits').value = String(cfg.id_digits || 5);
+            document.getElementById('cfg_id_digits').value = String(currentDigits);
             document.getElementById('cfg_show_written_box').checked = cfg.show_written_box !== false;
             document.getElementById('cfg_written_box_title').value = cfg.written_box_title || 'خاص بالمصحح';
             document.getElementById('cfg_written_box_sub').value = cfg.written_box_sub || 'درجة السؤال المقالي';
@@ -7786,11 +7787,11 @@ function getAdminCenterCoords(centerName, address) {
                 show_parent_phone: document.getElementById('cfg_show_parent_phone').checked,
                 id_label: document.getElementById('cfg_id_label').value.trim() || 'ID :',
                 model_label: document.getElementById('cfg_model_label').value.trim() || 'Model :',
-                roll_title: document.getElementById('cfg_roll_title').value.trim() || 'Roll No (كود الطالب)',
+                roll_title: document.getElementById('cfg_roll_title').value.trim() || (parseInt(document.getElementById('cfg_id_digits').value, 10) === 11 ? 'رقم الهاتف (Phone No)' : 'Roll No (كود الطالب)'),
                 show_center_questions: document.getElementById('cfg_show_center_questions').checked,
                 attend_center_label: document.getElementById('cfg_attend_label').value.trim() || 'بتحضر فين :',
                 exam_center_label: document.getElementById('cfg_exam_center_label').value.trim() || 'بتمتحن فين :',
-                id_digits: parseInt(document.getElementById('cfg_id_digits').value, 10) || 5,
+                id_digits: parseInt(document.getElementById('cfg_id_digits').value, 10) || 11,
                 show_written_box: document.getElementById('cfg_show_written_box').checked,
                 written_box_title: document.getElementById('cfg_written_box_title').value.trim() || 'خاص بالمصحح',
                 written_box_sub: document.getElementById('cfg_written_box_sub').value.trim() || 'درجة السؤال المقالي'
@@ -8147,11 +8148,17 @@ function getAdminCenterCoords(centerName, address) {
                         </h4>
                         <div>
                             <label class="block font-semibold text-on-surface-variant mb-1">Number of ID Digits:</label>
-                            <select id="cfg_id_digits" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-bold" onchange="if(this.value==='11'){document.getElementById('cfg_roll_title').value='رقم الهاتف (Phone No)';}else if(this.value==='5'){document.getElementById('cfg_roll_title').value='Roll No (كود الطالب)';}">
-                                <option value="11" selected>11 Digits - Phone Number (رقم الهاتف e.g. 01012345678)</option>
+                            <select id="cfg_id_digits" class="w-full bg-surface border border-outline-variant rounded-xl p-2 text-xs font-bold" onchange="if(this.value==='11'){document.getElementById('cfg_roll_title').value='رقم الهاتف (Phone No)';}else if(this.value==='14'){document.getElementById('cfg_roll_title').value='الرقم القومي (National ID)';}else if(this.value==='5'){document.getElementById('cfg_roll_title').value='Roll No (كود الطالب)';}">
+                                <option value="11" selected>11 Digits - Phone Number (رقم الهاتف - 010XXXXXXXX)</option>
+                                <option value="14">14 Digits - National ID (الرقم القومي)</option>
+                                <option value="10">10 Digits</option>
+                                <option value="9">9 Digits</option>
+                                <option value="8">8 Digits</option>
+                                <option value="7">7 Digits</option>
+                                <option value="6">6 Digits</option>
+                                <option value="5">5 Digits (Standard e.g. 10245)</option>
                                 <option value="4">4 Digits (e.g. 1024)</option>
-                                <option value="5" selected>5 Digits (Standard e.g. 10245)</option>
-                                <option value="6">6 Digits (e.g. 102456)</option>
+                                <option value="3">3 Digits</option>
                             </select>
                         </div>
                     </div>

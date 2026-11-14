@@ -919,7 +919,7 @@ class OMREngine {
   // MASTER PIPELINE
   // ---------------------------------------------------------------------------
   static OMRScanResult scanImage(img.Image rawImage, int questionCount,
-      [Map<int, String>? answerKey]) {
+      [Map<int, String>? answerKey, int expectedIdDigits = 11]) {
     // Apply EXIF rotation, then require a portrait photo
     var image = img.bakeOrientation(rawImage);
 
@@ -1022,26 +1022,43 @@ class OMREngine {
     final allSnappedRollCoords = <List<math.Point<int>>>[];
     final idDigitsList = <String>[];
 
-    // Try reading 11-digit phone layout first
+    // Detect 5-digit vs 11-digit layout
+    final layout5 = computeBubbleLayout(qCount, idDigits: 5);
     final layout11 = computeBubbleLayout(qCount, idDigits: 11);
-    final id11Digits = <String>[];
-    int confident11Count = 0;
+
+    int conf5 = 0;
+    for (final colPts in layout5.rollCoords) {
+      final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
+      final adj = _adjustedScores(an);
+      final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
+      if (adj[order[0]] > 0.20 && (adj[order[0]] - adj[order[1]]) > 0.06) conf5++;
+    }
+
+    int conf11 = 0;
     for (final colPts in layout11.rollCoords) {
       final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
       final adj = _adjustedScores(an);
       final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
-      final best = adj[order[0]];
-      final second = adj[order[1]];
-      if (best > 0.20 && (best - second) > 0.06) {
-        id11Digits.add(order[0].toString());
-        confident11Count++;
-      } else {
-        id11Digits.add('?');
-      }
+      if (adj[order[0]] > 0.20 && (adj[order[0]] - adj[order[1]]) > 0.06) conf11++;
     }
 
-    final bool use11Digits = confident11Count >= 8;
-    final activeRollCoords = use11Digits ? layout11.rollCoords : layout.rollCoords;
+    final double ratio5 = conf5 / 5.0;
+    final double ratio11 = conf11 / 11.0;
+
+    final bool use11Digits;
+    if (expectedIdDigits == 5) {
+      use11Digits = false;
+    } else if (expectedIdDigits == 11 && conf11 >= 8) {
+      use11Digits = true;
+    } else if (ratio5 >= 0.7 && ratio5 >= ratio11) {
+      use11Digits = false;
+    } else if (conf11 >= 8) {
+      use11Digits = true;
+    } else {
+      use11Digits = (expectedIdDigits == 11);
+    }
+
+    final activeRollCoords = use11Digits ? layout11.rollCoords : layout5.rollCoords;
 
     for (final colPts in activeRollCoords) {
       final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
