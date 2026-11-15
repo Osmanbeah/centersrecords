@@ -26,7 +26,7 @@ class Exam {
     this.models = const {},
     this.status = 'active',
     this.idDigits = 11,
-    this.hasCenterQuestions = true,
+    this.hasCenterQuestions = false,
   });
 
   factory Exam.fromJson(Map<String, dynamic> json) {
@@ -54,7 +54,7 @@ class Exam {
         : ((json['id_digits'] as num?)?.toInt() ?? 11);
     final bool parsedHasCenterQuestions = (rawConfig is Map && rawConfig['show_center_questions'] != null)
         ? (rawConfig['show_center_questions'] == true)
-        : true;
+        : false;
 
     return Exam(
       id: json['id']?.toString() ?? '',

@@ -325,33 +325,53 @@ class OMREngine {
   static SheetBubbleLayout computeBubbleLayout(
     int questionCount, {
     int idDigits = 11,
-    bool hasCenterQuestions = true,
+    bool hasCenterQuestions = false,
   }) {
     final qCount = questionCount.clamp(1, 100);
     final numMcqCols = qCount <= 20 ? 1 : (qCount <= 40 ? 2 : (qCount <= 75 ? 3 : 4));
     final qPerCol = (qCount / numMcqCols).ceil();
 
-    // 1. Model coordinates
+    // 1. Model coordinates (measured from canonical PDF template: Y=476, Xs=[356, 449, 542, 637])
     final modelYs = hasCenterQuestions ? 481 : 476;
     final modelXs = hasCenterQuestions
         ? const [374, 467, 556, 645]
-        : const [357, 452, 545, 640];
+        : const [356, 449, 542, 637];
     const opts = ['A', 'B', 'C', 'D'];
     final modelCoords = {
       for (int i = 0; i < 4; i++) opts[i]: math.Point(modelXs[i], modelYs),
     };
 
-    // 2. Roll number coordinates (5 cols or 11 cols x 10 rows)
-    final rollRowYs = numMcqCols == 1
-        ? (hasCenterQuestions
-            ? const [705, 749, 793, 837, 881, 925, 969, 1013, 1057, 1101]
-            : const [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083])
-        : const [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
-    final rollColXs = (idDigits == 11)
-        ? const [198, 234, 269, 305, 341, 376, 412, 447, 483, 519, 554]
+    // 2. Roll / Phone number coordinates (10 digit rows: 0 to 9)
+    // 11-digit phone number rows: Y = 681 + d * 39.3 => [681, 720, 760, 799, 838, 878, 917, 956, 996, 1035]
+    // 5-digit roll number rows: [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083]
+    final clampedDigits = idDigits.clamp(3, 14);
+    final rollRowYs = (clampedDigits == 11)
+        ? const [681, 720, 760, 799, 838, 878, 917, 956, 996, 1035]
         : (numMcqCols == 1
-            ? const [197, 240, 282, 325, 367]
-            : const [196, 242, 289, 335, 382]);
+            ? (hasCenterQuestions
+                ? const [705, 749, 793, 837, 881, 925, 969, 1013, 1057, 1101]
+                : const [691, 734, 778, 822, 866, 909, 953, 997, 1041, 1083])
+            : const [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063]);
+
+    // Compute column Xs dynamically for any number of ID/Phone digits (3 to 14)
+    // For 11 digits: exactly matches [196, 231, 266, 300, 335, 370, 405, 439, 474, 509, 544]
+    final List<int> rollColXs;
+    if (clampedDigits == 11) {
+      rollColXs = const [196, 231, 266, 300, 335, 370, 405, 439, 474, 509, 544];
+    } else if (clampedDigits == 5) {
+      rollColXs = numMcqCols == 1
+          ? const [197, 240, 282, 325, 367]
+          : const [196, 242, 289, 335, 382];
+    } else {
+      final double colStep = (clampedDigits >= 12)
+          ? 26.5
+          : ((clampedDigits >= 9) ? 34.8 : ((clampedDigits >= 6) ? 44.0 : 54.0));
+      final double startX = 370.0 - ((clampedDigits - 1) * colStep) / 2.0;
+      rollColXs = List<int>.generate(
+        clampedDigits,
+        (c) => (startX + c * colStep).round(),
+      );
+    }
 
     final rollCoords = <List<math.Point<int>>>[];
     for (final cx in rollColXs) {
@@ -363,20 +383,26 @@ class OMREngine {
     }
 
     // 3. MCQ coordinates
-    final qYs15 = hasCenterQuestions
+    // Single column (up to 20 questions, e.g. 14 or 15 questions in blocks of 5)
+    // If 11-digit phone number: table is at [770, 840, 911, 982]
+    // If 5-digit roll number: table is at [683, 752, 825, 895] (or [678, 745, 815, 883] with center q)
+    final optXsSingle = (clampedDigits == 11)
+        ? const [770, 840, 911, 982]
+        : (hasCenterQuestions
+            ? const [678, 745, 815, 883]
+            : const [683, 752, 825, 895]);
+    final qYsSingle = hasCenterQuestions
         ? const [
             705, 750, 795, 840, 885,
             988, 1034, 1080, 1125, 1170,
             1271, 1317, 1364, 1409, 1454,
           ]
         : const [
-            634, 680, 728, 774, 820,
-            925, 971, 1017, 1065, 1111,
-            1214, 1261, 1307, 1353, 1401,
+            635, 682, 729, 776, 822, // Block 1 (Q1-Q5)
+            927, 974, 1020, 1067, 1114, // Block 2 (Q6-Q10)
+            1218, 1265, 1312, 1359, 1406, // Block 3 (Q11-Q15)
+            1510, 1557, 1604, 1651, 1698, // Block 4 (Q16-Q20)
           ];
-    final optXs15 = hasCenterQuestions
-        ? const [678, 745, 815, 883]
-        : const [683, 752, 825, 895];
 
     final regX = _regX(numMcqCols);
     final gridTopY = numMcqCols == 1 ? (hasCenterQuestions ? 636.0 : 566.0) : 480.0;
@@ -390,9 +416,9 @@ class OMREngine {
 
     final questionCoords = <int, Map<String, math.Point<int>>>{};
     for (int q = 1; q <= qCount; q++) {
-      if (numMcqCols == 1 && qCount <= 15 && (q - 1) < qYs15.length) {
-        final qy = qYs15[q - 1];
-        questionCoords[q] = {for (int i = 0; i < 4; i++) opts[i]: math.Point(optXs15[i], qy)};
+      if (numMcqCols == 1 && (q - 1) < qYsSingle.length) {
+        final qy = qYsSingle[q - 1];
+        questionCoords[q] = {for (int i = 0; i < 4; i++) opts[i]: math.Point(optXsSingle[i], qy)};
       } else {
         final colIdx = (q - 1) ~/ qPerCol;
         final inCol = (q - 1) % qPerCol;
@@ -419,12 +445,20 @@ class OMREngine {
       }
     }
 
-    final cornerMarkers = const [
-      math.Point(103, 88),
-      math.Point(1109, 88),
-      math.Point(1109, 1597),
-      math.Point(103, 1597),
-    ];
+    // 4 Corner fiducial markers (measured from PDF at 5mm A4 margins: [104, 92] to [1098, 1593])
+    final cornerMarkers = numMcqCols == 1 && qCount > 14
+        ? const [
+            math.Point(103, 88),
+            math.Point(1109, 88),
+            math.Point(1109, 1597),
+            math.Point(103, 1597),
+          ]
+        : const [
+            math.Point(104, 92),
+            math.Point(1098, 92),
+            math.Point(1098, 1593),
+            math.Point(104, 1593),
+          ];
 
     return SheetBubbleLayout(
       modelCoords: modelCoords,
@@ -587,10 +621,10 @@ class OMREngine {
     // Outer page markers span full page (aspect ~ 0.667, while inner grid aspect ~ 1.10)
     final isPageCorners = aspect < 0.88;
     if (isPageCorners) {
-      final pageLeftX = numMcqCols == 1 ? 103.0 : 60.0;
-      final pageRightX = numMcqCols == 1 ? 1109.0 : targetW - 60.0;
-      final pageTopY = numMcqCols == 1 ? 88.0 : 60.0;
-      final pageBotY = numMcqCols == 1 ? 1597.0 : targetH - 60.0;
+      final pageLeftX = numMcqCols == 1 ? (questionCount <= 14 ? 104.0 : 103.0) : 60.0;
+      final pageRightX = numMcqCols == 1 ? (questionCount <= 14 ? 1098.0 : 1109.0) : targetW - 60.0;
+      final pageTopY = numMcqCols == 1 ? (questionCount <= 14 ? 92.0 : 88.0) : 60.0;
+      final pageBotY = numMcqCols == 1 ? (questionCount <= 14 ? 1593.0 : 1597.0) : targetH - 60.0;
 
       dstCorners = [
         math.Point(pageLeftX, pageTopY),
@@ -996,11 +1030,12 @@ class OMREngine {
     Map<String, math.Point<int>> detectedModelCoords = {};
 
     const candidateModelYs = [
-      481, 476, 460, 490, 505, // Primary: True template position (~481 with center questions, ~476 without)
+      476, 481, 460, 490, 505, // Primary: True template position (~476 without center q row, ~481 with center q)
       240, 255, 265, 280, 300, 320, 340, 360, // Secondary: older/custom headers
     ];
     const candidateXConfigs = [
-      [374, 467, 556, 645], // Primary: True exact 11-digit template spacing
+      [356, 449, 542, 637], // Primary: Exact canonical PDF template model bubbles
+      [374, 467, 556, 645], // Secondary: 11-digit template with wider model spacing
       [357, 452, 545, 640], // Single-column 5-digit template spacing
       [360, 440, 520, 600], // wide table spacing
       [250, 290, 330, 370], // narrow table spacing
@@ -1029,13 +1064,46 @@ class OMREngine {
       }
     }
 
+    // 2. Student roll / phone number layout auto-detection (5 digits vs 11 digits)
+    final testLayout5 = computeBubbleLayout(qCount, idDigits: 5, hasCenterQuestions: false);
+    final testLayout11 = computeBubbleLayout(qCount, idDigits: 11, hasCenterQuestions: false);
+
+    int conf5 = 0;
+    for (final colPts in testLayout5.rollCoords) {
+      final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
+      final adj = _adjustedScores(an);
+      final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
+      if (adj[order[0]] > 0.15 && (adj[order[0]] - adj[order[1]]) > 0.04) conf5++;
+    }
+
+    int conf11 = 0;
+    for (final colPts in testLayout11.rollCoords) {
+      final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
+      final adj = _adjustedScores(an);
+      final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
+      if (adj[order[0]] > 0.15 && (adj[order[0]] - adj[order[1]]) > 0.04) conf11++;
+    }
+
+    final int activeDigits;
+    if (expectedIdDigits != 5 && expectedIdDigits != 11) {
+      activeDigits = expectedIdDigits;
+    } else {
+      if (conf11 >= 8) {
+        activeDigits = 11;
+      } else if (conf5 >= 4 && (conf5 / 5.0) > (conf11 / 11.0)) {
+        activeDigits = 5;
+      } else {
+        activeDigits = expectedIdDigits;
+      }
+    }
+
     // Detect whether the sheet has the center questions row or not
     final bool useCenterQuestions;
     if (expectedHasCenterQuestions != null) {
       useCenterQuestions = expectedHasCenterQuestions;
     } else {
-      final qCheckNew = computeBubbleLayout(qCount, idDigits: expectedIdDigits, hasCenterQuestions: true);
-      final qCheckOld = computeBubbleLayout(qCount, idDigits: expectedIdDigits, hasCenterQuestions: false);
+      final qCheckNew = computeBubbleLayout(qCount, idDigits: activeDigits, hasCenterQuestions: true);
+      final qCheckOld = computeBubbleLayout(qCount, idDigits: activeDigits, hasCenterQuestions: false);
 
       double scoreNew = 0.0;
       double scoreOld = 0.0;
@@ -1051,55 +1119,16 @@ class OMREngine {
       useCenterQuestions = scoreNew >= scoreOld;
     }
 
-    final layout = computeBubbleLayout(qCount, idDigits: expectedIdDigits, hasCenterQuestions: useCenterQuestions);
+    final layout = computeBubbleLayout(qCount, idDigits: activeDigits, hasCenterQuestions: useCenterQuestions);
     if (detectedModelCoords.isEmpty) {
       final defaultRes = _classify(gray, ii, layout.modelCoords, targetW, targetH);
       detectedModelCoords = defaultRes.snappedCoords;
     }
 
-    // 2. Student roll / phone number (supports 5 digits or 11 digits phone number)
     final allSnappedRollCoords = <List<math.Point<int>>>[];
     final idDigitsList = <String>[];
 
-    // Detect 5-digit vs 11-digit layout
-    final layout5 = computeBubbleLayout(qCount, idDigits: 5, hasCenterQuestions: useCenterQuestions);
-    final layout11 = computeBubbleLayout(qCount, idDigits: 11, hasCenterQuestions: useCenterQuestions);
-
-    int conf5 = 0;
-    for (final colPts in layout5.rollCoords) {
-      final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
-      final adj = _adjustedScores(an);
-      final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
-      if (adj[order[0]] > 0.20 && (adj[order[0]] - adj[order[1]]) > 0.06) conf5++;
-    }
-
-    int conf11 = 0;
-    for (final colPts in layout11.rollCoords) {
-      final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
-      final adj = _adjustedScores(an);
-      final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
-      if (adj[order[0]] > 0.20 && (adj[order[0]] - adj[order[1]]) > 0.06) conf11++;
-    }
-
-    final double ratio5 = conf5 / 5.0;
-    final double ratio11 = conf11 / 11.0;
-
-    final bool use11Digits;
-    if (expectedIdDigits == 5) {
-      use11Digits = false;
-    } else if (expectedIdDigits == 11 && conf11 >= 8) {
-      use11Digits = true;
-    } else if (ratio5 >= 0.7 && ratio5 >= ratio11) {
-      use11Digits = false;
-    } else if (conf11 >= 8) {
-      use11Digits = true;
-    } else {
-      use11Digits = (expectedIdDigits == 11);
-    }
-
-    final activeRollCoords = use11Digits ? layout11.rollCoords : layout5.rollCoords;
-
-    for (final colPts in activeRollCoords) {
+    for (final colPts in layout.rollCoords) {
       final an = _analyzePoints(gray, ii, colPts, targetW, targetH);
       final colSnapped = [for (final a in an) math.Point(a.snappedX, a.snappedY)];
       allSnappedRollCoords.add(colSnapped);
@@ -1107,7 +1136,7 @@ class OMREngine {
       final order = List<int>.generate(10, (i) => i)..sort((a, b) => adj[b].compareTo(adj[a]));
       final best = adj[order[0]];
       final second = adj[order[1]];
-      if (best > 0.20 && (best - second) > 0.06) {
+      if (best > 0.15 && (best - second) > 0.005) {
         idDigitsList.add(order[0].toString());
       } else {
         idDigitsList.add('?');
@@ -1370,10 +1399,62 @@ class OMREngine {
       );
     }
 
+    // Comprehensive EvalBee-style geometry validation
+    final tl = quad[0];
+    final tr = quad[1];
+    final br = quad[2];
+    final bl = quad[3];
+
+    double hypot(num dx, num dy) => math.sqrt(dx * dx + dy * dy);
+    final wTop = hypot(tr.x - tl.x, tr.y - tl.y);
+    final wBot = hypot(br.x - bl.x, br.y - bl.y);
+    final hLeft = hypot(bl.x - tl.x, bl.y - tl.y);
+    final hRight = hypot(br.x - tr.x, br.y - tr.y);
+
+    final avgW = (wTop + wBot) / 2.0;
+    final avgH = (hLeft + hRight) / 2.0;
+    final longDim = math.max(avgW, avgH);
+    final shortDim = math.max(1.0, math.min(avgW, avgH));
+    final aspect = longDim / shortDim;
+
+    // 1. Aspect ratio check: fiducials span 1501 / 994 = 1.51
+    if (aspect < 1.25 || aspect > 1.85) {
+      return AlignmentStatus(
+        isAligned: false,
+        visibleCornersCount: 4,
+        message: 'وجّه الكاميرا بشكل مستقيم نحو ورقة الإجابة',
+        detectedCorners: quad,
+      );
+    }
+
+    // 2. Minimum sheet coverage in viewfinder frame
+    final frameMinDim = math.min(srcW, srcH);
+    final frameMaxDim = math.max(srcW, srcH);
+    if (shortDim < frameMinDim * 0.40 || longDim < frameMaxDim * 0.40) {
+      return AlignmentStatus(
+        isAligned: false,
+        visibleCornersCount: 4,
+        message: 'اقترب أكثر من الورقة لتملأ الإطار',
+        detectedCorners: quad,
+      );
+    }
+
+    // 3. Parallelism / perspective tilt check
+    final wRatio = math.min(wTop, wBot) / math.max(wTop, wBot);
+    final hRatio = math.min(hLeft, hRight) / math.max(hLeft, hRight);
+    if (wRatio < 0.70 || hRatio < 0.70) {
+      return AlignmentStatus(
+        isAligned: false,
+        visibleCornersCount: 4,
+        message: 'اضبط الهاتف عمودياً ومستوياً فوق الورقة',
+        detectedCorners: quad,
+      );
+    }
+
     return AlignmentStatus(
       isAligned: true,
       visibleCornersCount: 4,
-      message: 'تم محاذاة الورقة بنجاح 🟢 جارِ المسح التلقائي...',
+      message: 'تم تطابق النقاط والزوايا بنجاح 🟢 جارِ المسح التلقائي...',
       detectedCorners: quad,
     );
   }

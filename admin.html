@@ -6985,6 +6985,12 @@ function getAdminCenterCoords(centerName, address) {
                                 if (!ex.sheet_config && ex.models && ex.models._sheet_config) {
                                     ex.sheet_config = ex.models._sheet_config;
                                 }
+                                if (ex.sheet_config && !ex.sheet_config.id_digits && ex.id_digits) {
+                                    ex.sheet_config.id_digits = ex.id_digits;
+                                }
+                                if (ex.sheet_config && ex.sheet_config.id_digits && !ex.id_digits) {
+                                    ex.id_digits = ex.sheet_config.id_digits;
+                                }
                                 return ex;
                             });
 
@@ -7754,7 +7760,7 @@ function getAdminCenterCoords(centerName, address) {
 
             document.getElementById('cfg_id_label').value = cfg.id_label || 'ID :';
             document.getElementById('cfg_model_label').value = cfg.model_label || 'Model :';
-            const currentDigits = parseInt(cfg.id_digits, 10) || 11;
+            const currentDigits = parseInt(cfg.id_digits, 10) || parseInt(exam.id_digits, 10) || 11;
             document.getElementById('cfg_roll_title').value = cfg.roll_title || (currentDigits === 11 ? 'رقم الهاتف (Phone No)' : (currentDigits === 14 ? 'الرقم القومي (National ID)' : 'Roll No (كود الطالب)'));
 
             const showCenterQ = cfg.show_center_questions === true; // Default false (hidden)
@@ -7813,24 +7819,27 @@ function getAdminCenterCoords(centerName, address) {
             };
 
             exam.sheet_config = sheetConfig;
+            exam.id_digits = sheetConfig.id_digits;
             if (!exam.models || typeof exam.models !== 'object') exam.models = { 'A': {} };
             exam.models._sheet_config = sheetConfig;
 
             const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
             if (client) {
                 try {
-                    // Update models JSONB column (guaranteed to exist in Supabase and persists _sheet_config)
-                    const { error: modErr } = await client.from('exams')
-                        .update({ models: exam.models })
+                    // Update models JSONB, sheet_config, and id_digits columns
+                    const { error: updateErr } = await client.from('exams')
+                        .update({
+                            models: exam.models,
+                            sheet_config: sheetConfig,
+                            id_digits: sheetConfig.id_digits
+                        })
                         .eq('id', currentConfigExamId);
-                    if (modErr) console.warn('Supabase update models error:', modErr);
-
-                    // Also attempt updating sheet_config column if present
-                    try {
+                    if (updateErr) {
+                        console.warn('Supabase update multi-column error, falling back to models:', updateErr);
                         await client.from('exams')
-                            .update({ sheet_config: sheetConfig })
+                            .update({ models: exam.models })
                             .eq('id', currentConfigExamId);
-                    } catch (_) {}
+                    }
                 } catch(err) {
                     console.warn('Supabase update sheet_config fallback to local:', err);
                 }

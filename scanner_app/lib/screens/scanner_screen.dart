@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -678,7 +679,7 @@ class _ViewfinderOverlayPainter extends CustomPainter {
   _ViewfinderOverlayPainter({
     required this.questionCount,
     this.idDigits = 11,
-    this.hasCenterQuestions = true,
+    this.hasCenterQuestions = false,
     this.isAligned = false,
   }) : layout = OMREngine.computeBubbleLayout(
           questionCount,
@@ -688,8 +689,17 @@ class _ViewfinderOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final targetW = size.width * 0.82;
-    final targetH = targetW * (1509.0 / 1006.0); // Exact 1.500 ratio
+    const canonicalW = 994.0;
+    const canonicalH = 1501.0;
+
+    final scale = math.min(
+      size.width * 0.85 / canonicalW,
+      size.height * 0.78 / canonicalH,
+    );
+
+    final targetW = canonicalW * scale;
+    final targetH = canonicalH * scale;
+
     final targetLeft = (size.width - targetW) / 2.0;
     final targetTop = (size.height - targetH) / 2.0;
     final targetRight = targetLeft + targetW;
@@ -723,8 +733,9 @@ class _ViewfinderOverlayPainter extends CustomPainter {
     const cornerBracketLen = 22.0;
     const boxR = 12.0;
 
-    double mapX(int canonX) => targetLeft + ((canonX - 103) / 1006.0) * targetW;
-    double mapY(int canonY) => targetTop + ((canonY - 88) / 1509.0) * targetH;
+    // Shared unified coordinate mapping from canonical coordinates (104, 92) -> (1098, 1593) to screen
+    double mapX(int canonX) => targetLeft + ((canonX - 104) / 994.0) * targetW;
+    double mapY(int canonY) => targetTop + ((canonY - 92) / 1501.0) * targetH;
 
     final corners = [
       Offset(targetLeft, targetTop),
@@ -769,7 +780,7 @@ class _ViewfinderOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = isAligned ? 1.5 : 1.3;
 
-    final circleRadius = (13.0 / 1006.0) * targetW;
+    final circleRadius = (13.0 / 994.0) * targetW;
 
     // Model hollow circles (4 bubbles)
     for (final pt in layout.modelCoords.values) {

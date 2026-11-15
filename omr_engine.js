@@ -2513,33 +2513,19 @@
                 // If aspect < 0.80, candidate dots are the Full Page Perimeter Corner Markers (aspect ~0.68)
 
                 if (aspect >= 0.80) {
-
                     dstCorners = [
-
                         { x: gridLeftX, y: gridTopY },
-
                         { x: gridRightX, y: gridTopY },
-
                         { x: gridRightX, y: gridBotY },
-
                         { x: gridLeftX, y: gridBotY }
-
                     ];
-
                 } else {
-
                     dstCorners = [
-
-                        { x: 60, y: 60 },
-
-                        { x: targetW - 60, y: 60 },
-
-                        { x: targetW - 60, y: targetH - 60 },
-
-                        { x: 60, y: targetH - 60 }
-
+                        { x: 104, y: 92 },
+                        { x: 1098, y: 92 },
+                        { x: 1098, y: 1593 },
+                        { x: 104, y: 1593 }
                     ];
-
                 }
 
                 const srcCorners = [tl, tr, br, bl];
@@ -2884,8 +2870,10 @@
             let bestModelMargin = -1.0;
             let detectedModelCoord = null;
 
-            const candidateModelYs = [240, 255, 265, 280, 300, 320, 340, 360];
+            const candidateModelYs = [476, 481, 460, 490, 505, 240, 255, 265, 280, 300, 320, 340, 360];
             const candidateXConfigs = [
+                { 'A': 356, 'B': 449, 'C': 542, 'D': 637 }, // Exact canonical PDF template
+                { 'A': 374, 'B': 467, 'C': 556, 'D': 645 }, // 11-digit secondary spacing
                 { 'A': 360, 'B': 440, 'C': 520, 'D': 600 }, // Wide table spacing
                 { 'A': 250, 'B': 290, 'C': 330, 'D': 370 }  // Narrow table spacing
             ];
@@ -2912,11 +2900,21 @@
                 }
             }
 
-            // Step 5: Read Student Roll No (5 Digits) with Snapping
-            const rollRowYs = [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
-            const rollColXs = (numMcqCols === 1)
-                ? [175, 215, 255, 295, 335]  // 15-question sheet (calibrated between X=100 and X=480)
-                : [196, 242, 289, 335, 382]; // 30+ question multi-column sheet
+            // Step 5: Read Student Roll No (Dynamic digits, default 11 digits phone number)
+            const rollRowYs = (numMcqCols === 1)
+                ? [681, 720, 760, 799, 838, 878, 917, 956, 996, 1035]
+                : [604, 655, 706, 757, 808, 859, 910, 961, 1012, 1063];
+            const clampedDigits = Math.max(3, Math.min(14, parseInt(expectedIdDigits, 10) || 11));
+            let rollColXs;
+            if (clampedDigits === 11) {
+                rollColXs = [196, 231, 266, 300, 335, 370, 405, 439, 474, 509, 544];
+            } else if (clampedDigits === 5 && numMcqCols > 1) {
+                rollColXs = [196, 242, 289, 335, 382];
+            } else {
+                const colStep = (clampedDigits >= 12) ? 26.5 : ((clampedDigits >= 9) ? 34.8 : ((clampedDigits >= 6) ? 44.0 : 54.0));
+                const startX = 370.0 - ((clampedDigits - 1) * colStep) / 2.0;
+                rollColXs = Array.from({ length: clampedDigits }).map((_, c) => Math.round(startX + c * colStep));
+            }
             const detectedRollCoords = [];
 
             const idDigits = [];
@@ -2945,12 +2943,13 @@
             const detectedAnswers = {};
             const optOffsets = [0.32, 0.49, 0.66, 0.83];
 
-            const qYs15 = [
-                656, 708, 764, 817, 869,     // Block 1: Q1..5
-                978, 1030, 1082, 1139, 1191, // Block 2: Q6..10
-                1300, 1352, 1404, 1456, 1509 // Block 3: Q11..15
+            const qYsSingle = [
+                635, 682, 729, 776, 822,      // Block 1: Q1..5
+                927, 974, 1020, 1067, 1114,   // Block 2: Q6..10
+                1218, 1265, 1312, 1359, 1406, // Block 3: Q11..15
+                1510, 1557, 1604, 1651, 1698  // Block 4: Q16..20
             ];
-            const optXs15 = { 'A': 650, 'B': 730, 'C': 810, 'D': 885 };
+            const optXsSingle = { 'A': 770, 'B': 840, 'C': 911, 'D': 982 };
 
             let regX;
             if (numMcqCols === 1) regX = [100, 480, 1100];
@@ -2975,15 +2974,15 @@
                 let qy;
                 let effColLeft, effColW;
 
-                if (numMcqCols === 1 && qCount <= 15 && (q - 1) < qYs15.length) {
-                    qy = qYs15[q - 1];
-                    effColLeft = 750;
-                    effColW = 260;
+                if (numMcqCols === 1 && (q - 1) < qYsSingle.length) {
+                    qy = qYsSingle[q - 1];
+                    effColLeft = 770;
+                    effColW = 212;
                     qCoords = {
-                        'A': { x: optXs15['A'], y: qy },
-                        'B': { x: optXs15['B'], y: qy },
-                        'C': { x: optXs15['C'], y: qy },
-                        'D': { x: optXs15['D'], y: qy }
+                        'A': { x: optXsSingle['A'], y: qy },
+                        'B': { x: optXsSingle['B'], y: qy },
+                        'C': { x: optXsSingle['C'], y: qy },
+                        'D': { x: optXsSingle['D'], y: qy }
                     };
                 } else {
                     const colIdx = Math.floor((q - 1) / qPerCol);

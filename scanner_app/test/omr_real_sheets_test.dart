@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:scanner_app/services/omr_engine.dart';
@@ -60,19 +61,55 @@ void main() {
   });
 
   test('11-digit phone number layout generates 11 columns with 10 digits each', () {
-    final layout11 = OMREngine.computeBubbleLayout(15, idDigits: 11, hasCenterQuestions: true);
+    final layout11 = OMREngine.computeBubbleLayout(14, idDigits: 11, hasCenterQuestions: false);
     expect(layout11.rollCoords.length, 11);
     for (final col in layout11.rollCoords) {
       expect(col.length, 10);
     }
-    // Verify calibrated coordinates
-    expect(layout11.rollCoords.first.first.x, 198);
-    expect(layout11.rollCoords.last.first.x, 554);
-    expect(layout11.rollCoords.first.first.y, 705);
-    expect(layout11.rollCoords.first.last.y, 1101);
-    expect(layout11.modelCoords['A']?.x, 374);
-    expect(layout11.modelCoords['A']?.y, 481);
-    expect(layout11.questionCoords[1]?['A']?.x, 678);
-    expect(layout11.questionCoords[1]?['A']?.y, 705);
+    // Verify calibrated canonical coordinates from PDF
+    expect(layout11.rollCoords.first.first.x, 196);
+    expect(layout11.rollCoords.last.first.x, 544);
+    expect(layout11.rollCoords.first.first.y, 681);
+    expect(layout11.rollCoords.first.last.y, 1035);
+    expect(layout11.modelCoords['A']?.x, 356);
+    expect(layout11.modelCoords['A']?.y, 476);
+    expect(layout11.questionCoords[1]?['A']?.x, 770);
+    expect(layout11.questionCoords[1]?['A']?.y, 635);
+    expect(layout11.cornerMarkers.first, const math.Point(104, 92));
+    expect(layout11.cornerMarkers[2], const math.Point(1098, 1593));
+  });
+
+  test('Scan canonical template rendered from Bubble Sheet7 - statics part 2.pdf', () {
+    final file = File('canonical_pdf_render.png').existsSync()
+        ? File('canonical_pdf_render.png')
+        : File('../canonical_pdf_render.png');
+    expect(file.existsSync(), isTrue);
+    final bytes = file.readAsBytesSync();
+    final decoded = img.decodeImage(bytes)!;
+
+    // Test live alignment check on canonical template
+    final alignment = OMREngine.checkAlignmentFromImage(decoded);
+    expect(alignment.isAligned, isTrue);
+    expect(alignment.visibleCornersCount, 4);
+
+    // Test full OMR scan on canonical template
+    final res = OMREngine.scanImage(decoded, 14, null, 11, false);
+    expect(res.success, isTrue, reason: res.message ?? res.error);
+    expect(res.model, 'C');
+    expect(res.modelDetected, isTrue);
+    expect(res.studentCode, '01125098795');
+    expect(res.answers[1]?.selected, 'C');
+    expect(res.answers[2]?.selected, 'C');
+    expect(res.answers[3]?.selected, 'C');
+    expect(res.answers[4]?.selected, 'C');
+    expect(res.answers[5]?.selected, 'C');
+    expect(res.answers[6]?.selected, 'B');
+    expect(res.answers[7]?.selected, 'A');
+    expect(res.answers[9]?.selected, 'C');
+    expect(res.answers[10]?.selected, 'C');
+    expect(res.answers[11]?.selected, 'D');
+    expect(res.answers[12]?.selected, 'C');
+    expect(res.answers[13]?.selected, 'C');
+    expect(res.answers[14]?.selected, 'C');
   });
 }
