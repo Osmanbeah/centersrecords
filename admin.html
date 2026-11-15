@@ -6981,7 +6981,12 @@ function getAdminCenterCoords(centerName, address) {
                             .select('*')
                             .order('created_at', { ascending: false });
                         if (!error && Array.isArray(data)) {
-                            exams = data;
+                            exams = data.map(ex => {
+                                if (!ex.sheet_config && ex.models && ex.models._sheet_config) {
+                                    ex.sheet_config = ex.models._sheet_config;
+                                }
+                                return ex;
+                            });
 
                             // Sync any local exams created previously that didn't upload to Supabase
                             try {
@@ -7021,7 +7026,17 @@ function getAdminCenterCoords(centerName, address) {
                 if (!exams.length) {
                     try {
                         const cached = localStorage.getItem('mr_kelany_exams');
-                        if (cached) exams = JSON.parse(cached);
+                        if (cached) {
+                            const parsed = JSON.parse(cached);
+                            if (Array.isArray(parsed)) {
+                                exams = parsed.map(ex => {
+                                    if (!ex.sheet_config && ex.models && ex.models._sheet_config) {
+                                        ex.sheet_config = ex.models._sheet_config;
+                                    }
+                                    return ex;
+                                });
+                            }
+                        }
                     } catch (e) {}
                 }
 
@@ -7288,7 +7303,7 @@ function getAdminCenterCoords(centerName, address) {
                 question_count: exam.question_count || 30,
                 mcq_score_per_q: exam.mcq_score_per_q || 1,
                 written_max_score: exam.written_max_score != null ? exam.written_max_score : 20,
-                sheet_config: exam.sheet_config || {}};
+                sheet_config: exam.sheet_config || (exam.models && exam.models._sheet_config) || {}};
 
             const printableHtml = OMREngine.generatePrintableSheetHtml(normalized);
             const printWin = window.open('', '_blank');
@@ -7727,7 +7742,7 @@ function getAdminCenterCoords(centerName, address) {
 
             document.getElementById('edit_sheet_modal_subtitle').textContent = `${exam.title} - Configure header & fields`;
 
-            const cfg = exam.sheet_config || {};
+            const cfg = exam.sheet_config || (exam.models && exam.models._sheet_config) || {};
 
             document.getElementById('cfg_academy_name').value = cfg.academy_name || 'MR. KELANY ACADEMY';
             document.getElementById('cfg_footer_note').value = cfg.footer_note || 'تعليمات التظليل: ● تظليل كامل (صحيح) | ✕ ✗ غير صحيح - لا تطوِ الورقة أو تكتب في الهوامش';
@@ -7798,13 +7813,24 @@ function getAdminCenterCoords(centerName, address) {
             };
 
             exam.sheet_config = sheetConfig;
+            if (!exam.models || typeof exam.models !== 'object') exam.models = { 'A': {} };
+            exam.models._sheet_config = sheetConfig;
 
             const client = (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
             if (client) {
                 try {
-                    await client.from('exams')
-                        .update({ sheet_config: sheetConfig })
+                    // Update models JSONB column (guaranteed to exist in Supabase and persists _sheet_config)
+                    const { error: modErr } = await client.from('exams')
+                        .update({ models: exam.models })
                         .eq('id', currentConfigExamId);
+                    if (modErr) console.warn('Supabase update models error:', modErr);
+
+                    // Also attempt updating sheet_config column if present
+                    try {
+                        await client.from('exams')
+                            .update({ sheet_config: sheetConfig })
+                            .eq('id', currentConfigExamId);
+                    } catch (_) {}
                 } catch(err) {
                     console.warn('Supabase update sheet_config fallback to local:', err);
                 }

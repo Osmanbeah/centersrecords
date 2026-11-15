@@ -183,7 +183,9 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     try {
       if (_cameraController != null && _cameraController!.value.isStreamingImages) {
         await _cameraController!.stopImageStream();
+        await Future.delayed(const Duration(milliseconds: 200));
       }
+      if (_cameraController == null || !_cameraController!.value.isInitialized) return;
       final XFile photo = await _cameraController!.takePicture();
       final bytes = await photo.readAsBytes();
       await _processImageBytes(bytes);
@@ -257,7 +259,9 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
 
       if (_cameraController!.value.isStreamingImages) {
         await _cameraController!.stopImageStream();
+        await Future.delayed(const Duration(milliseconds: 200));
       }
+      if (_cameraController == null || !_cameraController!.value.isInitialized) return;
 
       final XFile photo = await _cameraController!.takePicture();
       final bytes = await photo.readAsBytes();

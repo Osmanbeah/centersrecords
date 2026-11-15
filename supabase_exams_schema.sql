@@ -15,8 +15,14 @@ CREATE TABLE IF NOT EXISTS public.exams (
     written_max_score NUMERIC DEFAULT 20,
     total_score NUMERIC DEFAULT 50,
     models JSONB DEFAULT '{"A": {}}'::jsonb,
+    sheet_config JSONB DEFAULT '{}'::jsonb,
+    id_digits INT DEFAULT 11,
     status TEXT DEFAULT 'active' -- 'active' | 'closed'
 );
+
+-- Upgrade existing tables if columns missing:
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS sheet_config JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS id_digits INT DEFAULT 11;
 
 -- 2. Exam Results Table (Scanned by Assistants, reviewed by Admin)
 CREATE TABLE IF NOT EXISTS public.exam_results (
