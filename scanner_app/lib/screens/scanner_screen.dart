@@ -42,7 +42,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
   @override
   void initState() {
     super.initState();
-    _idDigits = (widget.exam.idDigits == 5) ? 11 : widget.exam.idDigits;
+    _idDigits = widget.exam.idDigits;
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
   }
